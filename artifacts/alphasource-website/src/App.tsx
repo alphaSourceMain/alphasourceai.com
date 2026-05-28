@@ -15,7 +15,7 @@ import TawkWidget from "@/components/TawkWidget";
 import HomePage from "@/pages/HomePage";
 import AlphaScreenPage from "@/pages/AlphaScreenPage";
 import AboutPage from "@/pages/AboutPage";
-import PublicFaqPage from "@/pages/FaqPage";
+import PublicSupportPage from "@/pages/FaqPage";
 import TermsPage from "@/pages/TermsPage";
 import CandidateTermsPage from "@/pages/CandidateTermsPage";
 import InterviewPage from "@/pages/InterviewPage";
@@ -50,7 +50,7 @@ import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient();
 const env =
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
-const PUBLIC_TAWK_ROUTES = new Set(["/", "/about", "/alphascreen", "/faq"]);
+const PUBLIC_TAWK_ROUTES = new Set(["/", "/about", "/alphascreen", "/support", "/faq"]);
 const DASHBOARD_TAB_ROUTE: Record<string, string> = {
   roles: "/dashboard/roles",
   candidates: "/dashboard/candidates",
@@ -428,7 +428,8 @@ function Router() {
           <Route path="/"            component={HomePage} />
           <Route path="/alphascreen" component={AlphaScreenPage} />
           <Route path="/about"       component={AboutPage} />
-          <Route path="/faq"         component={PublicFaqPage} />
+          <Route path="/support"     component={PublicSupportPage} />
+          <Route path="/faq"         component={PublicSupportPage} />
           <Route path="/terms"       component={TermsPage} />
           <Route component={NotFound} />
         </Switch>
