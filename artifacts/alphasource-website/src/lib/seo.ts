@@ -59,6 +59,32 @@ const PUBLIC_ROUTES: Record<string, Omit<SeoConfig, "robots" | "imagePath" | "ty
       },
     },
   },
+  "/alphascreen/pricing": {
+    title: "alphaScreen Pricing | AI Interview Screening Packages",
+    description:
+      "Compare alphaScreen Basic, Pro, and Enterprise package options for structured AI-assisted interview screening, included interviews, duration caps, and additional interview pricing.",
+    path: "/alphascreen/pricing",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: "alphaScreen",
+      brand: {
+        "@type": "Brand",
+        name: "alphaSource AI",
+      },
+      category: "AI-assisted interview screening software",
+      description:
+        "Public alphaScreen package preview for structured AI-assisted candidate screening.",
+      url: "https://www.alphasourceai.com/alphascreen/pricing",
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "USD",
+        lowPrice: "399",
+        highPrice: "699",
+        offerCount: "2",
+      },
+    },
+  },
   "/about": {
     title: "About alphaSource AI | Practical AI Built Around Human Judgment",
     description:

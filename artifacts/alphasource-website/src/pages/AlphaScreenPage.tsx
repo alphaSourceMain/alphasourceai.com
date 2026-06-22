@@ -102,6 +102,15 @@ function HeroSection() {
               >
                 See How It Works
               </a>
+              <a
+                href="/alphascreen/pricing"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-[#0A1547] bg-white border border-[#0A1547]/10 rounded-full transition-all hover:border-[#02ABE0] hover:text-[#02ABE0] hover:shadow-md active:scale-95"
+                data-testid="alphascreen-pricing-link"
+                data-analytics-cta="View Pricing"
+                data-analytics-placement="alphascreen-hero"
+              >
+                View Pricing
+              </a>
             </motion.div>
           </div>
 

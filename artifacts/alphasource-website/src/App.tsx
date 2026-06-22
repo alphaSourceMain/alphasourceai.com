@@ -16,6 +16,7 @@ import PageAnalytics from "@/components/PageAnalytics";
 /* Public pages */
 import HomePage from "@/pages/HomePage";
 import AlphaScreenPage from "@/pages/AlphaScreenPage";
+import AlphaScreenPricingPage from "@/pages/AlphaScreenPricingPage";
 import AboutPage from "@/pages/AboutPage";
 import PublicSupportPage from "@/pages/FaqPage";
 import TermsPage from "@/pages/TermsPage";
@@ -464,6 +465,7 @@ function Router() {
       <main className="flex-1">
         <Switch>
           <Route path="/"            component={HomePage} />
+          <Route path="/alphascreen/pricing" component={AlphaScreenPricingPage} />
           <Route path="/alphascreen" component={AlphaScreenPage} />
           <Route path="/about"       component={AboutPage} />
           <Route path="/support"     component={PublicSupportPage} />
