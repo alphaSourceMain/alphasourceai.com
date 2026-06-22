@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRight,
   BadgeDollarSign,
@@ -9,9 +9,12 @@ import {
   Layers3,
   ShieldCheck,
 } from "lucide-react";
+import LeadCaptureForm from "@/components/LeadCaptureForm";
+import { trackEvent } from "@/lib/analytics";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 
 type PackageLoadState = "loading" | "ready" | "fallback";
+type PurchaseIntentStatus = "idle" | "submitting" | "success";
 
 type BillingCadence = {
   key?: string;
@@ -31,6 +34,37 @@ type AlphaScreenPackage = {
   overage_price: number;
   per_role_fee: number;
   billing_cadences: BillingCadence[];
+};
+
+type PurchaseIntentForm = {
+  company_legal_name: string;
+  company_dba: string;
+  buyer_first_name: string;
+  buyer_last_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  buyer_title: string;
+  billing_cadence: string;
+  agreement_acknowledged: boolean;
+  contact_acknowledged: boolean;
+};
+
+type PurchaseIntentResult = {
+  purchase_intent_id: string;
+  status: string;
+  duplicate?: boolean;
+  selected_package?: {
+    plan_key?: string;
+    display_name?: string;
+    billing_cadence?: string;
+    included_interviews?: number;
+    interview_duration_minutes?: number;
+    max_interview_minutes?: number;
+    additional_interview_price?: number;
+    additional_interview_fee?: number;
+    per_role_fee?: number;
+  };
+  next_step_message?: string;
 };
 
 const FALLBACK_PACKAGES: AlphaScreenPackage[] = [
@@ -86,9 +120,34 @@ const PLAN_ACCENTS: Record<string, { color: string; border: string; bg: string }
   },
 };
 
+const EMPTY_PURCHASE_FORM: PurchaseIntentForm = {
+  company_legal_name: "",
+  company_dba: "",
+  buyer_first_name: "",
+  buyer_last_name: "",
+  buyer_email: "",
+  buyer_phone: "",
+  buyer_title: "",
+  billing_cadence: "monthly",
+  agreement_acknowledged: false,
+  contact_acknowledged: false,
+};
+
 function asNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function purchaseIntentEndpoint(): string {
+  return joinUrl(getPublicBackendBase(), "/api/alphascreen/purchase-intents");
+}
+
+function validEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function cleanText(value: string, max: number): string {
+  return String(value || "").trim().slice(0, max);
 }
 
 function normalizePackage(raw: unknown): AlphaScreenPackage | null {
@@ -144,6 +203,32 @@ function formatUsd(value: number): string {
   }).format(value);
 }
 
+function cadenceOptions(plan: AlphaScreenPackage | null): BillingCadence[] {
+  const options = (plan?.billing_cadences || []).filter((cadence) => String(cadence.key || "").trim());
+  return options.length ? options : [{ key: "monthly", display_name: "Monthly" }];
+}
+
+function defaultCadence(plan: AlphaScreenPackage | null): string {
+  const options = cadenceOptions(plan);
+  return options.find((cadence) => cadence.key === "monthly")?.key || options[0]?.key || "monthly";
+}
+
+function cadenceLabel(plan: AlphaScreenPackage | null, key: string): string {
+  const match = cadenceOptions(plan).find((cadence) => cadence.key === key);
+  return match?.display_name || key || "Billing cadence";
+}
+
+function validatePurchaseForm(form: PurchaseIntentForm, selectedPlan: AlphaScreenPackage | null): string {
+  if (!selectedPlan) return "Choose Basic or Pro before starting purchase intake.";
+  if (!cleanText(form.company_legal_name, 120)) return "Company legal name is required.";
+  if (!cleanText(form.buyer_first_name, 80)) return "Buyer first name is required.";
+  if (!cleanText(form.buyer_last_name, 80)) return "Buyer last name is required.";
+  if (!validEmail(form.buyer_email)) return "Enter a valid work email address.";
+  if (!form.agreement_acknowledged) return "Confirm that agreement signing and payment are required before access is activated.";
+  if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen purchase.";
+  return "";
+}
+
 function PackageMetric({
   icon,
   label,
@@ -164,7 +249,15 @@ function PackageMetric({
   );
 }
 
-function PlanCard({ plan }: { plan: AlphaScreenPackage }) {
+function PlanCard({
+  plan,
+  selected,
+  onStart,
+}: {
+  plan: AlphaScreenPackage;
+  selected: boolean;
+  onStart: (plan: AlphaScreenPackage) => void;
+}) {
   const accent = PLAN_ACCENTS[plan.plan_key] || PLAN_ACCENTS.basic;
   const included = plan.included_interviews_per_role || plan.included_interviews;
   const duration = plan.max_interview_minutes || plan.interview_duration_minutes;
@@ -236,18 +329,22 @@ function PlanCard({ plan }: { plan: AlphaScreenPackage }) {
       <div className="mt-6 space-y-3">
         <button
           type="button"
-          disabled
-          className="w-full cursor-not-allowed rounded-full border border-[#0A1547]/12 bg-[#0A1547]/5 px-4 py-3 text-sm font-black text-[#0A1547]/45"
+          onClick={() => onStart(plan)}
+          className="w-full rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: selected ? "#0A1547" : accent.color }}
+          data-analytics-cta={`Start with ${plan.display_name}`}
+          data-analytics-placement="pricing-card"
+          data-analytics-target="#purchase-intake"
         >
-          Start purchase - coming soon
+          {selected ? `${plan.display_name} selected` : `Start with ${plan.display_name}`}
         </button>
         <a
-          href="/alphascreen#request-demo"
+          href="#pricing-demo"
           className="flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: accent.color }}
           data-analytics-cta={`Request demo for ${plan.display_name}`}
           data-analytics-placement="pricing-card"
-          data-analytics-target="/alphascreen#request-demo"
+          data-analytics-target="#pricing-demo"
         >
           Request demo instead
           <ArrowRight className="h-4 w-4" />
@@ -285,16 +382,276 @@ function EnterpriseCard() {
         ))}
       </div>
       <a
-        href="/alphascreen#request-demo"
+        href="#pricing-demo"
         className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-[#0A1547] transition-opacity hover:opacity-90"
         data-analytics-cta="Contact Sales"
         data-analytics-placement="pricing-enterprise"
-        data-analytics-target="/alphascreen#request-demo"
+        data-analytics-target="#pricing-demo"
       >
         Contact Sales
         <ArrowRight className="h-4 w-4" />
       </a>
     </article>
+  );
+}
+
+function PurchaseTextField({
+  label,
+  value,
+  onChange,
+  required = false,
+  type = "text",
+  placeholder,
+  maxLength,
+  autoComplete,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  type?: string;
+  placeholder?: string;
+  maxLength?: number;
+  autoComplete?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-black text-[#0A1547]">
+        {label}
+        {required ? <span className="text-[#A380F6]"> *</span> : null}
+      </span>
+      <input
+        type={type}
+        required={required}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
+        className="w-full rounded-lg border border-[#0A1547]/12 bg-white px-4 py-3 text-sm text-[#0A1547] outline-none transition-colors placeholder:text-[#0A1547]/35 focus:border-[#A380F6] focus:ring-2 focus:ring-[#A380F6]/20"
+      />
+    </label>
+  );
+}
+
+function PurchaseIntentPanel({
+  selectedPlan,
+  form,
+  status,
+  error,
+  result,
+  onChange,
+  onSubmit,
+}: {
+  selectedPlan: AlphaScreenPackage | null;
+  form: PurchaseIntentForm;
+  status: PurchaseIntentStatus;
+  error: string;
+  result: PurchaseIntentResult | null;
+  onChange: <K extends keyof PurchaseIntentForm>(field: K, value: PurchaseIntentForm[K]) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  if (!selectedPlan) {
+    return (
+      <div className="rounded-lg border border-dashed border-[#0A1547]/18 bg-white px-6 py-8 text-center">
+        <h3 className="text-xl font-black text-[#0A1547]">Choose Basic or Pro to start purchase intake.</h3>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
+          This creates a pending purchase intent for QA. Agreement signing, payment, and account activation remain separate later steps.
+        </p>
+      </div>
+    );
+  }
+
+  const included = selectedPlan.included_interviews_per_role || selectedPlan.included_interviews;
+  const duration = selectedPlan.max_interview_minutes || selectedPlan.interview_duration_minutes;
+  const overage = selectedPlan.additional_interview_fee || selectedPlan.additional_interview_price || selectedPlan.overage_price;
+  const options = cadenceOptions(selectedPlan);
+  const planName = result?.selected_package?.display_name || selectedPlan.display_name;
+
+  if (status === "success" && result) {
+    return (
+      <div className="rounded-lg border border-[#02D99D]/35 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#02D99D]/10 text-[#02D99D]">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02D99D]">
+              {result.duplicate ? "Pending intent found" : "Purchase intent received"}
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-[#0A1547]">{planName} intake is pending.</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
+              {result.next_step_message || "Next step: membership agreement signing will be prepared in the next step."}
+            </p>
+          </div>
+          <div className="rounded-lg bg-[#F8F9FD] px-4 py-3 text-sm font-bold text-[#0A1547]/65">
+            ID: {result.purchase_intent_id}
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Package</p>
+            <p className="mt-2 text-sm font-black text-[#0A1547]">
+              {planName} - {cadenceLabel(selectedPlan, form.billing_cadence)}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">
+              {included} interviews, {duration}-minute cap, {formatUsd(overage)} additional interviews
+            </p>
+          </div>
+          <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Company</p>
+            <p className="mt-2 text-sm font-black text-[#0A1547]">{form.company_legal_name}</p>
+            {form.company_dba ? <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">DBA {form.company_dba}</p> : null}
+          </div>
+          <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Buyer</p>
+            <p className="mt-2 text-sm font-black text-[#0A1547]">
+              {form.buyer_first_name} {form.buyer_last_name}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">{form.buyer_email}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm" data-testid="purchase-intent-form">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Buyer intake</p>
+          <h3 className="mt-2 text-2xl font-black text-[#0A1547]">Start with {selectedPlan.display_name}</h3>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
+            No payment is collected here. This creates a pending purchase intent so the agreement step can be prepared later.
+          </p>
+        </div>
+        <div className="rounded-lg bg-[#F8F9FD] px-4 py-3 text-sm font-bold text-[#0A1547]/65">
+          {included} interviews per role - {duration}-minute cap - {formatUsd(overage)} overage
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <PurchaseTextField
+          label="Company legal name"
+          required
+          value={form.company_legal_name}
+          onChange={(value) => onChange("company_legal_name", value)}
+          placeholder="Acme Corporation, Inc."
+          maxLength={120}
+          autoComplete="organization"
+        />
+        <PurchaseTextField
+          label="DBA"
+          value={form.company_dba}
+          onChange={(value) => onChange("company_dba", value)}
+          placeholder="Optional"
+          maxLength={120}
+        />
+        <PurchaseTextField
+          label="First name"
+          required
+          value={form.buyer_first_name}
+          onChange={(value) => onChange("buyer_first_name", value)}
+          placeholder="Jane"
+          maxLength={80}
+          autoComplete="given-name"
+        />
+        <PurchaseTextField
+          label="Last name"
+          required
+          value={form.buyer_last_name}
+          onChange={(value) => onChange("buyer_last_name", value)}
+          placeholder="Smith"
+          maxLength={80}
+          autoComplete="family-name"
+        />
+        <PurchaseTextField
+          label="Work email"
+          required
+          type="email"
+          value={form.buyer_email}
+          onChange={(value) => onChange("buyer_email", value)}
+          placeholder="jane@company.com"
+          maxLength={160}
+          autoComplete="email"
+        />
+        <PurchaseTextField
+          label="Phone"
+          type="tel"
+          value={form.buyer_phone}
+          onChange={(value) => onChange("buyer_phone", value)}
+          placeholder="Optional"
+          maxLength={40}
+          autoComplete="tel"
+        />
+        <PurchaseTextField
+          label="Title"
+          value={form.buyer_title}
+          onChange={(value) => onChange("buyer_title", value)}
+          placeholder="Optional"
+          maxLength={100}
+          autoComplete="organization-title"
+        />
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-black text-[#0A1547]">Billing cadence</span>
+          <select
+            value={form.billing_cadence}
+            onChange={(event) => onChange("billing_cadence", event.target.value)}
+            className="w-full rounded-lg border border-[#0A1547]/12 bg-white px-4 py-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6] focus:ring-2 focus:ring-[#A380F6]/20"
+          >
+            {options.map((cadence) => (
+              <option key={String(cadence.key)} value={String(cadence.key)}>
+                {cadence.display_name || cadence.key}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-6 grid gap-3">
+        <label className="flex items-start gap-3 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4 text-sm font-semibold leading-relaxed text-[#0A1547]/70">
+          <input
+            type="checkbox"
+            checked={form.agreement_acknowledged}
+            onChange={(event) => onChange("agreement_acknowledged", event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
+          />
+          <span>I understand signup requires membership agreement signing and payment before access is activated.</span>
+        </label>
+        <label className="flex items-start gap-3 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4 text-sm font-semibold leading-relaxed text-[#0A1547]/70">
+          <input
+            type="checkbox"
+            checked={form.contact_acknowledged}
+            onChange={(event) => onChange("contact_acknowledged", event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
+          />
+          <span>I agree to be contacted about this alphaScreen purchase.</span>
+        </label>
+      </div>
+
+      {error ? (
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="submit"
+          disabled={status === "submitting"}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-6 py-3.5 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          data-analytics-cta="Submit Purchase Intent"
+          data-analytics-placement="purchase-intake"
+          data-analytics-target="/alphascreen/pricing#purchase-intake"
+        >
+          {status === "submitting" ? "Creating pending intent..." : "Create pending purchase intent"}
+          <ArrowRight className="h-4 w-4" />
+        </button>
+        <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
+          This QA step does not create an agreement, checkout session, user, client, or membership.
+        </p>
+      </div>
+    </form>
   );
 }
 
@@ -314,6 +671,12 @@ function LoadingNotice({ state }: { state: PackageLoadState }) {
 export default function AlphaScreenPricingPage() {
   const [packages, setPackages] = useState<AlphaScreenPackage[]>(FALLBACK_PACKAGES);
   const [loadState, setLoadState] = useState<PackageLoadState>("loading");
+  const purchaseFormStartedRef = useRef(false);
+  const [selectedPlanKey, setSelectedPlanKey] = useState("");
+  const [purchaseForm, setPurchaseForm] = useState<PurchaseIntentForm>(EMPTY_PURCHASE_FORM);
+  const [purchaseStatus, setPurchaseStatus] = useState<PurchaseIntentStatus>("idle");
+  const [purchaseError, setPurchaseError] = useState("");
+  const [purchaseResult, setPurchaseResult] = useState<PurchaseIntentResult | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -340,6 +703,126 @@ export default function AlphaScreenPricingPage() {
   }, []);
 
   const planCards = useMemo(() => normalizePackages(packages), [packages]);
+  const selectedPlan = useMemo(
+    () => planCards.find((plan) => plan.plan_key === selectedPlanKey) || null,
+    [planCards, selectedPlanKey],
+  );
+
+  const startPurchase = (plan: AlphaScreenPackage) => {
+    setSelectedPlanKey(plan.plan_key);
+    setPurchaseStatus("idle");
+    setPurchaseError("");
+    setPurchaseResult(null);
+    setPurchaseForm((prev) => ({ ...prev, billing_cadence: defaultCadence(plan) }));
+    trackEvent("signup_started", { plan: plan.plan_key, step: "plan_selection" });
+    window.setTimeout(() => {
+      document.getElementById("purchase-intake")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const updatePurchaseField = <K extends keyof PurchaseIntentForm>(field: K, value: PurchaseIntentForm[K]) => {
+    if (!purchaseFormStartedRef.current) {
+      purchaseFormStartedRef.current = true;
+      trackEvent("lead_form_started", {
+        form_id: "alphascreen-purchase-intent",
+        form_type: "purchase_intent",
+        product_interest: "alphascreen",
+        first_field: String(field),
+      });
+      trackEvent("signup_step_viewed", { plan: selectedPlanKey, step: "buyer_intake" });
+    }
+    setPurchaseError("");
+    setPurchaseForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePurchaseSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const validationMessage = validatePurchaseForm(purchaseForm, selectedPlan);
+    trackEvent("lead_form_submit_attempted", {
+      form_id: "alphascreen-purchase-intent",
+      form_type: "purchase_intent",
+      product_interest: "alphascreen",
+    });
+
+    if (validationMessage || !selectedPlan) {
+      setPurchaseError(validationMessage || "Choose Basic or Pro before submitting.");
+      trackEvent("lead_form_submit_failed", {
+        form_id: "alphascreen-purchase-intent",
+        form_type: "purchase_intent",
+        product_interest: "alphascreen",
+        error_type: "validation",
+      });
+      return;
+    }
+
+    setPurchaseStatus("submitting");
+    setPurchaseError("");
+
+    const payload = {
+      plan_key: selectedPlan.plan_key,
+      billing_cadence: purchaseForm.billing_cadence || defaultCadence(selectedPlan),
+      company_legal_name: cleanText(purchaseForm.company_legal_name, 120),
+      company_dba: cleanText(purchaseForm.company_dba, 120),
+      buyer_first_name: cleanText(purchaseForm.buyer_first_name, 80),
+      buyer_last_name: cleanText(purchaseForm.buyer_last_name, 80),
+      buyer_email: cleanText(purchaseForm.buyer_email, 160),
+      buyer_phone: cleanText(purchaseForm.buyer_phone, 40),
+      buyer_title: cleanText(purchaseForm.buyer_title, 100),
+      source_path: typeof window !== "undefined" ? window.location.pathname : "/alphascreen/pricing",
+      agreement_acknowledged: purchaseForm.agreement_acknowledged,
+      contact_acknowledged: purchaseForm.contact_acknowledged,
+    };
+
+    try {
+      const response = await fetch(purchaseIntentEndpoint(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({})) as PurchaseIntentResult & {
+        detail?: string;
+        code?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        const detail = body.detail || (response.status === 429
+          ? "Too many purchase intake attempts. Please wait a few minutes and try again."
+          : "We could not create this purchase intent. Please try again.");
+        setPurchaseStatus("idle");
+        setPurchaseError(detail);
+        trackEvent("lead_form_submit_failed", {
+          form_id: "alphascreen-purchase-intent",
+          form_type: "purchase_intent",
+          product_interest: "alphascreen",
+          error_type: response.status === 429 ? "rate_limited" : "backend",
+        });
+        return;
+      }
+
+      setPurchaseResult(body);
+      setPurchaseStatus("success");
+      trackEvent("lead_form_submit_succeeded", {
+        form_id: "alphascreen-purchase-intent",
+        form_type: "purchase_intent",
+        product_interest: "alphascreen",
+      });
+      trackEvent("signup_step_completed", {
+        plan: selectedPlan.plan_key,
+        step: "purchase_intent",
+        completion_percent: 50,
+      });
+    } catch (_) {
+      setPurchaseStatus("idle");
+      setPurchaseError("We could not reach the purchase intake service. Please try again.");
+      trackEvent("lead_form_submit_failed", {
+        form_id: "alphascreen-purchase-intent",
+        form_type: "purchase_intent",
+        product_interest: "alphascreen",
+        error_type: "network",
+      });
+    }
+  };
 
   return (
     <div className="bg-white">
@@ -371,11 +854,11 @@ export default function AlphaScreenPricingPage() {
                 <ArrowRight className="h-4 w-4" />
               </a>
               <a
-                href="/alphascreen#request-demo"
+                href="#pricing-demo"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-base font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
                 data-analytics-cta="Request a Demo"
                 data-analytics-placement="pricing-hero"
-                data-analytics-target="/alphascreen#request-demo"
+                data-analytics-target="#pricing-demo"
               >
                 Request a demo
               </a>
@@ -426,13 +909,43 @@ export default function AlphaScreenPricingPage() {
           <LoadingNotice state={loadState} />
           <div className="grid gap-5 lg:grid-cols-3">
             {planCards.map((plan) => (
-              <PlanCard key={plan.plan_key} plan={plan} />
+              <PlanCard
+                key={plan.plan_key}
+                plan={plan}
+                selected={selectedPlanKey === plan.plan_key}
+                onStart={startPurchase}
+              />
             ))}
             <EnterpriseCard />
           </div>
           <p className="mt-5 max-w-3xl text-sm leading-relaxed text-[#0A1547]/55">
             Package details shown here are for planning. Self-serve signup, agreement generation, and Stripe checkout are not active on this page yet.
           </p>
+        </div>
+      </section>
+
+      <section id="purchase-intake" className="bg-[#F8F9FD] py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mb-8 grid gap-5 lg:grid-cols-[0.72fr_1fr] lg:items-end">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Purchase intake</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
+                Create a pending purchase intent.
+              </h2>
+            </div>
+            <p className="text-sm leading-relaxed text-[#0A1547]/60">
+              Basic and Pro buyers can enter company and admin details here. This does not collect payment details or activate access.
+            </p>
+          </div>
+          <PurchaseIntentPanel
+            selectedPlan={selectedPlan}
+            form={purchaseForm}
+            status={purchaseStatus}
+            error={purchaseError}
+            result={purchaseResult}
+            onChange={updatePurchaseField}
+            onSubmit={handlePurchaseSubmit}
+          />
         </div>
       </section>
 
@@ -466,22 +979,28 @@ export default function AlphaScreenPricingPage() {
         </div>
       </section>
 
-      <section className="bg-white py-16 lg:py-20">
-        <div className="mx-auto max-w-5xl px-6 text-center lg:px-8">
-          <h2 className="text-3xl font-black text-[#0A1547]">Need access before self-serve purchase opens?</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-            Request a demo and the alphaSource team can walk through package fit, agreement timing, and current onboarding options.
-          </p>
-          <a
-            href="/alphascreen#request-demo"
-            className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-6 py-3.5 text-base font-black text-white transition-opacity hover:opacity-90"
-            data-analytics-cta="Request a Demo"
-            data-analytics-placement="pricing-bottom"
-            data-analytics-target="/alphascreen#request-demo"
-          >
-            Request a demo
-            <ArrowRight className="h-4 w-4" />
-          </a>
+      <section id="pricing-demo" className="bg-white py-16 lg:py-20">
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 lg:grid-cols-[0.9fr_1fr] lg:items-start lg:px-8">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Demo and contact</p>
+            <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
+              Need access before self-serve purchase opens?
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
+              Request a demo and the alphaSource team can walk through package fit, agreement timing, and current onboarding options.
+            </p>
+          </div>
+          <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6 shadow-sm">
+            <LeadCaptureForm
+              formId="alphascreen-pricing-demo"
+              formType="demo"
+              formTestId="alphascreen-pricing-demo-form"
+              productInterest="alphascreen"
+              successTitle="We'll be in touch!"
+              successBody="Our team will reach out to discuss alphaScreen package fit."
+              ctaLabel="Request pricing demo"
+            />
+          </div>
         </div>
       </section>
     </div>
