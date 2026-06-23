@@ -163,7 +163,7 @@ function PricingSignupSection() {
   return (
     <section className="bg-white py-16 lg:py-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+        <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -172,30 +172,20 @@ function PricingSignupSection() {
           >
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">PRICING AND SIGNUP</p>
             <h2 className="mt-3 text-3xl lg:text-4xl font-black text-[#0A1547] leading-tight">
-              Choose the membership that fits your hiring volume.
+              Choose the membership that best fits your team.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#0A1547]/60">
               Start with Basic or Pro, then complete agreement review and secure checkout when you are ready. Each membership includes structured AI-assisted interviews, candidate scoring, and on-demand reports for your hiring team.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="/alphascreen/pricing"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-white rounded-full transition-all hover:opacity-90 hover:shadow-lg active:scale-95"
-                style={{ backgroundColor: "#A380F6" }}
-                data-testid="alphascreen-signup-pricing-cta"
-                data-analytics-cta="Compare Memberships"
-                data-analytics-placement="alphascreen-pricing-section"
-              >
-                Compare memberships
-                <ArrowRight className="w-4 h-4" />
-              </a>
+            <div className="mt-6">
               <a
                 href="#request-demo"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-[#0A1547] bg-[#F8F9FD] border border-[#0A1547]/10 rounded-full transition-all hover:border-[#02ABE0] hover:text-[#02ABE0] active:scale-95"
+                className="inline-flex items-center gap-2 text-sm font-black text-[#0A1547]/65 underline decoration-[#A380F6]/35 underline-offset-4 transition-colors hover:text-[#A380F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A380F6]"
                 data-analytics-cta="Talk to Sales"
                 data-analytics-placement="alphascreen-pricing-section"
               >
                 Talk to sales
+                <ArrowRight className="w-4 h-4" />
               </a>
             </div>
           </motion.div>
@@ -206,25 +196,44 @@ function PricingSignupSection() {
             viewport={{ once: true, amount: 0.25 }}
             variants={fadeUp}
             custom={1}
-            className="grid gap-4 sm:grid-cols-2"
+            className="grid gap-4"
           >
-            {memberships.map((item) => (
-              <div key={item.name} className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#A380F6]">{item.name}</p>
-                    <p className="mt-2 min-h-[3.5rem] text-sm font-semibold leading-relaxed text-[#0A1547]/60">{item.description}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {memberships.map((item) => (
+                <div key={item.name} className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#A380F6]">{item.name}</p>
+                      <p className="mt-2 min-h-[3.5rem] text-sm font-semibold leading-relaxed text-[#0A1547]/60">{item.description}</p>
+                    </div>
+                    <div className="h-9 w-9 rounded-lg bg-white flex items-center justify-center text-[#02D99D]">
+                      <CheckCircle className="h-5 w-5" />
+                    </div>
                   </div>
-                  <div className="h-9 w-9 rounded-lg bg-white flex items-center justify-center text-[#02D99D]">
-                    <CheckCircle className="h-5 w-5" />
+                  <div className="mt-auto flex items-start gap-2 pt-5 text-sm font-black leading-snug text-[#0A1547]/70">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#02D99D]" />
+                    <span>{item.details}</span>
                   </div>
                 </div>
-                <div className="mt-auto flex items-start gap-2 pt-5 text-sm font-black leading-snug text-[#0A1547]/70">
-                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#02D99D]" />
-                  <span>{item.details}</span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <a
+              href="/alphascreen/pricing"
+              className="alphascreen-membership-cta group mt-1 block rounded-xl px-5 py-4 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A380F6]"
+              data-testid="alphascreen-signup-pricing-cta"
+              data-analytics-cta="See Memberships and Pricing"
+              data-analytics-placement="alphascreen-pricing-section"
+            >
+              <span className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  <span className="block text-base font-black tracking-normal">See memberships and pricing</span>
+                  <span className="mt-1 block text-sm font-semibold text-white/65">Compare Basic, Pro, and Enterprise options.</span>
+                </span>
+                <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors group-hover:bg-white group-hover:text-[#0A1547]">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              </span>
+            </a>
           </motion.div>
         </div>
       </div>
