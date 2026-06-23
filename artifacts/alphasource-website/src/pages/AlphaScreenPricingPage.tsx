@@ -331,7 +331,7 @@ function PlanCard({
 
   return (
     <article
-      className="rounded-lg border bg-white p-6 shadow-sm transition-transform hover:-translate-y-1"
+      className="flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-transform hover:-translate-y-1"
       style={{
         borderColor: plan.plan_key === "pro" ? accent.border : "rgba(10,21,71,0.10)",
         boxShadow: plan.plan_key === "pro" ? "0 18px 46px rgba(10,21,71,0.12)" : "0 10px 28px rgba(10,21,71,0.06)",
@@ -390,11 +390,11 @@ function PlanCard({
         ))}
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-auto grid gap-2 pt-6">
         <button
           type="button"
           onClick={() => onStart(plan)}
-          className="w-full rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
+          className="min-h-11 w-full rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: selected ? "#0A1547" : accent.color }}
           data-analytics-cta={`Start with ${plan.display_name}`}
           data-analytics-placement="pricing-card"
@@ -404,8 +404,7 @@ function PlanCard({
         </button>
         <a
           href="#pricing-demo"
-          className="flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: accent.color }}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-black text-[#0A1547]/60 transition-colors hover:border-[#A380F6]/35 hover:bg-[#A380F6]/8 hover:text-[#A380F6]"
           data-analytics-cta={`Request demo for ${plan.display_name}`}
           data-analytics-placement="pricing-card"
           data-analytics-target="#pricing-demo"
@@ -420,7 +419,7 @@ function PlanCard({
 
 function EnterpriseCard() {
   return (
-    <article className="rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
+    <article className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#02ABE0]">Enterprise</p>
@@ -447,16 +446,19 @@ function EnterpriseCard() {
           </div>
         ))}
       </div>
-      <a
-        href="#pricing-demo"
-        className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-[#0A1547] transition-opacity hover:opacity-90"
-        data-analytics-cta="Contact Sales"
-        data-analytics-placement="pricing-enterprise"
-        data-analytics-target="#pricing-demo"
-      >
-        Contact Sales
-        <ArrowRight className="h-4 w-4" />
-      </a>
+      <div className="mt-auto grid gap-2 pt-6">
+        <div className="hidden min-h-11 lg:block" aria-hidden="true" />
+        <a
+          href="#pricing-demo"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-[#0A1547] transition-opacity hover:opacity-90"
+          data-analytics-cta="Contact Sales"
+          data-analytics-placement="pricing-enterprise"
+          data-analytics-target="#pricing-demo"
+        >
+          Contact Sales
+          <ArrowRight className="h-4 w-4" />
+        </a>
+      </div>
     </article>
   );
 }
@@ -730,7 +732,7 @@ function PurchaseIntentPanel({
           <select
             value={form.billing_cadence}
             onChange={(event) => onChange("billing_cadence", event.target.value)}
-            className="w-full rounded-lg border border-[#0A1547]/12 bg-white px-4 py-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6] focus:ring-2 focus:ring-[#A380F6]/20"
+            className="h-[46px] w-full rounded-lg border border-[#0A1547]/12 bg-white px-4 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6] focus:ring-2 focus:ring-[#A380F6]/20"
           >
             {options.map((cadence) => (
               <option key={String(cadence.key)} value={String(cadence.key)}>

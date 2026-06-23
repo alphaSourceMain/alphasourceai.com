@@ -17,6 +17,7 @@ import PageAnalytics from "@/components/PageAnalytics";
 import HomePage from "@/pages/HomePage";
 import AlphaScreenPage from "@/pages/AlphaScreenPage";
 import AlphaScreenPricingPage from "@/pages/AlphaScreenPricingPage";
+import CheckoutSubscriptionSuccessPage from "@/pages/CheckoutSubscriptionSuccessPage";
 import AboutPage from "@/pages/AboutPage";
 import PublicSupportPage from "@/pages/FaqPage";
 import TermsPage from "@/pages/TermsPage";
@@ -464,6 +465,7 @@ function Router() {
       <Navbar />
       <main className="flex-1">
         <Switch>
+          <Route path="/checkout/subscription-success" component={CheckoutSubscriptionSuccessPage} />
           <Route path="/"            component={HomePage} />
           <Route path="/alphascreen/pricing" component={AlphaScreenPricingPage} />
           <Route path="/alphascreen" component={AlphaScreenPage} />
