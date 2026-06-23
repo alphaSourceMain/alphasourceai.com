@@ -286,7 +286,7 @@ function validatePurchaseForm(form: PurchaseIntentForm, selectedPlan: AlphaScree
   if (!cleanText(form.company_legal_name, 120)) return "Company legal name is required.";
   if (!cleanText(form.buyer_first_name, 80)) return "Buyer first name is required.";
   if (!cleanText(form.buyer_last_name, 80)) return "Buyer last name is required.";
-  if (!validEmail(form.buyer_email)) return "Enter a valid work email address.";
+  if (!validEmail(form.buyer_email)) return "Enter a valid email address.";
   if (!form.agreement_acknowledged) return "Confirm that agreement signing and payment are required before access is activated.";
   if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen membership.";
   return "";
@@ -704,12 +704,12 @@ function PurchaseIntentPanel({
           autoComplete="family-name"
         />
         <PurchaseTextField
-          label="Work email"
+          label="Account email"
           required
           type="email"
           value={form.buyer_email}
           onChange={(value) => onChange("buyer_email", value)}
-          placeholder="jane@company.com"
+          placeholder="jane@example.com"
           maxLength={160}
           autoComplete="email"
         />
