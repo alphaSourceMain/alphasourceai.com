@@ -1096,7 +1096,7 @@ export default function AlphaScreenPricingPage() {
             <div className="max-w-3xl">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Memberships</p>
               <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
-                Choose the screening membership that matches your hiring volume.
+                Choose the membership that fits your hiring needs.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
                 Select Basic or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.
