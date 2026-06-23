@@ -83,24 +83,15 @@ function HeroSection() {
               className="flex flex-col sm:flex-row gap-4"
             >
               <a
-                href="#request-demo"
+                href="#how-it-works"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-white rounded-full transition-all hover:opacity-90 hover:shadow-lg active:scale-95"
                 style={{ backgroundColor: "#A380F6" }}
-                data-testid="alphascreen-hero-cta"
-                data-analytics-cta="Request a Demo"
-                data-analytics-placement="alphascreen-hero"
-              >
-                Request a Demo
-                <ArrowRight className="w-4 h-4" />
-              </a>
-              <a
-                href="#how-it-works"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-[#0A1547] bg-white border border-[#0A1547]/10 rounded-full transition-all hover:border-[#A380F6] hover:text-[#A380F6] hover:shadow-md active:scale-95"
                 data-testid="alphascreen-how-it-works"
                 data-analytics-cta="See How It Works"
                 data-analytics-placement="alphascreen-hero"
               >
                 See How It Works
+                <ArrowRight className="w-4 h-4" />
               </a>
             </motion.div>
           </div>
@@ -133,6 +124,20 @@ function HeroSection() {
                 playsInline
                 className="w-full block"
               />
+              <div className="flex flex-col gap-3 border-t border-[#0A1547]/8 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold leading-relaxed text-[#0A1547]/55">
+                  Want to see it with your hiring workflow?
+                </p>
+                <a
+                  href="#request-demo"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-[#F8F9FD] px-4 py-2.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+                  data-testid="alphascreen-video-demo-cta"
+                  data-analytics-cta="Request a Demo"
+                  data-analytics-placement="alphascreen-video-card"
+                >
+                  Request demo
+                </a>
+              </div>
             </div>
           </motion.div>
         </div>
@@ -204,18 +209,18 @@ function PricingSignupSection() {
             className="grid gap-4 sm:grid-cols-2"
           >
             {memberships.map((item) => (
-              <div key={item.name} className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
+              <div key={item.name} className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#A380F6]">{item.name}</p>
-                    <p className="mt-2 text-sm font-semibold leading-relaxed text-[#0A1547]/60">{item.description}</p>
+                    <p className="mt-2 min-h-[3.5rem] text-sm font-semibold leading-relaxed text-[#0A1547]/60">{item.description}</p>
                   </div>
                   <div className="h-9 w-9 rounded-lg bg-white flex items-center justify-center text-[#02D99D]">
                     <CheckCircle className="h-5 w-5" />
                   </div>
                 </div>
-                <div className="mt-5 flex items-center gap-2 text-sm font-black text-[#0A1547]/70">
-                  <CheckCircle className="h-4 w-4 flex-shrink-0 text-[#02D99D]" />
+                <div className="mt-auto flex items-start gap-2 pt-5 text-sm font-black leading-snug text-[#0A1547]/70">
+                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#02D99D]" />
                   <span>{item.details}</span>
                 </div>
               </div>

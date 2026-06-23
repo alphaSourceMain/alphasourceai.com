@@ -282,13 +282,13 @@ function cadenceLabel(plan: AlphaScreenPackage | null, key: string): string {
 }
 
 function validatePurchaseForm(form: PurchaseIntentForm, selectedPlan: AlphaScreenPackage | null): string {
-  if (!selectedPlan) return "Choose Basic or Pro before starting signup.";
+  if (!selectedPlan) return "Choose Basic or Pro before starting membership signup.";
   if (!cleanText(form.company_legal_name, 120)) return "Company legal name is required.";
   if (!cleanText(form.buyer_first_name, 80)) return "Buyer first name is required.";
   if (!cleanText(form.buyer_last_name, 80)) return "Buyer last name is required.";
   if (!validEmail(form.buyer_email)) return "Enter a valid work email address.";
   if (!form.agreement_acknowledged) return "Confirm that agreement signing and payment are required before access is activated.";
-  if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen purchase.";
+  if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen membership.";
   return "";
 }
 
@@ -394,8 +394,11 @@ function PlanCard({
         <button
           type="button"
           onClick={() => onStart(plan)}
-          className="min-h-11 w-full rounded-full px-4 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: selected ? "#0A1547" : accent.color }}
+          className="min-h-12 w-full rounded-full px-4 py-3 text-sm font-black text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
+          style={{
+            backgroundColor: selected ? "#0A1547" : accent.color,
+            boxShadow: selected ? "0 14px 28px rgba(10,21,71,0.22)" : `0 14px 28px ${accent.color}33`,
+          }}
           data-analytics-cta={`Start with ${plan.display_name}`}
           data-analytics-placement="pricing-card"
           data-analytics-target="#signup-modal"
@@ -404,12 +407,12 @@ function PlanCard({
         </button>
         <a
           href="#pricing-demo"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-black text-[#0A1547]/60 transition-colors hover:border-[#A380F6]/35 hover:bg-[#A380F6]/8 hover:text-[#A380F6]"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-black text-[#0A1547]/55 transition-colors hover:border-[#A380F6]/35 hover:text-[#A380F6]"
           data-analytics-cta={`Request demo for ${plan.display_name}`}
           data-analytics-placement="pricing-card"
           data-analytics-target="#pricing-demo"
         >
-          Request demo instead
+          Request demo
           <ArrowRight className="h-4 w-4" />
         </a>
       </div>
@@ -450,7 +453,7 @@ function EnterpriseCard() {
         <div className="hidden min-h-11 lg:block" aria-hidden="true" />
         <a
           href="#pricing-demo"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-[#0A1547] transition-opacity hover:opacity-90"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-[#0A1547]"
           data-analytics-cta="Talk to Sales"
           data-analytics-placement="pricing-enterprise"
           data-analytics-target="#pricing-demo"
@@ -530,7 +533,7 @@ function PurchaseIntentPanel({
   if (!selectedPlan) {
     return (
       <div className="rounded-lg border border-dashed border-[#0A1547]/18 bg-white px-6 py-8 text-center">
-        <h3 className="text-xl font-black text-[#0A1547]">Choose Basic or Pro to start signup.</h3>
+        <h3 className="text-xl font-black text-[#0A1547]">Choose Basic or Pro to start membership signup.</h3>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
           No payment is collected in this step. You will review and sign the membership agreement before secure checkout.
         </p>
@@ -654,10 +657,10 @@ function PurchaseIntentPanel({
     <form onSubmit={onSubmit} className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm" data-testid="signup-profile-form">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Buyer intake</p>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Membership details</p>
           <h3 className="mt-2 text-2xl font-black text-[#0A1547]">Start {selectedPlan.display_name} membership</h3>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-            No payment is collected here. You will review the membership agreement before checkout, and access is activated only after signing and payment are confirmed.
+            Share the buyer and company details for agreement review. Payment is handled later through secure checkout.
           </p>
         </div>
         <div className="rounded-lg bg-[#F8F9FD] px-4 py-3 text-sm font-bold text-[#0A1547]/65">
@@ -760,7 +763,7 @@ function PurchaseIntentPanel({
             onChange={(event) => onChange("contact_acknowledged", event.target.checked)}
             className="mt-1 h-4 w-4 rounded border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
           />
-          <span>I agree to be contacted about this alphaScreen purchase.</span>
+          <span>I agree to be contacted about this alphaScreen membership.</span>
         </label>
       </div>
 
@@ -775,11 +778,11 @@ function PurchaseIntentPanel({
           type="submit"
           disabled={status === "submitting"}
           className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-6 py-3.5 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          data-analytics-cta="Save Signup Details"
+          data-analytics-cta="Continue with Signup"
           data-analytics-placement="signup-modal"
           data-analytics-target="/alphascreen/pricing#signup-modal"
         >
-          {status === "submitting" ? "Saving signup details..." : "Save signup details"}
+          {status === "submitting" ? "Saving details..." : "Continue with signup"}
           <ArrowRight className="h-4 w-4" />
         </button>
         <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
@@ -1038,37 +1041,23 @@ export default function AlphaScreenPricingPage() {
           <div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#A380F6]/25 bg-white px-3 py-1.5 text-sm font-bold text-[#A380F6] shadow-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-[#02D99D]" />
-              alphaScreen pricing
+              alphaScreen memberships
             </div>
             <h1 className="max-w-3xl text-5xl font-black leading-[1.04] tracking-normal text-[#0A1547] lg:text-6xl">
-              alphaScreen pricing
+              Start with the membership that fits your hiring volume.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#0A1547]/65">
-              Structured AI-assisted interview screening for hiring teams that need a clearer, more consistent read on candidates before the next conversation.
+              Choose Basic or Pro for structured AI-assisted candidate screening, or talk to sales for Enterprise volume and rollout support.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="#packages"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#A380F6] px-6 py-3.5 text-base font-black text-white transition-opacity hover:opacity-90"
-                data-analytics-cta="Compare Memberships"
-                data-analytics-placement="pricing-hero"
-              >
-                Compare memberships
-                <ArrowRight className="h-4 w-4" />
-              </a>
-              <a
-                href="#pricing-demo"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-base font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
-                data-analytics-cta="Request a Demo"
-                data-analytics-placement="pricing-hero"
-                data-analytics-target="#pricing-demo"
-              >
-                Request a demo
-              </a>
-            </div>
-            <p className="mt-5 max-w-xl text-sm font-semibold leading-relaxed text-[#0A1547]/55">
-              Start signup with a membership selection, then review the agreement and continue to secure payment before dashboard activation.
-            </p>
+            <a
+              href="#pricing-demo"
+              className="mt-8 inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-5 py-3 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+              data-analytics-cta="Request a Demo"
+              data-analytics-placement="pricing-hero"
+              data-analytics-target="#pricing-demo"
+            >
+              Request a demo
+            </a>
           </div>
 
           <div className="rounded-lg border border-[#0A1547]/10 bg-white p-5 shadow-sm">
@@ -1107,8 +1096,11 @@ export default function AlphaScreenPricingPage() {
             <div className="max-w-3xl">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Memberships</p>
               <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
-                Choose the screening membership that matches your hiring motion.
+                Choose the screening membership that matches your hiring volume.
               </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
+                Select Basic or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.
+              </p>
             </div>
             <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
               {(["monthly", "annual"] as BillingCadenceKey[]).map((cadence) => (
@@ -1204,17 +1196,17 @@ export default function AlphaScreenPricingPage() {
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Signup workflow</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">How membership signup works</h2>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">From membership choice to first screening role</h2>
               <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
-                Membership signup starts here, continues through agreement review, and moves to secure Stripe Checkout after signing. Dashboard access stays gated until payment is confirmed.
+                Pick the membership that fits your hiring volume, review terms, and complete secure checkout when you are ready. The alphaSource team keeps setup moving so your hiring team can start screening quickly.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {[
                 ["1", "Choose a membership", "Select Basic, Pro, or talk to sales for custom terms."],
                 ["2", "Review agreement", "Review and sign your membership agreement."],
-                ["3", "Complete payment", "Continue to secure Stripe Checkout after signing."],
-                ["4", "Set up dashboard", "Activation happens only after payment is confirmed."],
+                ["3", "Complete secure payment", "Continue to Stripe Checkout after signing."],
+                ["4", "Start screening", "Finish account setup and begin creating roles for your hiring team."],
               ].map(([step, title, body]) => (
                 <div key={step} className="rounded-lg border border-[#0A1547]/10 bg-white p-5">
                   <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#0A1547] text-sm font-black text-white">
