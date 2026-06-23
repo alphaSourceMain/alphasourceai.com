@@ -145,6 +145,10 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
       return raw;
     }
   }, [params?.token]);
+  const checkoutReturnState = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return String(new URLSearchParams(window.location.search || "").get("checkout") || "").trim().toLowerCase();
+  }, []);
 
   const [session, setSession] = useState<SignerSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -361,6 +365,7 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
   const isActivationPendingSession = sessionState === "activation_pending";
   const isActivationCompleteSession = sessionState === "activation_complete";
   const isAgreementSignedPendingPaymentSetupSession = sessionState === "agreement_signed_pending_payment_setup";
+  const checkoutCanceled = checkoutReturnState === "cancel";
 
   const handleSubmit = async () => {
     if (submitBusy) return;
@@ -440,7 +445,7 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "omit",
-        body: JSON.stringify({ token, embedded: true }),
+        body: JSON.stringify({ token }),
       });
       const text = await response.text();
       const payload = parseJsonSafe(text) as {
@@ -616,11 +621,11 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-[#0A1547]/60">
             {isActivationPendingSession
-              ? "Your agreement is signed. Complete checkout to activate your membership."
+              ? "Your agreement is signed. Continue to secure payment to activate billing and account setup."
               : isActivationCompleteSession
                 ? "Checkout is complete. Continue to account setup if needed."
                 : isAgreementSignedPendingPaymentSetupSession
-                  ? "Your agreement is signed. Payment and account setup happen after signing in later steps."
+                  ? "Your agreement is signed. Continue to secure payment to activate billing and account setup."
                   : "Review the agreement draft, then type your name, confirm acceptance, and draw your signature."}
           </p>
         </div>
@@ -654,39 +659,13 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
               <p className="flex items-start gap-2 text-sm font-semibold text-emerald-700">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                Agreement signed successfully. Payment and account setup happen after signing in later steps.
+                Your agreement is signed. Continue to secure payment to activate billing and account setup.
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/70">Client</p>
-                  <p className="mt-1 text-sm font-bold text-emerald-800">{session.client_legal_name || "—"}</p>
-                  <p className="text-[11px] text-emerald-800/75">{session.dba_trade_name || "No DBA"}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/70">Membership</p>
-                  <p className="mt-1 text-sm font-bold text-emerald-800">{toDisplayText(session.membership_tier)}</p>
-                  <p className="text-[11px] text-emerald-800/75">Billing: {toDisplayText(session.billing_option)}</p>
-                </div>
-              </div>
-              {session.executed_pdf_url ? (
-                <div className="mt-3">
-                  <a
-                    href={session.executed_pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100/70"
-                  >
-                    View signed agreement
-                  </a>
-                </div>
+              {checkoutCanceled ? (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  Checkout was canceled. Your signed agreement is saved, and you can resume secure payment when ready.
+                </p>
               ) : null}
-            </div>
-          ) : isActivationPendingSession ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-              <p className="flex items-start gap-2 text-sm font-semibold text-emerald-700">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                Agreement signed successfully. Continue to checkout to activate your membership.
-              </p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/70">Client</p>
@@ -712,7 +691,58 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
                     cursor: checkoutBusy ? "not-allowed" : "pointer",
                   }}
                 >
-                  {checkoutBusy ? "Opening checkout..." : "Continue to checkout"}
+                  {checkoutBusy ? "Opening checkout..." : "Continue to secure checkout"}
+                </button>
+                {session.executed_pdf_url ? (
+                  <a
+                    href={session.executed_pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100/70"
+                  >
+                    View signed agreement
+                  </a>
+                ) : null}
+                {checkoutError ? <p className="text-xs font-semibold text-red-500">{checkoutError}</p> : null}
+              </div>
+            </div>
+          ) : isActivationPendingSession ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+              <p className="flex items-start gap-2 text-sm font-semibold text-emerald-700">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                Your agreement is signed. Continue to secure payment to activate billing and account setup.
+              </p>
+              {checkoutCanceled ? (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  Checkout was canceled. Your signed agreement is saved, and you can resume secure payment when ready.
+                </p>
+              ) : null}
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/70">Client</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-800">{session.client_legal_name || "—"}</p>
+                  <p className="text-[11px] text-emerald-800/75">{session.dba_trade_name || "No DBA"}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/70">Membership</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-800">{toDisplayText(session.membership_tier)}</p>
+                  <p className="text-[11px] text-emerald-800/75">Billing: {toDisplayText(session.billing_option)}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleContinueToCheckout();
+                  }}
+                  disabled={checkoutBusy}
+                  className="rounded-full px-5 py-2.5 text-sm font-bold text-white transition-all"
+                  style={{
+                    backgroundColor: checkoutBusy ? "rgba(10,21,71,0.25)" : "#A380F6",
+                    cursor: checkoutBusy ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {checkoutBusy ? "Opening checkout..." : "Continue to secure checkout"}
                 </button>
                 {session.executed_pdf_url ? (
                   <a

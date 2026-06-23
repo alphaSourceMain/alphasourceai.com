@@ -32,7 +32,7 @@ type AlphaScreenPackage = {
   platform_monthly_fee_cents: number;
   platform_annual_fee: number;
   platform_annual_fee_cents: number;
-  annual_discount_percent: number;
+  annual_platform_fee_note: string;
   included_interviews: number;
   included_interviews_per_role: number;
   interview_duration_minutes: number;
@@ -72,7 +72,7 @@ type PurchaseIntentResult = {
     platform_monthly_fee_cents?: number;
     platform_annual_fee?: number;
     platform_annual_fee_cents?: number;
-    annual_discount_percent?: number;
+    annual_platform_fee_note?: string;
     included_interviews?: number;
     interview_duration_minutes?: number;
     max_interview_minutes?: number;
@@ -104,9 +104,9 @@ const FALLBACK_PACKAGES: AlphaScreenPackage[] = [
     display_name: "Basic",
     platform_monthly_fee: 299,
     platform_monthly_fee_cents: 29900,
-    platform_annual_fee: 3229.2,
-    platform_annual_fee_cents: 322920,
-    annual_discount_percent: 10,
+    platform_annual_fee: 3299,
+    platform_annual_fee_cents: 329900,
+    annual_platform_fee_note: "Discounted annual platform fee",
     included_interviews: 20,
     included_interviews_per_role: 20,
     interview_duration_minutes: 10,
@@ -125,9 +125,9 @@ const FALLBACK_PACKAGES: AlphaScreenPackage[] = [
     display_name: "Pro",
     platform_monthly_fee: 599,
     platform_monthly_fee_cents: 59900,
-    platform_annual_fee: 6469.2,
-    platform_annual_fee_cents: 646920,
-    annual_discount_percent: 10,
+    platform_annual_fee: 6499,
+    platform_annual_fee_cents: 649900,
+    annual_platform_fee_note: "Discounted annual platform fee",
     included_interviews: 30,
     included_interviews_per_role: 30,
     interview_duration_minutes: 12,
@@ -222,7 +222,7 @@ function normalizePackage(raw: unknown): AlphaScreenPackage | null {
     platform_monthly_fee_cents: asNumber(source.platform_monthly_fee_cents, fallback.platform_monthly_fee_cents),
     platform_annual_fee: asNumber(source.platform_annual_fee, fallback.platform_annual_fee),
     platform_annual_fee_cents: asNumber(source.platform_annual_fee_cents, fallback.platform_annual_fee_cents),
-    annual_discount_percent: asNumber(source.annual_discount_percent, fallback.annual_discount_percent),
+    annual_platform_fee_note: String(source.annual_platform_fee_note || fallback.annual_platform_fee_note).trim(),
     included_interviews: asNumber(source.included_interviews, fallback.included_interviews),
     included_interviews_per_role: asNumber(source.included_interviews_per_role, fallback.included_interviews_per_role),
     interview_duration_minutes: asNumber(source.interview_duration_minutes, fallback.interview_duration_minutes),
@@ -253,22 +253,13 @@ function formatUsd(value: number): string {
   }).format(value);
 }
 
-function formatUsdWithCents(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 function platformFeeForCadence(plan: AlphaScreenPackage, billingCadence: string): number {
   return billingCadence === "annual" ? plan.platform_annual_fee : plan.platform_monthly_fee;
 }
 
 function formatPlatformFee(plan: AlphaScreenPackage, billingCadence: string): string {
   const value = platformFeeForCadence(plan, billingCadence);
-  return billingCadence === "annual" ? formatUsdWithCents(value) : formatUsd(value);
+  return formatUsd(value);
 }
 
 function cadenceOptions(plan: AlphaScreenPackage | null): BillingCadence[] {
@@ -337,7 +328,6 @@ function PlanCard({
   const duration = plan.max_interview_minutes || plan.interview_duration_minutes;
   const overage = plan.additional_interview_fee || plan.additional_interview_price || plan.overage_price;
   const platformSuffix = billingCadence === "annual" ? "/year platform" : "/mo platform";
-  const annualDiscount = plan.annual_discount_percent || 10;
 
   return (
     <article
@@ -367,7 +357,7 @@ function PlanCard({
         <p className="mt-2 text-sm font-black text-[#0A1547]">+ {formatUsd(plan.per_role_fee)} / role</p>
         {billingCadence === "annual" ? (
           <p className="mt-1 text-xs font-bold text-[#0A1547]/55">
-            Annual is paid upfront with a {annualDiscount}% discount on the platform fee only.
+            Annual platform pricing is discounted and billed upfront.
           </p>
         ) : null}
         <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">{BEST_FOR[plan.plan_key]}</p>
@@ -540,7 +530,7 @@ function PurchaseIntentPanel({
       <div className="rounded-lg border border-dashed border-[#0A1547]/18 bg-white px-6 py-8 text-center">
         <h3 className="text-xl font-black text-[#0A1547]">Choose Basic or Pro to start signup.</h3>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-          No payment is collected in this step. Agreement signing, payment, and account activation remain separate later steps.
+          No payment is collected in this step. You will review and sign the membership agreement before secure checkout.
         </p>
       </div>
     );
@@ -553,7 +543,7 @@ function PurchaseIntentPanel({
   const planName = result?.selected_package?.display_name || selectedPlan.display_name;
   const billingCadence = form.billing_cadence === "annual" ? "annual" : "monthly";
   const selectedPlatformFee = result?.selected_package?.platform_fee ?? platformFeeForCadence(selectedPlan, billingCadence);
-  const selectedPlatformFeeLabel = billingCadence === "annual" ? formatUsdWithCents(selectedPlatformFee) : formatUsd(selectedPlatformFee);
+  const selectedPlatformFeeLabel = formatUsd(selectedPlatformFee);
 
   if (status === "success" && result) {
     const signingUrl = String(agreementResult?.agreement?.signing_url || "").trim();
@@ -569,7 +559,7 @@ function PurchaseIntentPanel({
             </p>
             <h3 className="mt-2 text-2xl font-black text-[#0A1547]">{planName} signup is ready for agreement review.</h3>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-              {agreementResult?.next_step_message || result.next_step_message || "Next step: membership agreement signing will be prepared for review."}
+              Next: review and sign your membership agreement. After signing, you will continue to secure payment.
             </p>
           </div>
           <div className="rounded-lg bg-[#F8F9FD] px-4 py-3 text-sm font-bold text-[#0A1547]/65">
@@ -611,12 +601,12 @@ function PurchaseIntentPanel({
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[#A380F6]">Step 2</p>
             <p className="mt-1 text-sm font-black text-[#0A1547]">Review and sign agreement</p>
-            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">Generate a tokenized membership agreement signing link.</p>
+            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">Next: review and sign your membership agreement.</p>
           </div>
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Step 3</p>
-            <p className="mt-1 text-sm font-black text-[#0A1547]">Payment and account setup</p>
-            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">Handled after signing in later steps.</p>
+            <p className="mt-1 text-sm font-black text-[#0A1547]">Secure payment</p>
+            <p className="mt-1 text-xs font-semibold text-[#0A1547]/55">After signing, you will continue to secure payment.</p>
           </div>
         </div>
         {agreementError ? (
@@ -651,7 +641,7 @@ function PurchaseIntentPanel({
             </button>
           )}
           <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
-            No payment details are collected here, and checkout is not started.
+            No payment details are collected here. Secure checkout opens after agreement signing.
           </p>
         </div>
       </div>
@@ -665,7 +655,7 @@ function PurchaseIntentPanel({
           <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Buyer intake</p>
           <h3 className="mt-2 text-2xl font-black text-[#0A1547]">Start with {selectedPlan.display_name}</h3>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-            No payment is collected here. You will review the membership agreement before checkout, and access is activated only after agreement signing and payment.
+            No payment is collected here. You will review the membership agreement before checkout, and access is activated only after signing and payment are confirmed.
           </p>
         </div>
         <div className="rounded-lg bg-[#F8F9FD] px-4 py-3 text-sm font-bold text-[#0A1547]/65">
@@ -1075,7 +1065,7 @@ export default function AlphaScreenPricingPage() {
               </a>
             </div>
             <p className="mt-5 max-w-xl text-sm font-semibold leading-relaxed text-[#0A1547]/55">
-              Self-serve purchase is being prepared. Final signup will require agreement review and payment before dashboard activation.
+              Start signup with a package selection, then review the agreement and continue to secure payment before dashboard activation.
             </p>
           </div>
 
@@ -1149,7 +1139,7 @@ export default function AlphaScreenPricingPage() {
             <EnterpriseCard />
           </div>
           <p className="mt-5 max-w-3xl text-sm leading-relaxed text-[#0A1547]/55">
-            Annual pricing is paid upfront with a 10% discount on the platform fee only. Role fees remain listed separately. Stripe checkout and account activation are not active on this page yet.
+            Annual platform pricing is discounted and billed upfront. Role fees are billed separately when roles are created. Secure checkout opens after agreement signing.
           </p>
         </div>
       </section>
@@ -1211,18 +1201,18 @@ export default function AlphaScreenPricingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Coming workflow</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">What self-serve signup will require</h2>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Signup workflow</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">How package signup works</h2>
               <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
-                This pricing page now supports staged signup details and agreement preparation. Payment and account activation stay gated until the later workflow is wired end to end.
+                Package signup starts here, continues through agreement review, and moves to secure Stripe Checkout after signing. Dashboard access stays gated until payment is confirmed.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {[
                 ["1", "Choose a package", "Select Basic, Pro, or contact Sales for custom terms."],
-                ["2", "Review agreement", "Final signup will require membership agreement review and signature."],
-                ["3", "Complete payment", "Stripe checkout will be added in a later phase."],
-                ["4", "Set up dashboard", "Activation will happen only after payment and account setup are complete."],
+                ["2", "Review agreement", "Review and sign your membership agreement."],
+                ["3", "Complete payment", "Continue to secure Stripe Checkout after signing."],
+                ["4", "Set up dashboard", "Activation happens only after payment is confirmed."],
               ].map(([step, title, body]) => (
                 <div key={step} className="rounded-lg border border-[#0A1547]/10 bg-white p-5">
                   <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#0A1547] text-sm font-black text-white">
@@ -1242,10 +1232,10 @@ export default function AlphaScreenPricingPage() {
           <div>
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Demo and contact</p>
             <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
-              Need access before self-serve purchase opens?
+              Need a custom rollout or Enterprise volume?
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
-              Request a demo and the alphaSource team can walk through package fit, agreement timing, and current onboarding options.
+              Request a demo and the alphaSource team can help confirm package fit, implementation timing, and onboarding options.
             </p>
           </div>
           <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6 shadow-sm">
