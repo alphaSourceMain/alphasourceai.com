@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
+import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
 
 const EASE_OUT = "easeOut" as const;
 
@@ -76,6 +77,15 @@ function HeroSection() {
               A membership-based AI interview agent that lets you create job roles and conduct automated screening interviews with AI avatars. The platform leverages advanced AI to comprehensively evaluate candidates — with flexible scheduling so candidates can interview anytime, day or night.
             </motion.p>
 
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.27, duration: 0.6 }}
+              className="mb-8 text-sm font-semibold text-[#0A1547]/42"
+            >
+              Last updated {PUBLIC_CONTENT_LAST_UPDATED}
+            </motion.p>
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -140,6 +150,97 @@ function HeroSection() {
               </div>
             </div>
           </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DirectAnswerSection() {
+  const answers = [
+    {
+      question: "What is AI candidate screening?",
+      answer:
+        "AI candidate screening uses structured software workflows to collect, organize, and summarize early candidate information so hiring teams can review applicants more consistently.",
+    },
+    {
+      question: "How does alphaScreen help hiring teams?",
+      answer:
+        "alphaScreen helps teams create roles, invite candidates, run structured AI avatar interviews, and review resume plus interview information in one organized workflow.",
+    },
+    {
+      question: "How does structured interview scoring work?",
+      answer:
+        "Scores are based on role-specific criteria and structured interview responses. They give hiring teams a consistent review aid, not an automatic employment decision.",
+    },
+    {
+      question: "Why use alphaScreen instead of only resumes or phone screens?",
+      answer:
+        "Resumes and phone screens can miss context and vary by reviewer. alphaScreen gives each candidate a more comparable first-pass screen before the team spends time on later-stage conversations.",
+    },
+    {
+      question: "How does alphaScreen keep humans in control?",
+      answer:
+        "People configure roles, review candidate reports, decide next steps, and manage hiring communication. AI supports consistency, structure, and summarization.",
+    },
+  ];
+
+  return (
+    <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={fadeUp}
+          className="mb-8 max-w-3xl"
+        >
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">
+            Direct answers
+          </p>
+          <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
+            What hiring teams ask about AI screening
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
+            alphaScreen is designed to organize early screening signal, support consistent review, and keep hiring decisions with the people responsible for them.
+          </p>
+        </motion.div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {answers.map((item, index) => (
+            <motion.article
+              key={item.question}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.25 }}
+              variants={fadeUp}
+              custom={index * 0.3}
+              className="rounded-lg border border-[#0A1547]/10 bg-white p-5 shadow-sm"
+            >
+              <h3 className="text-base font-black leading-snug text-[#0A1547]">{item.question}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-[#0A1547]/60">{item.answer}</p>
+            </motion.article>
+          ))}
+        </div>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <a
+            href="/alphascreen/pricing"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-5 py-3 text-sm font-black text-white transition-opacity hover:opacity-90"
+            data-analytics-cta="Compare alphaScreen memberships"
+            data-analytics-placement="alphascreen-direct-answers"
+          >
+            Compare memberships
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <a
+            href="/faq"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-5 py-3 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+            data-analytics-cta="Read alphaScreen FAQ"
+            data-analytics-placement="alphascreen-direct-answers"
+          >
+            Read the FAQ
+          </a>
         </div>
       </div>
     </section>
@@ -581,6 +682,7 @@ export default function AlphaScreenPage() {
       <PricingSignupSection />
       <SmartSection />
       <AboutAlphaScreenSection />
+      <DirectAnswerSection />
       <HowItWorksSection />
       <DemoSection />
     </div>

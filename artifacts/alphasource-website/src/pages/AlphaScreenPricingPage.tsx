@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { trackEvent } from "@/lib/analytics";
+import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 
 type PackageLoadState = "loading" | "ready" | "fallback";
@@ -1049,6 +1050,9 @@ export default function AlphaScreenPricingPage() {
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#0A1547]/65">
               Choose Basic or Pro for structured AI-assisted candidate screening, or talk to sales for Enterprise volume and rollout support.
             </p>
+            <p className="mt-4 text-sm font-semibold text-[#0A1547]/45">
+              Last updated {PUBLIC_CONTENT_LAST_UPDATED}
+            </p>
             <a
               href="#pricing-demo"
               className="mt-8 inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-5 py-3 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
@@ -1134,6 +1138,8 @@ export default function AlphaScreenPricingPage() {
           </div>
           <p className="mt-5 max-w-3xl text-sm leading-relaxed text-[#0A1547]/55">
             Annual platform pricing is discounted and billed upfront. Role fees are billed separately when roles are created. Secure checkout opens after agreement signing.
+            {" "}
+            For product and workflow questions, review the <a href="/faq" className="font-black text-[#0A1547] underline decoration-[#A380F6]/35 underline-offset-4 transition-colors hover:text-[#A380F6]">alphaScreen FAQ</a> or <a href="/alphascreen" className="font-black text-[#0A1547] underline decoration-[#A380F6]/35 underline-offset-4 transition-colors hover:text-[#A380F6]">alphaScreen overview</a>.
           </p>
         </div>
       </section>
