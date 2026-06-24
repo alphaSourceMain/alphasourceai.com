@@ -95,6 +95,7 @@ interface PublicPurchaseItem {
   expires_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  support_summary?: string | null;
 }
 
 interface PublicPurchasesPayload {
@@ -131,6 +132,14 @@ interface PublicPurchasesPayload {
       has_more?: boolean;
     };
   };
+}
+
+type PurchaseAction = "setup" | "welcome" | "checkout" | "copy_summary";
+
+interface ActionState {
+  loading?: boolean;
+  success?: string;
+  error?: string;
 }
 
 const env =
@@ -233,6 +242,28 @@ function safeText(value: unknown, fallback = "Not available"): string {
   return text || fallback;
 }
 
+function redactEmail(value: unknown): string {
+  const email = String(value || "").trim();
+  const [user, domain] = email.split("@");
+  if (!user || !domain) return email || "this buyer";
+  if (user.length <= 3) return `${user.slice(0, 1)}***@${domain}`;
+  return `${user.slice(0, 2)}***@${domain}`;
+}
+
+function actionKey(itemId: string, action: PurchaseAction): string {
+  return `${itemId}:${action}`;
+}
+
+function canSendSetupOrWelcome(item: PublicPurchaseItem): boolean {
+  const status = String(item.status?.key || "").toLowerCase();
+  return status === "setup_pending" || status === "completed";
+}
+
+function canSendCheckoutLink(item: PublicPurchaseItem): boolean {
+  const status = String(item.status?.key || "").toLowerCase();
+  return status === "signed_unpaid" || status === "checkout_pending";
+}
+
 function statusClass(status: unknown): string {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "completed") return "bg-[#02D99D]/10 text-[#00886A]";
@@ -294,11 +325,18 @@ function PurchaseRow({
   item,
   expanded,
   onToggle,
+  actionStates,
+  onRecoveryAction,
+  onCopySupportSummary,
 }: {
   item: PublicPurchaseItem;
   expanded: boolean;
   onToggle: () => void;
+  actionStates: Record<string, ActionState>;
+  onRecoveryAction: (item: PublicPurchaseItem, action: Exclude<PurchaseAction, "copy_summary">) => void;
+  onCopySupportSummary: (item: PublicPurchaseItem) => void;
 }) {
+  const rowId = String(item.id || item.purchase_intent_id || "");
   const membershipName = safeText(item.membership?.display_name, titleCase(item.membership?.key));
   const cadence = safeText(item.membership?.billing_cadence, "");
   const cadenceLabel = cadence ? titleCase(cadence) : "Billing not available";
@@ -307,6 +345,16 @@ function PurchaseRow({
     item.membership?.interview_duration_minutes ? `${item.membership.interview_duration_minutes}-minute cap` : "",
     item.membership?.additional_interview_price ? `${formatMoney(item.membership.additional_interview_price)} overage` : "",
   ].filter(Boolean).join(" · ");
+  const setupState = actionStates[actionKey(rowId, "setup")] || {};
+  const welcomeState = actionStates[actionKey(rowId, "welcome")] || {};
+  const checkoutState = actionStates[actionKey(rowId, "checkout")] || {};
+  const copyState = actionStates[actionKey(rowId, "copy_summary")] || {};
+  const hasRecoveryActions = canSendSetupOrWelcome(item) || canSendCheckoutLink(item);
+  const renderActionFeedback = (state: ActionState) => {
+    if (state.error) return <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">{state.error}</p>;
+    if (state.success) return <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{state.success}</p>;
+    return null;
+  };
 
   return (
     <article className="rounded-2xl border p-4" style={surfaceCardStyle}>
@@ -365,8 +413,67 @@ function PurchaseRow({
             <DetailRow label="Member setup" value={item.account_setup?.member_user_linked ? `Linked · ${safeText(item.account_setup?.member_role)}` : item.account_setup?.member_found ? "Member row found, user not linked" : "Not found"} />
             <DetailRow label="Welcome email" value={item.email_delivery?.welcome_email ? `${safeText(item.email_delivery.welcome_email.status)} · ${formatDateTime(item.email_delivery.welcome_email.last_event_at)}` : "Not recorded"} />
           </div>
-          <div className="rounded-xl border px-3 py-2 text-xs font-semibold" style={fieldStyle}>
-            Read-only monitor. Recovery, resend, cancel, void, archive, and checkout actions are intentionally not available in this phase.
+          <div className="rounded-2xl border p-4" style={fieldStyle}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-black" style={primaryTextStyle}>Recovery actions</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>
+                  Email sends are admin-only and do not change payment, billing, agreement, or access status.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canSendSetupOrWelcome(item) && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={setupState.loading}
+                      onClick={() => onRecoveryAction(item, "setup")}
+                      className="rounded-full border border-[#A380F6]/35 px-3 py-2 text-xs font-black text-[#4E40A5] transition hover:bg-[#A380F6]/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#D7CBFB]"
+                    >
+                      {setupState.loading ? "Sending..." : "Resend setup email"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={welcomeState.loading}
+                      onClick={() => onRecoveryAction(item, "welcome")}
+                      className="rounded-full border border-[#A380F6]/35 px-3 py-2 text-xs font-black text-[#4E40A5] transition hover:bg-[#A380F6]/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#D7CBFB]"
+                    >
+                      {welcomeState.loading ? "Sending..." : "Resend welcome email"}
+                    </button>
+                  </>
+                )}
+                {canSendCheckoutLink(item) && (
+                  <button
+                    type="button"
+                    disabled={checkoutState.loading}
+                    onClick={() => onRecoveryAction(item, "checkout")}
+                    className="rounded-full border border-[#A380F6]/35 px-3 py-2 text-xs font-black text-[#4E40A5] transition hover:bg-[#A380F6]/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#D7CBFB]"
+                  >
+                    {checkoutState.loading ? "Sending..." : "Resend checkout link"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={copyState.loading}
+                  onClick={() => onCopySupportSummary(item)}
+                  className="rounded-full border px-3 py-2 text-xs font-black transition hover:border-[#A380F6] disabled:cursor-not-allowed disabled:opacity-50"
+                  style={fieldStyle}
+                >
+                  Copy support summary
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              {!hasRecoveryActions && (
+                <p className="text-xs font-semibold" style={mutedTextStyle}>
+                  Email recovery actions are not available for this current status.
+                </p>
+              )}
+              {renderActionFeedback(setupState)}
+              {renderActionFeedback(welcomeState)}
+              {renderActionFeedback(checkoutState)}
+              {renderActionFeedback(copyState)}
+            </div>
           </div>
         </div>
       )}
@@ -386,6 +493,7 @@ export default function AdminPublicPurchasesPage() {
   const [page, setPage] = useState(1);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
 
   const getToken = useCallback(async (): Promise<string> => {
     const {
@@ -440,6 +548,79 @@ export default function AdminPublicPurchasesPage() {
     setPage(1);
     setExpandedId(null);
   }, []);
+
+  const setRowActionState = useCallback((itemId: string, action: PurchaseAction, state: ActionState) => {
+    setActionStates((current) => ({
+      ...current,
+      [actionKey(itemId, action)]: state,
+    }));
+  }, []);
+
+  const runRecoveryAction = useCallback(async (item: PublicPurchaseItem, action: Exclude<PurchaseAction, "copy_summary">) => {
+    const itemId = String(item.id || item.purchase_intent_id || "").trim();
+    if (!itemId) return;
+    const email = safeText(item.buyer?.email, "this buyer");
+    const confirmation =
+      action === "setup"
+        ? `Send password setup email to ${redactEmail(email)}?`
+        : action === "welcome"
+          ? `Send welcome email to ${email}?`
+          : `Send checkout recovery link to ${email}?`;
+    if (!window.confirm(confirmation)) return;
+    if (!backendBase) {
+      setRowActionState(itemId, action, { error: "Missing backend base URL configuration." });
+      return;
+    }
+    const endpoint =
+      action === "setup"
+        ? "resend-setup-email"
+        : action === "welcome"
+          ? "resend-welcome-email"
+          : "resend-checkout-link";
+    setRowActionState(itemId, action, { loading: true });
+    try {
+      const token = await getToken();
+      const response = await fetch(`${backendBase}/admin/public-purchases/${encodeURIComponent(itemId)}/${endpoint}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "omit",
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(extractErrorMessage(text, "Recovery action failed."));
+      }
+      const data = parseJsonSafe(text) as { message?: unknown; recipient?: unknown } | null;
+      const fallback =
+        action === "setup"
+          ? "Password setup email sent."
+          : action === "welcome"
+            ? "Welcome email sent."
+            : "Checkout recovery link sent.";
+      setRowActionState(itemId, action, { success: String(data?.message || fallback) });
+      setReloadNonce((value) => value + 1);
+    } catch (actionError) {
+      setRowActionState(itemId, action, {
+        error: actionError instanceof Error ? actionError.message : "Recovery action failed.",
+      });
+    }
+  }, [getToken, setRowActionState]);
+
+  const copySupportSummary = useCallback(async (item: PublicPurchaseItem) => {
+    const itemId = String(item.id || item.purchase_intent_id || "").trim();
+    if (!itemId) return;
+    const summary = String(item.support_summary || "").trim();
+    if (!summary) {
+      setRowActionState(itemId, "copy_summary", { error: "Support summary is not available for this row." });
+      return;
+    }
+    setRowActionState(itemId, "copy_summary", { loading: true });
+    try {
+      await navigator.clipboard.writeText(summary);
+      setRowActionState(itemId, "copy_summary", { success: "Support summary copied." });
+    } catch {
+      setRowActionState(itemId, "copy_summary", { error: "Could not copy support summary." });
+    }
+  }, [setRowActionState]);
 
   const purchases = payload?.purchases?.items || [];
   const pagination = payload?.purchases?.pagination || {};
@@ -652,6 +833,9 @@ export default function AdminPublicPurchasesPage() {
                   item={item}
                   expanded={expandedId === rowId}
                   onToggle={() => setExpandedId((current) => (current === rowId ? null : rowId))}
+                  actionStates={actionStates}
+                  onRecoveryAction={runRecoveryAction}
+                  onCopySupportSummary={copySupportSummary}
                 />
               );
             })
