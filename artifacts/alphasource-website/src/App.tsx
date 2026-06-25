@@ -17,6 +17,13 @@ import PageAnalytics from "@/components/PageAnalytics";
 import HomePage from "@/pages/HomePage";
 import AlphaScreenPage from "@/pages/AlphaScreenPage";
 import AlphaScreenPricingPage from "@/pages/AlphaScreenPricingPage";
+import {
+  AlphaScreenCandidateExperiencePage,
+  AlphaScreenDentalGroupsPage,
+  AlphaScreenHowItWorksPage,
+  AlphaScreenRoiPage,
+  AlphaScreenSecurityPage,
+} from "@/pages/AlphaScreenRetailPages";
 import CheckoutSubscriptionSuccessPage from "@/pages/CheckoutSubscriptionSuccessPage";
 import PasswordSetupPreviewPage from "@/pages/PasswordSetupPreviewPage";
 import AboutPage from "@/pages/AboutPage";
@@ -472,6 +479,11 @@ function Router() {
           <Route path="/checkout/subscription-success" component={CheckoutSubscriptionSuccessPage} />
           <Route path="/"            component={HomePage} />
           <Route path="/alphascreen/pricing" component={AlphaScreenPricingPage} />
+          <Route path="/alphascreen/how-it-works" component={AlphaScreenHowItWorksPage} />
+          <Route path="/alphascreen/security" component={AlphaScreenSecurityPage} />
+          <Route path="/alphascreen/candidate-experience" component={AlphaScreenCandidateExperiencePage} />
+          <Route path="/alphascreen/for-dental-groups" component={AlphaScreenDentalGroupsPage} />
+          <Route path="/alphascreen/roi" component={AlphaScreenRoiPage} />
           <Route path="/alphascreen" component={AlphaScreenPage} />
           <Route path="/about"       component={AboutPage} />
           <Route path="/support"     component={PublicSupportPage} />

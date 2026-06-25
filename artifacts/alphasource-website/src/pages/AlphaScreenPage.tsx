@@ -184,6 +184,13 @@ function DirectAnswerSection() {
         "People configure roles, review candidate reports, decide next steps, and manage hiring communication. AI supports consistency, structure, and summarization.",
     },
   ];
+  const relatedLinks = [
+    { label: "How alphaScreen works", href: "/alphascreen/how-it-works" },
+    { label: "Security and data", href: "/alphascreen/security" },
+    { label: "Candidate experience", href: "/alphascreen/candidate-experience" },
+    { label: "Dental groups", href: "/alphascreen/for-dental-groups" },
+    { label: "ROI estimator", href: "/alphascreen/roi" },
+  ];
 
   return (
     <section className="bg-[#F8F9FD] py-16 lg:py-20">
@@ -241,6 +248,20 @@ function DirectAnswerSection() {
           >
             Read the FAQ
           </a>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {relatedLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="rounded-full border border-[#0A1547]/10 bg-white px-3 py-2 text-xs font-black text-[#0A1547]/65 transition-colors hover:border-[#A380F6]/45 hover:text-[#A380F6]"
+              data-analytics-cta={link.label}
+              data-analytics-placement="alphascreen-direct-answers"
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
       </div>
     </section>

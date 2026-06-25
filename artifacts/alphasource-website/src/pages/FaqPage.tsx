@@ -101,6 +101,10 @@ export default function SupportPage() {
   const resourceLinks = [
     { label: "Explore alphaScreen", href: "/alphascreen" },
     { label: "Compare memberships", href: "/alphascreen/pricing" },
+    { label: "How alphaScreen works", href: "/alphascreen/how-it-works" },
+    { label: "Security and data", href: "/alphascreen/security" },
+    { label: "Candidate experience", href: "/alphascreen/candidate-experience" },
+    { label: "ROI estimator", href: "/alphascreen/roi" },
     { label: "Read the Privacy Policy", href: "/privacy" },
     { label: "Request a demo", href: "/#contact" },
   ];

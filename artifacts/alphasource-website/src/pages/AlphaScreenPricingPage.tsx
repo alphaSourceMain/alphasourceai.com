@@ -378,7 +378,7 @@ function PlanCard({
         <PackageMetric
           icon={<BadgeDollarSign className="h-4 w-4" />}
           label="Additional interviews"
-          value={`${formatUsd(overage)} each`}
+          value={`${formatUsd(overage)} per additional interview`}
         />
       </div>
 
@@ -1077,9 +1077,9 @@ export default function AlphaScreenPricingPage() {
             </div>
             <div className="mt-5 grid gap-3">
               {[
-                ["Basic", "$299/mo + $399/role", "20 interviews, 10-minute cap"],
-                ["Pro", "$599/mo + $699/role", "30 interviews, 12-minute cap"],
-                ["Enterprise", "Custom membership", "Talk to sales"],
+                ["Basic", "$299/mo or $3,299/year + $399/role", "20 interviews, 10-minute cap, $30 additional interviews"],
+                ["Pro", "$599/mo or $6,499/year + $699/role", "30 interviews, 12-minute cap, $35 additional interviews"],
+                ["Enterprise", "Custom membership", "Talk to sales for custom volume"],
               ].map(([name, price, detail]) => (
                 <div key={name} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-[#F8F9FD] px-4 py-3">
                   <div>
@@ -1137,10 +1137,29 @@ export default function AlphaScreenPricingPage() {
             <EnterpriseCard />
           </div>
           <p className="mt-5 max-w-3xl text-sm leading-relaxed text-[#0A1547]/55">
-            Annual platform pricing is discounted and billed upfront. Role fees are billed separately when roles are created. Secure checkout opens after agreement signing.
+            Annual platform pricing is discounted and billed upfront. Role fees are billed separately when roles are created. Basic additional interviews are fixed at $30 each. Pro additional interviews are fixed at $35 each. Secure checkout opens after agreement signing.
             {" "}
             For product and workflow questions, review the <a href="/faq" className="font-black text-[#0A1547] underline decoration-[#A380F6]/35 underline-offset-4 transition-colors hover:text-[#A380F6]">alphaScreen FAQ</a> or <a href="/alphascreen" className="font-black text-[#0A1547] underline decoration-[#A380F6]/35 underline-offset-4 transition-colors hover:text-[#A380F6]">alphaScreen overview</a>.
           </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {[
+              ["How it works", "/alphascreen/how-it-works"],
+              ["Security", "/alphascreen/security"],
+              ["Candidate experience", "/alphascreen/candidate-experience"],
+              ["Dental groups", "/alphascreen/for-dental-groups"],
+              ["ROI estimator", "/alphascreen/roi"],
+            ].map(([label, href]) => (
+              <a
+                key={href}
+                href={href}
+                className="rounded-full border border-[#0A1547]/10 bg-[#F8F9FD] px-3 py-2 text-xs font-black text-[#0A1547]/65 transition-colors hover:border-[#A380F6]/45 hover:text-[#A380F6]"
+                data-analytics-cta={label}
+                data-analytics-placement="pricing-related-links"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1199,20 +1218,21 @@ export default function AlphaScreenPricingPage() {
 
       <section className="bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-            <div>
+          <div className="grid gap-8">
+            <div className="max-w-3xl">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Signup workflow</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">From membership choice to first screening role</h2>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">What happens next after signup starts</h2>
               <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
-                Pick the membership that fits your hiring volume, review terms, and complete secure checkout when you are ready. The alphaSource team keeps setup moving so your hiring team can start screening quickly.
+                Pick the membership that fits your hiring volume, review terms, complete checkout, and set up access before creating roles and inviting candidates.
               </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {[
-                ["1", "Choose a membership", "Select Basic, Pro, or talk to sales for custom terms."],
+                ["1", "Start membership signup", "Select Basic, Pro, or talk to sales for custom terms."],
                 ["2", "Review agreement", "Review and sign your membership agreement."],
-                ["3", "Complete secure payment", "Continue to Stripe Checkout after signing."],
-                ["4", "Start screening", "Finish account setup and begin creating roles for your hiring team."],
+                ["3", "Complete Stripe Checkout", "Continue to secure payment after signing."],
+                ["4", "Set your password", "Finish account setup and access the dashboard."],
+                ["5", "Create roles and invite candidates", "Configure screening roles and send candidates into the workflow."],
               ].map(([step, title, body]) => (
                 <div key={step} className="rounded-lg border border-[#0A1547]/10 bg-white p-5">
                   <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#0A1547] text-sm font-black text-white">

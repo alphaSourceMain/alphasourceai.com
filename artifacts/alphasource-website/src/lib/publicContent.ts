@@ -1,4 +1,4 @@
-export const PUBLIC_CONTENT_LAST_UPDATED = "June 24, 2026";
+export const PUBLIC_CONTENT_LAST_UPDATED = "June 25, 2026";
 
 export type PublicFaqItem = {
   question: string;

@@ -194,6 +194,29 @@ const FAQ_SCHEMA = {
   })),
 };
 
+function alphaScreenWebPageSchema(path: string, name: string, description: string): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name,
+    description,
+    url: routeUrl(path),
+    isPartOf: WEBSITE_SCHEMA,
+    about: {
+      "@type": "SoftwareApplication",
+      name: "alphaScreen",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: routeUrl("/alphascreen"),
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "alphaSource AI",
+      url: `${SITE_URL}/`,
+    },
+  };
+}
+
 const PUBLIC_ROUTES: Record<string, Omit<SeoConfig, "robots" | "imagePath" | "type">> = {
   "/": {
     title: "alphaSource AI | AI Candidate Screening and Workflow Automation",
@@ -226,6 +249,96 @@ const PUBLIC_ROUTES: Record<string, Omit<SeoConfig, "robots" | "imagePath" | "ty
         { name: "Home", path: "/" },
         { name: "alphaScreen", path: "/alphascreen" },
         { name: "Pricing", path: "/alphascreen/pricing" },
+      ]),
+    ],
+  },
+  "/alphascreen/how-it-works": {
+    title: "How alphaScreen Works | Self-Serve AI Screening Workflow",
+    description:
+      "See how alphaScreen self-serve signup, agreement review, Stripe Checkout, account setup, role creation, candidate invitations, and structured reports work.",
+    path: "/alphascreen/how-it-works",
+    jsonLd: [
+      alphaScreenWebPageSchema(
+        "/alphascreen/how-it-works",
+        "How alphaScreen Works",
+        "Self-serve alphaScreen workflow from membership selection to structured candidate review.",
+      ),
+      breadcrumbSchema([
+        { name: "Home", path: "/" },
+        { name: "alphaScreen", path: "/alphascreen" },
+        { name: "How It Works", path: "/alphascreen/how-it-works" },
+      ]),
+    ],
+  },
+  "/alphascreen/security": {
+    title: "alphaScreen Security | Candidate Data and Human Review",
+    description:
+      "Review alphaScreen public security and data protection positioning for candidate data, authorized access, reports, privacy, and human hiring decisions.",
+    path: "/alphascreen/security",
+    jsonLd: [
+      alphaScreenWebPageSchema(
+        "/alphascreen/security",
+        "alphaScreen Security and Data Protection",
+        "Public alphaScreen data protection overview covering candidate data, access control, reports, privacy, and human review.",
+      ),
+      breadcrumbSchema([
+        { name: "Home", path: "/" },
+        { name: "alphaScreen", path: "/alphascreen" },
+        { name: "Security", path: "/alphascreen/security" },
+      ]),
+    ],
+  },
+  "/alphascreen/candidate-experience": {
+    title: "alphaScreen Candidate Experience | Structured AI Screening",
+    description:
+      "Learn how candidates experience alphaScreen structured AI avatar screening interviews and how hiring teams review results.",
+    path: "/alphascreen/candidate-experience",
+    jsonLd: [
+      alphaScreenWebPageSchema(
+        "/alphascreen/candidate-experience",
+        "alphaScreen Candidate Experience",
+        "Public overview of the candidate experience in alphaScreen structured AI-assisted screening interviews.",
+      ),
+      breadcrumbSchema([
+        { name: "Home", path: "/" },
+        { name: "alphaScreen", path: "/alphascreen" },
+        { name: "Candidate Experience", path: "/alphascreen/candidate-experience" },
+      ]),
+    ],
+  },
+  "/alphascreen/for-dental-groups": {
+    title: "alphaScreen for Dental Groups | DSO and Multi-Location Hiring",
+    description:
+      "See how alphaScreen supports structured candidate screening for dental groups, DSOs, multi-location operators, and broader hiring teams.",
+    path: "/alphascreen/for-dental-groups",
+    jsonLd: [
+      alphaScreenWebPageSchema(
+        "/alphascreen/for-dental-groups",
+        "alphaScreen for Dental Groups",
+        "Public alphaScreen use case page for dental groups, DSOs, multi-location operators, and other structured hiring teams.",
+      ),
+      breadcrumbSchema([
+        { name: "Home", path: "/" },
+        { name: "alphaScreen", path: "/alphascreen" },
+        { name: "Dental Groups", path: "/alphascreen/for-dental-groups" },
+      ]),
+    ],
+  },
+  "/alphascreen/roi": {
+    title: "alphaScreen ROI Estimator | Screening Time and Membership Cost",
+    description:
+      "Estimate screening hours, labor value, membership platform cost, role fees, and additional interview fees for alphaScreen Basic and Pro memberships.",
+    path: "/alphascreen/roi",
+    jsonLd: [
+      alphaScreenWebPageSchema(
+        "/alphascreen/roi",
+        "alphaScreen ROI Estimator",
+        "Estimate screening time, labor value, and alphaScreen membership costs without guarantee of savings or outcomes.",
+      ),
+      breadcrumbSchema([
+        { name: "Home", path: "/" },
+        { name: "alphaScreen", path: "/alphascreen" },
+        { name: "ROI Estimator", path: "/alphascreen/roi" },
       ]),
     ],
   },
