@@ -572,17 +572,21 @@ export function AlphaScreenRoiPage() {
                   </select>
                 </label>
               </div>
+
+              <div className="rounded-lg border border-[#0A1547]/10 bg-white p-4">
+                <p className="text-sm font-black text-[#0A1547]">{estimate.selected.name} membership assumptions</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
+                  Includes {estimate.selected.included} interviews per role, {estimate.selected.cap}-minute interview cap, {formatUsd(estimate.selected.role)} per role, and {formatUsd(estimate.selected.additional)} per additional interview.
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm">
-            <div className="mb-5 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
+            <div className="mb-5 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
               <h2 className="text-base font-black text-[#0A1547]">How this estimate works</h2>
               <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                The calculator estimates the labor cost of manual initial screens by multiplying roles, candidates per role, screening minutes, and hourly cost. It then compares that estimate with the selected alphaScreen membership and role fees.
-              </p>
-              <p className="mt-3 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
-                This estimate does not include downstream hiring outcomes, offer acceptance, retention, or the operational value of faster manager review.
+                The calculator compares estimated manual initial-screening labor cost with the selected alphaScreen membership, role, and additional-interview costs.
               </p>
             </div>
 
@@ -612,18 +616,21 @@ export function AlphaScreenRoiPage() {
               <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
                 Estimated difference between manual initial-screening labor cost and the selected alphaScreen membership, role, and additional-interview costs.
               </p>
-              <p className="mt-3 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
-                This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
-              </p>
-              <p className="mt-2 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-[#0A1547]/60">
                 <strong>Additional value</strong> may also come from <strong>efficiency gains</strong> when hiring managers can spend recovered screening time on higher-value work.
               </p>
             </div>
 
-            <div className="mt-5 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
-              <p className="text-sm font-black text-[#0A1547]">{estimate.selected.name} membership assumptions</p>
-              <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                Includes {estimate.selected.included} interviews per role, {estimate.selected.cap}-minute interview cap, {formatUsd(estimate.selected.role)} per role, and {formatUsd(estimate.selected.additional)} per additional interview.
+            <div className="mt-4 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Supporting notes</p>
+              <p className="mt-2 text-xs font-semibold leading-relaxed text-[#0A1547]/55">
+                alphaScreen can collect structured candidate responses outside normal working hours, while hiring managers are typically limited to business-hour review time.
+              </p>
+              <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
+                * This estimate does not include downstream hiring outcomes, offer acceptance, retention, or the operational value of faster manager review.
+              </p>
+              <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
+                * This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
               </p>
             </div>
           </div>
