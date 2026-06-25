@@ -614,7 +614,10 @@ export function AlphaScreenRoiPage() {
                 {estimate.net < 0 ? ` At these inputs, selected alphaScreen costs are ${formatUsd(Math.abs(estimate.net))} higher than the estimated manual initial-screening labor cost.` : ""}
               </p>
               <p className="mt-3 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
-                This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality. Actual value may also come from efficiency gains when hiring managers can spend recovered screening time on higher-value work.
+                This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
+              </p>
+              <p className="mt-2 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
+                <strong>Additional value</strong> may also come from <strong>efficiency gains</strong> when hiring managers can spend recovered screening time on higher-value work.
               </p>
             </div>
 
