@@ -522,117 +522,112 @@ export function AlphaScreenRoiPage() {
       </PageHero>
 
       <section className="bg-white py-16 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-8 px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-          <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A380F6]/10 text-[#A380F6]">
-                <Calculator className="h-5 w-5" />
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="grid items-stretch gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A380F6]/10 text-[#A380F6]">
+                  <Calculator className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-[#0A1547]">Screening estimate inputs</h2>
+                  <p className="text-sm font-semibold text-[#0A1547]/50">Adjust these values for a typical month.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black text-[#0A1547]">Screening estimate inputs</h2>
-                <p className="text-sm font-semibold text-[#0A1547]/50">Adjust these values for a typical month.</p>
+
+              <div className="flex flex-1 flex-col gap-4">
+                {numericInputs.map((input) => (
+                  <label key={input.label} className="grid gap-2">
+                    <span className="text-sm font-black text-[#0A1547]">{input.label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={input.value}
+                      onChange={(event) => input.setValue(Number(event.target.value))}
+                      className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
+                    />
+                  </label>
+                ))}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-sm font-black text-[#0A1547]">Membership</span>
+                    <select
+                      value={membership}
+                      onChange={(event) => setMembership(event.target.value as MembershipKey)}
+                      className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
+                    >
+                      <option value="basic">Basic</option>
+                      <option value="pro">Pro</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-sm font-black text-[#0A1547]">Billing cadence</span>
+                    <select
+                      value={cadence}
+                      onChange={(event) => setCadence(event.target.value as CadenceKey)}
+                      className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="annual">Annual</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-auto rounded-lg border border-[#0A1547]/10 bg-white p-4">
+                  <p className="text-sm font-black text-[#0A1547]">{estimate.selected.name} membership assumptions</p>
+                  <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
+                    Includes {estimate.selected.included} interviews per role, {estimate.selected.cap}-minute interview cap, {formatUsd(estimate.selected.role)} per role, and {formatUsd(estimate.selected.additional)} per additional interview.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4">
-              {numericInputs.map((input) => (
-                <label key={input.label} className="grid gap-2">
-                  <span className="text-sm font-black text-[#0A1547]">{input.label}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={input.value}
-                    onChange={(event) => input.setValue(Number(event.target.value))}
-                    className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
-                  />
-                </label>
-              ))}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2">
-                  <span className="text-sm font-black text-[#0A1547]">Membership</span>
-                  <select
-                    value={membership}
-                    onChange={(event) => setMembership(event.target.value as MembershipKey)}
-                    className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
-                  >
-                    <option value="basic">Basic</option>
-                    <option value="pro">Pro</option>
-                  </select>
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-black text-[#0A1547]">Billing cadence</span>
-                  <select
-                    value={cadence}
-                    onChange={(event) => setCadence(event.target.value as CadenceKey)}
-                    className="min-h-11 rounded-lg border border-[#0A1547]/12 bg-white px-3 text-sm font-bold text-[#0A1547] outline-none transition-colors focus:border-[#A380F6]"
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="annual">Annual</option>
-                  </select>
-                </label>
+            <div className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#02D99D]/10 text-[#02D99D]">
+                  <LineChart className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-[#0A1547]">Estimated monthly comparison</h2>
+                  <p className="text-sm font-semibold text-[#0A1547]/50">Based on the values entered in the calculator.</p>
+                </div>
               </div>
 
-              <div className="rounded-lg border border-[#0A1547]/10 bg-white p-4">
-                <p className="text-sm font-black text-[#0A1547]">{estimate.selected.name} membership assumptions</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {resultCards.map((card) => (
+                  <div key={card.label} className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+                    <div className="mb-2 text-[#A380F6]">{card.icon}</div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">{card.label}</p>
+                    <p className="mt-1 text-xl font-black text-[#0A1547]">{card.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-lg border border-[#02D99D]/25 bg-[#02D99D]/10 p-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Estimated potential savings</p>
+                <p className="mt-2 text-3xl font-black text-[#0A1547]">{formatUsd(potentialSavings)}</p>
                 <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                  Includes {estimate.selected.included} interviews per role, {estimate.selected.cap}-minute interview cap, {formatUsd(estimate.selected.role)} per role, and {formatUsd(estimate.selected.additional)} per additional interview.
+                  Estimated difference between manual initial-screening labor cost and the selected alphaScreen membership, role, and additional-interview costs.
+                </p>
+                <p className="mt-3 text-sm font-semibold leading-relaxed text-[#0A1547]/60">
+                  <strong>Additional value</strong> may also come from <strong>efficiency gains</strong> when hiring managers can spend recovered screening time on higher-value work.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm">
-            <div className="mb-5 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
-              <h2 className="text-base font-black text-[#0A1547]">How this estimate works</h2>
-              <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                The calculator compares estimated manual initial-screening labor cost with the selected alphaScreen membership, role, and additional-interview costs.
-              </p>
-            </div>
-
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#02D99D]/10 text-[#02D99D]">
-                <LineChart className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-xl font-black text-[#0A1547]">Estimated monthly comparison</h2>
-                <p className="text-sm font-semibold text-[#0A1547]/50">Based on the values entered in the calculator.</p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {resultCards.map((card) => (
-                <div key={card.label} className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
-                  <div className="mb-2 text-[#A380F6]">{card.icon}</div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">{card.label}</p>
-                  <p className="mt-1 text-xl font-black text-[#0A1547]">{card.value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 rounded-lg border border-[#02D99D]/25 bg-[#02D99D]/10 p-5">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Estimated potential savings</p>
-              <p className="mt-2 text-3xl font-black text-[#0A1547]">{formatUsd(potentialSavings)}</p>
-              <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                Estimated difference between manual initial-screening labor cost and the selected alphaScreen membership, role, and additional-interview costs.
-              </p>
-              <p className="mt-3 text-sm font-semibold leading-relaxed text-[#0A1547]/60">
-                <strong>Additional value</strong> may also come from <strong>efficiency gains</strong> when hiring managers can spend recovered screening time on higher-value work.
-              </p>
-            </div>
-
-            <div className="mt-4 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Supporting notes</p>
-              <p className="mt-2 text-xs font-semibold leading-relaxed text-[#0A1547]/55">
-                alphaScreen can collect structured candidate responses outside normal working hours, while hiring managers are typically limited to business-hour review time.
-              </p>
-              <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
-                * This estimate does not include downstream hiring outcomes, offer acceptance, retention, or the operational value of faster manager review.
-              </p>
-              <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
-                * This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
-              </p>
-            </div>
+          <div className="mt-6 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Supporting notes</p>
+            <p className="mt-2 text-xs font-semibold leading-relaxed text-[#0A1547]/55">
+              alphaScreen can collect structured candidate responses outside normal working hours, while hiring managers are typically limited to business-hour review time.
+            </p>
+            <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
+              * This estimate does not include downstream hiring outcomes, offer acceptance, retention, or the operational value of faster manager review.
+            </p>
+            <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[#0A1547]/45">
+              * This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
+            </p>
           </div>
         </div>
       </section>
