@@ -592,7 +592,7 @@ export function AlphaScreenRoiPage() {
               </div>
               <div>
                 <h2 className="text-xl font-black text-[#0A1547]">Estimated monthly comparison</h2>
-                <p className="text-sm font-semibold text-[#0A1547]/50">Based on the values entered above.</p>
+                <p className="text-sm font-semibold text-[#0A1547]/50">Based on the values entered in the calculator.</p>
               </div>
             </div>
 
@@ -611,7 +611,6 @@ export function AlphaScreenRoiPage() {
               <p className="mt-2 text-3xl font-black text-[#0A1547]">{formatUsd(potentialSavings)}</p>
               <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
                 Estimated difference between manual initial-screening labor cost and the selected alphaScreen membership, role, and additional-interview costs.
-                {estimate.net < 0 ? ` At these inputs, selected alphaScreen costs are ${formatUsd(Math.abs(estimate.net))} higher than the estimated manual initial-screening labor cost.` : ""}
               </p>
               <p className="mt-3 text-xs font-semibold leading-relaxed text-[#0A1547]/50">
                 This estimate compares the labor cost of manual initial screening against the selected alphaScreen membership and role costs. It is not a guarantee of savings, hiring outcomes, or candidate quality.
