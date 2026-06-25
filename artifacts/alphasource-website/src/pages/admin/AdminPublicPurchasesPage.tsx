@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import {
   AlertCircle,
+  BookOpen,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -688,16 +690,26 @@ export default function AdminPublicPurchasesPage() {
               Track self-serve alphaScreen membership signups, agreement status, payment progress, and account setup.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setReloadNonce((value) => value + 1)}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: "#A380F6" }}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-            Refresh
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/public-purchases/playbook"
+              className="inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-black transition hover:border-[#A380F6] focus:outline-none focus:ring-2 focus:ring-[#A380F6]"
+              style={fieldStyle}
+            >
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              Support Playbook
+            </Link>
+            <button
+              type="button"
+              onClick={() => setReloadNonce((value) => value + 1)}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: "#A380F6" }}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+              Refresh
+            </button>
+          </div>
         </section>
 
         <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">

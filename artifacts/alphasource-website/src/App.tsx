@@ -56,6 +56,7 @@ import AdminClientsPage from "@/pages/admin/AdminClientsPage";
 import AdminMetricsPage from "@/pages/admin/AdminMetricsPage";
 import AdminPublicAnalyticsPage from "@/pages/admin/AdminPublicAnalyticsPage";
 import AdminPublicPurchasesPage from "@/pages/admin/AdminPublicPurchasesPage";
+import AdminPublicPurchasePlaybookPage from "@/pages/admin/AdminPublicPurchasePlaybookPage";
 import AdminRolesPage from "@/pages/admin/AdminRolesPage";
 import AdminCandidatesPage from "@/pages/admin/AdminCandidatesPage";
 import AdminRoleConfigPage from "@/pages/admin/AdminRoleConfigPage";
@@ -357,6 +358,7 @@ function AdminGuard() {
           <Route path="/admin"                  component={AdminOverviewPage} />
           <Route path="/admin/metrics"          component={AdminMetricsPage} />
           <Route path="/admin/public-analytics" component={AdminPublicAnalyticsPage} />
+          <Route path="/admin/public-purchases/playbook" component={AdminPublicPurchasePlaybookPage} />
           <Route path="/admin/public-purchases" component={AdminPublicPurchasesPage} />
           <Route path="/admin/clients"          component={AdminClientsPage} />
           <Route path="/admin/roles"            component={AdminRolesPage} />
