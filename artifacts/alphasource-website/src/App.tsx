@@ -12,6 +12,7 @@ import Footer from "@/components/Footer";
 import TawkWidget from "@/components/TawkWidget";
 import Seo from "@/components/Seo";
 import PageAnalytics from "@/components/PageAnalytics";
+import IDPixelLoader from "@/components/IDPixelLoader";
 
 /* Public pages */
 import HomePage from "@/pages/HomePage";
@@ -512,6 +513,7 @@ function Router() {
     <>
       <Seo location={location} />
       <PageAnalytics location={location} />
+      <IDPixelLoader location={location} />
       {content}
     </>
   );
