@@ -398,7 +398,13 @@ function hasMembersNavAccess(client: Client): boolean {
 
 function hasEntitiesNavAccess(client: Client, isGlobalAdmin: boolean): boolean {
   if (isGlobalAdmin) return true;
-  return normalizeClientRole(client.role) === "super_admin";
+  const isParentScope = !(client.is_child_client === true || client.parent_client_id);
+  const inheritedFromParent = client.inherited === true && Boolean(client.inherited_from_client_id || client.parent_client_id);
+  const canReachParentEntityScope = isParentScope || inheritedFromParent;
+  const permission = client.permissions?.can_manage_members;
+  if (permission === true) return canReachParentEntityScope;
+  if (permission === false) return false;
+  return canReachParentEntityScope && ["manager", "admin", "owner", "super_admin"].includes(normalizeClientRole(client.role));
 }
 
 /* ── Main layout ─────────────────────────────────────────────── */
