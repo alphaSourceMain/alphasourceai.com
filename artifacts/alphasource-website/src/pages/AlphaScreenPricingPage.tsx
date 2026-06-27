@@ -367,6 +367,8 @@ function validatePurchaseForm(form: PurchaseIntentForm, selectedPlan: AlphaScree
   if (!cleanText(form.buyer_first_name, 80)) return "Buyer first name is required.";
   if (!cleanText(form.buyer_last_name, 80)) return "Buyer last name is required.";
   if (!validEmail(form.buyer_email)) return "Enter a valid email address.";
+  if (!cleanText(form.buyer_phone, 40)) return "Phone is required.";
+  if (!cleanText(form.buyer_title, 100)) return "Title is required.";
   if (!form.agreement_acknowledged) return "Confirm that agreement signing and payment are required before access is activated.";
   if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen membership.";
   return "";
@@ -832,18 +834,20 @@ function PurchaseIntentPanel({
         />
         <PurchaseTextField
           label="Phone"
+          required
           type="tel"
           value={form.buyer_phone}
           onChange={(value) => onChange("buyer_phone", value)}
-          placeholder="Optional"
+          placeholder="+1 (555) 123-4567"
           maxLength={40}
           autoComplete="tel"
         />
         <PurchaseTextField
           label="Title"
+          required
           value={form.buyer_title}
           onChange={(value) => onChange("buyer_title", value)}
-          placeholder="Optional"
+          placeholder="Director of Operations"
           maxLength={100}
           autoComplete="organization-title"
         />
