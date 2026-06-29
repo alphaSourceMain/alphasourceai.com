@@ -14,6 +14,18 @@ export type SeoConfig = {
 };
 
 const SITE_URL = "https://www.alphasourceai.com";
+const TRAILING_SLASH_PUBLIC_PATHS = new Set([
+  "/about",
+  "/support",
+  "/faq",
+  "/alphascreen",
+  "/alphascreen/pricing",
+  "/alphascreen/how-it-works",
+  "/alphascreen/security",
+  "/alphascreen/candidate-experience",
+  "/alphascreen/for-dental-groups",
+  "/alphascreen/roi",
+]);
 const ORGANIZATION_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "Organization",
@@ -47,7 +59,8 @@ const WEBSITE_SCHEMA = {
 };
 
 function routeUrl(path = "/"): string {
-  return path === "/" ? `${SITE_URL}/` : `${SITE_URL}${path}`;
+  const canonicalPathname = toCanonicalPublicPath(path);
+  return canonicalPathname === "/" ? `${SITE_URL}/` : `${SITE_URL}${canonicalPathname}`;
 }
 
 function breadcrumbSchema(items: Array<{ name: string; path: string }>): Record<string, unknown> {
@@ -401,10 +414,16 @@ function normalizePath(pathname: string): string {
   return path.length > 1 ? path.replace(/\/+$/, "") : "/";
 }
 
+function toCanonicalPublicPath(pathname: string): string {
+  const normalizedPath = normalizePath(pathname);
+  if (normalizedPath === "/") return "/";
+  return TRAILING_SLASH_PUBLIC_PATHS.has(normalizedPath) ? `${normalizedPath}/` : normalizedPath;
+}
+
 export function canonicalUrl(path = "/"): string {
   const base = getPublicSiteBase() || "https://www.alphasourceai.com";
-  const normalizedPath = normalizePath(path);
-  return normalizedPath === "/" ? `${base}/` : `${base}${normalizedPath}`;
+  const canonicalPathname = toCanonicalPublicPath(path);
+  return canonicalPathname === "/" ? `${base}/` : `${base}${canonicalPathname}`;
 }
 
 export function assetUrl(path = "/opengraph.jpg"): string {

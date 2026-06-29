@@ -24,6 +24,8 @@ const publicRoutes = [
   "/alphascreen/roi",
 ];
 
+const trailingSlashPublicRoutes = new Set(publicRoutes.filter((route) => route !== "/"));
+
 const navLinks = [
   ["Home", "/"],
   ["About", "/about"],
@@ -627,7 +629,8 @@ function offer(name, price, unitText) {
 }
 
 function routeUrl(routePath = "/") {
-  return routePath === "/" ? `${SITE_URL}/` : `${SITE_URL}${routePath}`;
+  const href = crawlableHref(routePath);
+  return href === "/" ? `${SITE_URL}/` : `${SITE_URL}${href}`;
 }
 
 function webPageSchema(routePath, name, description) {
@@ -708,7 +711,7 @@ function renderNav() {
       <nav class="as-snapshot-nav" aria-label="Public navigation">
         <a class="as-brand" href="/">alphaSource AI</a>
         <div>
-          ${navLinks.map(([label, href]) => `<a href="${escapeAttr(href)}">${escapeHtml(label)}</a>`).join("\n          ")}
+          ${navLinks.map(([label, href]) => `<a href="${escapeAttr(crawlableHref(href))}">${escapeHtml(label)}</a>`).join("\n          ")}
         </div>
       </nav>`;
 }
@@ -723,7 +726,7 @@ function renderFooter() {
           <p><a href="https://www.linkedin.com/company/alphasourceai">LinkedIn</a> <a href="https://www.facebook.com/alphasourceai">Facebook</a></p>
         </div>
         <nav aria-label="Footer navigation">
-          ${footerLinks.map(([label, href]) => `<a href="${escapeAttr(href)}">${escapeHtml(label)}</a>`).join("\n          ")}
+          ${footerLinks.map(([label, href]) => `<a href="${escapeAttr(crawlableHref(href))}">${escapeHtml(label)}</a>`).join("\n          ")}
         </nav>
       </footer>`;
 }
@@ -752,7 +755,7 @@ function renderRelatedLinks(links) {
           <h2>Related alphaScreen pages</h2>
           <p>Use these public pages to compare alphaScreen workflows, security, pricing, candidate experience, and FAQ answers.</p>
           <nav aria-label="Related public pages">
-            ${links.map(([href, label]) => `<a href="${escapeAttr(href)}">${escapeHtml(label)}</a>`).join("\n            ")}
+            ${links.map(([href, label]) => `<a href="${escapeAttr(crawlableHref(href))}">${escapeHtml(label)}</a>`).join("\n            ")}
           </nav>
         </section>`;
 }
@@ -847,8 +850,9 @@ function writeStaticRoutingFile() {
     ...publicRoutes
       .filter((route) => route !== "/")
       .flatMap((route) => [
-        `${route} ${route}/index.html 200`,
+        `${route} ${crawlableHref(route)} 301`,
         `${route}/ ${route}/index.html 200`,
+        `${route}/index.html ${route}/index.html 200`,
       ]),
     "",
     "# Authenticated and dynamic app routes remain client-rendered SPA routes.",
@@ -867,6 +871,16 @@ function writeStaticRoutingFile() {
     "",
   ];
   fs.writeFileSync(path.join(distRoot, "_redirects"), lines.join("\n"));
+}
+
+function crawlableHref(href) {
+  const value = String(href || "").trim();
+  if (!value || !value.startsWith("/") || value === "/" || value.startsWith("/#")) return value;
+  const match = value.match(/^([^?#]*)([?#].*)?$/);
+  const pathPart = (match?.[1] || value).replace(/\/+$/, "") || "/";
+  const suffix = match?.[2] || "";
+  if (trailingSlashPublicRoutes.has(pathPart)) return `${pathPart}/${suffix}`;
+  return value;
 }
 
 function escapeHtml(value) {
