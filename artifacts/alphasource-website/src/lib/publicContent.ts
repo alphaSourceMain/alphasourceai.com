@@ -22,19 +22,24 @@ export const publicFaqSections: PublicFaqSection[] = [
           "alphaScreen is alphaSource AI's web-based candidate screening platform. It helps hiring teams create roles, invite candidates, run structured AI-assisted screening interviews, and review candidate reports before deciding what to do next.",
       },
       {
+        question: "How does alphaScreen work?",
+        answer:
+          "Hiring teams choose a membership, complete agreement and checkout steps, set up dashboard access, create roles, invite candidates, and review structured reports after candidates complete screening interviews.",
+      },
+      {
+        question: "Who is alphaScreen for?",
+        answer:
+          "alphaScreen is for employers and hiring teams that want a more consistent first-pass screening workflow before later-stage interviews and final hiring decisions.",
+      },
+      {
         question: "How does alphaScreen evaluate candidates?",
         answer:
           "alphaScreen combines role criteria, resume information, structured interview responses, and available interview signals into organized reports and scores. The output is designed to help hiring teams review candidates more consistently, not to make final hiring decisions automatically.",
       },
       {
-        question: "Does alphaScreen replace human hiring decisions?",
+        question: "Does alphaScreen replace recruiters or hiring managers?",
         answer:
-          "No. alphaScreen supports screening and review, but the employer remains responsible for hiring decisions, candidate follow-up, accommodations, and final judgment.",
-      },
-      {
-        question: "Can hiring teams review candidates before taking action?",
-        answer:
-          "Yes. Authorized hiring team members can review candidate summaries, reports, and available interview information before deciding whether to advance, pause, or reject a candidate.",
+          "No. alphaScreen supports screening and review, but recruiters and hiring managers remain responsible for communication, accommodations, next steps, and final hiring decisions.",
       },
     ],
   },
@@ -48,14 +53,14 @@ export const publicFaqSections: PublicFaqSection[] = [
           "alphaScreen supports structured AI avatar screening interviews tied to a specific role. Candidates can complete the screening interview from a web link on their own schedule, subject to the employer's role setup and instructions.",
       },
       {
-        question: "Why use alphaScreen instead of only resumes or phone screens?",
+        question: "What happens after a candidate completes an interview?",
         answer:
-          "Resumes and phone screens can be inconsistent and time-consuming. alphaScreen gives every candidate a more structured first-pass experience and gives hiring teams a clearer, comparable review record before they spend time on later-stage conversations.",
+          "The hiring team can review the candidate's available resume, interview responses, score context, and report information before choosing the next step.",
       },
       {
-        question: "How are candidate recordings and reports handled?",
+        question: "How are candidate reports used?",
         answer:
-          "Candidate interview materials and reports are handled inside the alphaScreen workflow for authorized review. Availability depends on the role, account settings, and the information collected during the screening process.",
+          "Candidate reports are review aids for authorized hiring team members. They help organize screening information so teams can compare candidates more consistently.",
       },
     ],
   },
@@ -66,7 +71,7 @@ export const publicFaqSections: PublicFaqSection[] = [
       {
         question: "How does alphaSource protect candidate data?",
         answer:
-          "alphaSource designs alphaScreen around role-based access, privacy-conscious workflows, and limited use of candidate information for screening and account support. Specific privacy details are described in the public Privacy Policy and product terms.",
+          "alphaSource designs alphaScreen around authenticated access, role-based permissions, controlled file and report access, and privacy-conscious workflows for candidate and client information.",
       },
       {
         question: "Who can access candidate reports?",
@@ -74,9 +79,9 @@ export const publicFaqSections: PublicFaqSection[] = [
           "Candidate reports are intended for authorized users within the employer account or approved alphaSource support workflows. Access should be limited to people who need the information for the hiring process.",
       },
       {
-        question: "Does alphaScreen make compliance claims?",
+        question: "Does alphaScreen support accommodations?",
         answer:
-          "alphaScreen is built to support consistent review and human oversight, but alphaSource does not claim a certification, legal outcome, or compliance status unless that claim is stated in a signed agreement or published policy.",
+          "Accommodation requests remain part of the employer's hiring process. alphaScreen supports controlled workflows and human review so candidate needs can be routed appropriately.",
       },
     ],
   },
@@ -95,6 +100,11 @@ export const publicFaqSections: PublicFaqSection[] = [
           "Basic includes 20 interviews per role with a 10-minute interview cap. Pro includes 30 interviews per role with a 12-minute interview cap. Additional interviews are listed publicly at $30 for Basic and $35 for Pro.",
       },
       {
+        question: "What is first-role prepay?",
+        answer:
+          "New self-serve buyers can optionally prepay the first role during signup at a one-time 10% discount. The prepaid first role is used when the first paid role is opened under the same billing account.",
+      },
+      {
         question: "What happens after a company signs up?",
         answer:
           "A company starts membership signup, reviews and signs the membership agreement, completes secure checkout, and then finishes account setup before creating roles and inviting candidates.",
@@ -103,6 +113,22 @@ export const publicFaqSections: PublicFaqSection[] = [
         question: "What if our team needs custom volume or rollout support?",
         answer:
           "Teams with larger volume, custom terms, or implementation needs can request a demo or contact alphaSource about Enterprise options.",
+      },
+    ],
+  },
+  {
+    title: "Dental Groups & Multi-Location Teams",
+    intro: "How alphaScreen fits dental, DSO, and entity-scoped hiring teams.",
+    items: [
+      {
+        question: "Is alphaScreen designed for dental groups?",
+        answer:
+          "alphaScreen is built for structured hiring teams broadly and is a strong fit for dental groups, DSOs, and multi-location operators that need consistent screening across practices or entities.",
+      },
+      {
+        question: "Can managers use alphaScreen across multiple locations or entities?",
+        answer:
+          "Authorized parent-level managers can work across assigned client or entity scopes. Access depends on the membership account structure and role permissions configured for that user.",
       },
     ],
   },
@@ -116,14 +142,9 @@ export const publicFaqSections: PublicFaqSection[] = [
           "alphaScreen uses role-specific criteria and structured interview responses to organize scoring and report information. The scoring is a review aid for hiring teams, not an automatic employment decision.",
       },
       {
-        question: "How does alphaScreen keep humans in control?",
+        question: "How does alphaScreen handle automation and human review?",
         answer:
           "alphaScreen is designed so people configure roles, review candidate information, decide next steps, and manage communication. AI assists with structure, consistency, and summarization.",
-      },
-      {
-        question: "Can alphaSource help with custom AI workflows beyond hiring?",
-        answer:
-          "Yes. alphaSource also works with companies on practical AI workflows for operations, analysis, reporting, and business process support when a custom solution is a better fit.",
       },
     ],
   },
