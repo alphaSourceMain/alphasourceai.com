@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
-const distRoot = path.join(projectRoot, "dist", "public");
+const distRoot = path.join(projectRoot, "dist");
 const indexPath = path.join(distRoot, "index.html");
 
 const SITE_URL = "https://www.alphasourceai.com";
@@ -561,6 +561,8 @@ for (const route of publicRoutes) {
   writeRoute(route, renderRouteHtml(baseHtml, route, content));
 }
 
+writeStaticRoutingFile();
+
 console.log(`Prerendered ${publicRoutes.length} public route HTML snapshots.`);
 
 function faqRoute(label) {
@@ -837,6 +839,34 @@ function writeRoute(route, html) {
     : path.join(distRoot, ...route.split("/").filter(Boolean), "index.html");
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, html);
+}
+
+function writeStaticRoutingFile() {
+  const lines = [
+    "# Public prerendered routes. Keep these before the SPA fallback.",
+    ...publicRoutes
+      .filter((route) => route !== "/")
+      .flatMap((route) => [
+        `${route} ${route}/index.html 200`,
+        `${route}/ ${route}/index.html 200`,
+      ]),
+    "",
+    "# Authenticated and dynamic app routes remain client-rendered SPA routes.",
+    "/dashboard/* /index.html 200",
+    "/admin/* /index.html 200",
+    "/checkout/* /index.html 200",
+    "/membership-agreement/* /index.html 200",
+    "/interview/* /index.html 200",
+    "/interview-access/* /index.html 200",
+    "/interview-host/* /index.html 200",
+    "/text-interview/* /index.html 200",
+    "/automation/* /index.html 200",
+    "/pwreset /index.html 200",
+    "/accommodation-request/* /index.html 200",
+    "/* /index.html 200",
+    "",
+  ];
+  fs.writeFileSync(path.join(distRoot, "_redirects"), lines.join("\n"));
 }
 
 function escapeHtml(value) {
