@@ -244,6 +244,25 @@ function purchaseIntentAgreementEndpoint(purchaseIntentId: string): string {
   return joinUrl(getPublicBackendBase(), `/api/alphascreen/purchase-intents/${encodeURIComponent(purchaseIntentId)}/agreement`);
 }
 
+function isAgreementSigningPath(path: string): boolean {
+  return /^\/membership-agreement\/sign\/[^/?#]+(?:[?#].*)?$/.test(String(path || "").trim());
+}
+
+function agreementSigningHref(result: PurchaseAgreementResult | null): string {
+  const rawPath = String(result?.agreement?.signing_path || "").trim();
+  if (isAgreementSigningPath(rawPath)) return rawPath;
+
+  const rawUrl = String(result?.agreement?.signing_url || "").trim();
+  if (!rawUrl) return "";
+  try {
+    const parsed = new URL(rawUrl, typeof window !== "undefined" ? window.location.origin : "https://www.alphasourceai.com");
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return isAgreementSigningPath(path) ? path : "";
+  } catch (_) {
+    return "";
+  }
+}
+
 function validEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
@@ -602,6 +621,7 @@ function PurchaseIntentPanel({
   onChange,
   onSubmit,
   onContinueToAgreement,
+  onBack,
 }: {
   selectedPlan: AlphaScreenPackage | null;
   form: PurchaseIntentForm;
@@ -614,6 +634,7 @@ function PurchaseIntentPanel({
   onChange: <K extends keyof PurchaseIntentForm>(field: K, value: PurchaseIntentForm[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onContinueToAgreement: () => void;
+  onBack: () => void;
 }) {
   if (!selectedPlan) {
     return (
@@ -641,7 +662,7 @@ function PurchaseIntentPanel({
   const totalDueToday = selectedPlatformFee + (prepaySelected ? discountedFirstRoleFee : 0);
 
   if (status === "success" && result) {
-    const signingUrl = String(agreementResult?.agreement?.signing_url || "").trim();
+    const signingUrl = agreementSigningHref(agreementResult);
     return (
       <div className="rounded-lg border border-[#02D99D]/35 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -764,6 +785,14 @@ function PurchaseIntentPanel({
               <ArrowRight className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={agreementStatus === "preparing"}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Back to pricing
+          </button>
           <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
             No payment details are collected here. Secure checkout opens after agreement signing.
           </p>
@@ -977,6 +1006,14 @@ function PurchaseIntentPanel({
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
+          type="button"
+          onClick={onBack}
+          disabled={status === "submitting"}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Back to pricing
+        </button>
+        <button
           type="submit"
           disabled={status === "submitting"}
           className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-6 py-3.5 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1071,6 +1108,15 @@ export default function AlphaScreenPricingPage() {
   const closeCheckoutModal = () => {
     if (purchaseStatus === "submitting" || agreementStatus === "preparing") return;
     setCheckoutModalOpen(false);
+  };
+
+  const backToPricing = () => {
+    if (purchaseStatus === "submitting" || agreementStatus === "preparing") return;
+    setCheckoutModalOpen(false);
+    trackEvent("signup_back_clicked", {
+      plan: selectedPlanKey,
+      step: purchaseStatus === "success" ? "agreement_review" : "buyer_intake",
+    });
   };
 
   const updateSelectedBillingCadence = (cadence: BillingCadenceKey) => {
@@ -1224,7 +1270,13 @@ export default function AlphaScreenPricingPage() {
         return;
       }
 
+      const signingHref = agreementSigningHref(body);
       setAgreementResult(body);
+      if (!signingHref) {
+        setAgreementStatus("idle");
+        setAgreementError("The agreement was prepared, but the signing link was unavailable. Please try again or contact support.");
+        return;
+      }
       setAgreementStatus("ready");
       trackEvent("signup_step_completed", {
         plan: selectedPlanKey,
@@ -1397,6 +1449,14 @@ export default function AlphaScreenPricingPage() {
               </div>
               <button
                 type="button"
+                onClick={backToPricing}
+                disabled={purchaseStatus === "submitting" || agreementStatus === "preparing"}
+                className="hidden flex-shrink-0 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
+              >
+                Back
+              </button>
+              <button
+                type="button"
                 onClick={closeCheckoutModal}
                 disabled={purchaseStatus === "submitting" || agreementStatus === "preparing"}
                 className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[#0A1547]/10 bg-[#F8F9FD] text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1418,6 +1478,7 @@ export default function AlphaScreenPricingPage() {
                 onChange={updatePurchaseField}
                 onSubmit={handlePurchaseSubmit}
                 onContinueToAgreement={handleContinueToAgreement}
+                onBack={backToPricing}
               />
             </div>
           </div>

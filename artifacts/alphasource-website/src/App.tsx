@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -73,6 +73,7 @@ const queryClient = new QueryClient();
 const env =
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
 const PUBLIC_TAWK_ROUTES = new Set(["/", "/about", "/alphascreen", "/support", "/faq"]);
+const PUBLIC_CHECKOUT_FALLBACK_MESSAGE = "We could not load this step. Please refresh or contact support.";
 const DASHBOARD_TAB_ROUTE: Record<string, string> = {
   roles: "/dashboard/roles",
   automation: "/dashboard/automation",
@@ -80,6 +81,110 @@ const DASHBOARD_TAB_ROUTE: Record<string, string> = {
   members: "/dashboard/members",
   billing: "/dashboard/billing",
 };
+
+function sanitizePublicCheckoutRoute(path: string): string {
+  const rawPath = String(path || "").split("?")[0] || "/";
+  if (rawPath.startsWith("/membership-agreement/sign/")) return "/membership-agreement/sign/[token]";
+  if (rawPath.startsWith("/checkout/subscription-success")) return "/checkout/subscription-success";
+  if (rawPath.startsWith("/alphascreen/pricing")) return "/alphascreen/pricing";
+  return rawPath;
+}
+
+class PublicCheckoutErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidUpdate(prevProps: { resetKey: string }) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    const route = sanitizePublicCheckoutRoute(typeof window !== "undefined" ? window.location.pathname : this.props.resetKey);
+    console.error("[public-checkout] render_failed", {
+      route,
+      error_name: error instanceof Error ? error.name : "unknown",
+      component_stack_present: Boolean(info.componentStack),
+    });
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <section className="min-h-[calc(100vh-160px)] bg-[#F8F9FD] px-6 py-16 lg:py-20">
+        <div className="mx-auto max-w-xl rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm sm:p-8">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">alphaScreen</p>
+          <h1 className="mt-3 text-2xl font-black leading-tight text-[#0A1547]">This step could not load.</h1>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-[#0A1547]/60">
+            {PUBLIC_CHECKOUT_FALLBACK_MESSAGE}
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-full bg-[#0A1547] px-5 py-2.5 text-sm font-black text-white transition-opacity hover:opacity-90"
+            >
+              Refresh
+            </button>
+            <a
+              href="/alphascreen/pricing#pricing-demo"
+              className="inline-flex items-center justify-center rounded-full border border-[#0A1547]/12 bg-white px-5 py-2.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+            >
+              Back to pricing
+            </a>
+            <a
+              href="/support/"
+              className="inline-flex items-center justify-center rounded-full border border-[#0A1547]/12 bg-white px-5 py-2.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+            >
+              Contact support
+            </a>
+          </div>
+        </div>
+      </section>
+    );
+  }
+}
+
+function PublicCheckoutBoundaryRoute({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return (
+    <PublicCheckoutErrorBoundary resetKey={sanitizePublicCheckoutRoute(location)}>
+      {children}
+    </PublicCheckoutErrorBoundary>
+  );
+}
+
+function AlphaScreenPricingRoute() {
+  return (
+    <PublicCheckoutBoundaryRoute>
+      <AlphaScreenPricingPage />
+    </PublicCheckoutBoundaryRoute>
+  );
+}
+
+function CheckoutSubscriptionSuccessRoute() {
+  return (
+    <PublicCheckoutBoundaryRoute>
+      <CheckoutSubscriptionSuccessPage />
+    </PublicCheckoutBoundaryRoute>
+  );
+}
+
+function MembershipAgreementSignerRoute({ params }: { params?: { token?: string } }) {
+  return (
+    <PublicCheckoutBoundaryRoute>
+      <MembershipAgreementSignerPage params={params} />
+    </PublicCheckoutBoundaryRoute>
+  );
+}
 const DASHBOARD_INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
 const DASHBOARD_WARNING_WINDOW_MS = 60 * 1000;
 const DASHBOARD_ACTIVITY_STORAGE_KEY = "alphasource:dashboard_last_activity_ms";
@@ -460,7 +565,7 @@ function Router() {
         <Route path="/interview-access/:role_token" component={InterviewTokenAlias} />
         <Route path="/interview-host/:role_token" component={InterviewTokenAlias} />
         <Route path="/text-interview/:token" component={TextInterviewPage} />
-        <Route path="/membership-agreement/sign/:token" component={MembershipAgreementSignerPage} />
+        <Route path="/membership-agreement/sign/:token" component={MembershipAgreementSignerRoute} />
         <Route path="/interview/terms" component={CandidateTermsPage} />
         <Route path="/pwreset" component={PwResetPage} />
         <Route path="/interview-access" component={InterviewPage} />
@@ -479,9 +584,9 @@ function Router() {
       <main className="flex-1">
         <Switch>
           <Route path="/checkout/password-setup-preview" component={PasswordSetupPreviewPage} />
-          <Route path="/checkout/subscription-success" component={CheckoutSubscriptionSuccessPage} />
+          <Route path="/checkout/subscription-success" component={CheckoutSubscriptionSuccessRoute} />
           <Route path="/"            component={HomePage} />
-          <Route path="/alphascreen/pricing" component={AlphaScreenPricingPage} />
+          <Route path="/alphascreen/pricing" component={AlphaScreenPricingRoute} />
           <Route path="/alphascreen/how-it-works" component={AlphaScreenHowItWorksPage} />
           <Route path="/alphascreen/security" component={AlphaScreenSecurityPage} />
           <Route path="/alphascreen/candidate-experience" component={AlphaScreenCandidateExperiencePage} />

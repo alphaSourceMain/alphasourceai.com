@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CheckCircle, Clock3, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock3, RefreshCw, ShieldCheck } from "lucide-react";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 
 type ReturnStatus = "ready" | "password_required" | "setup_email_sent" | "setup_pending" | "activation_pending" | "payment_pending" | "cancelled";
@@ -359,6 +359,8 @@ export default function CheckoutSubscriptionSuccessPage() {
       : status === "ready"
         ? "/"
         : "";
+  const backHref = status === "ready" ? "/dashboard" : "/alphascreen/pricing#pricing-demo";
+  const backLabel = status === "ready" ? "Back to dashboard" : "Back to pricing";
   const nextStepCopy = isPasswordSetupStatus
     ? status === "password_required" && setPasswordUrl
       ? "Set your password to continue to account access."
@@ -372,6 +374,13 @@ export default function CheckoutSubscriptionSuccessPage() {
   return (
     <section className="min-h-[calc(100vh-160px)] bg-[#F8F9FD] px-6 py-16 lg:py-20">
       <div className="mx-auto max-w-4xl">
+        <a
+          href={backHref}
+          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-xs font-black text-[#0A1547] shadow-sm transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {backLabel}
+        </a>
         <div className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
             <div

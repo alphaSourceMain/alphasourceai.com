@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, RefreshCw, X } from "lucide-react";
 
 interface SignerPageProps {
   params?: {
@@ -649,6 +649,13 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
       style={{ fontFamily: "'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
     >
       <div className="mx-auto w-full max-w-5xl space-y-4">
+        <a
+          href="/alphascreen/pricing#pricing-demo"
+          className="inline-flex items-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-xs font-black text-[#0A1547] shadow-sm transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to pricing
+        </a>
         <div
           className="rounded-2xl bg-white px-5 py-4 sm:px-6"
           style={{ border: "1px solid rgba(10,21,71,0.08)", boxShadow: "0 8px 26px rgba(10,21,71,0.08)" }}
