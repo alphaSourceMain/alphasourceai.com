@@ -116,6 +116,9 @@ type PurchaseAgreementResult = {
 
 const SIGNUP_ALREADY_EXISTS_MESSAGE =
   "This email is already associated with an alphaScreen account or signup. Sign in, check your email, or contact support for help.";
+const CHECKOUT_RECOVERY_STORAGE_KEY = "alphascreen:retail_checkout_recovery:v1";
+const CHECKOUT_BACK_LINK_CLASS =
+  "inline-flex text-sm font-semibold text-[#A380F6] transition-colors hover:text-[#0A1547]";
 
 const FALLBACK_PACKAGES: AlphaScreenPackage[] = [
   {
@@ -269,6 +272,84 @@ function validEmail(value: string): boolean {
 
 function cleanText(value: string, max: number): string {
   return String(value || "").trim().slice(0, max);
+}
+
+function buildPurchasePayload(form: PurchaseIntentForm, selectedPlan: AlphaScreenPackage) {
+  return {
+    plan_key: selectedPlan.plan_key,
+    billing_cadence: form.billing_cadence || defaultCadence(selectedPlan),
+    company_legal_name: cleanText(form.company_legal_name, 120),
+    company_dba: cleanText(form.company_dba, 120),
+    buyer_first_name: cleanText(form.buyer_first_name, 80),
+    buyer_last_name: cleanText(form.buyer_last_name, 80),
+    buyer_email: cleanText(form.buyer_email, 160),
+    buyer_phone: cleanText(form.buyer_phone, 40),
+    buyer_title: cleanText(form.buyer_title, 100),
+    first_role_prepay_selected: form.first_role_prepay_selected === true,
+    source_path: typeof window !== "undefined" ? window.location.pathname : "/alphascreen/pricing",
+    agreement_acknowledged: form.agreement_acknowledged,
+    contact_acknowledged: form.contact_acknowledged,
+  };
+}
+
+function purchasePayloadKey(payload: ReturnType<typeof buildPurchasePayload>): string {
+  return JSON.stringify(payload);
+}
+
+function saveCheckoutRecoveryState(input: {
+  selectedPlanKey: string;
+  form: PurchaseIntentForm;
+  purchaseResult: PurchaseIntentResult | null;
+  agreementResult: PurchaseAgreementResult | null;
+  purchaseSubmissionKey: string;
+}) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(CHECKOUT_RECOVERY_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      saved_at: new Date().toISOString(),
+      selected_plan_key: input.selectedPlanKey,
+      form: input.form,
+      purchase_result: input.purchaseResult,
+      agreement_result: input.agreementResult,
+      purchase_submission_key: input.purchaseSubmissionKey,
+    }));
+  } catch (_) {
+    // Recovery is best-effort; the live checkout flow should not depend on storage.
+  }
+}
+
+function loadCheckoutRecoveryState(): {
+  selectedPlanKey: string;
+  form: PurchaseIntentForm;
+  purchaseResult: PurchaseIntentResult;
+  agreementResult: PurchaseAgreementResult | null;
+  purchaseSubmissionKey: string;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (parsed.version !== 1) return null;
+    const form = parsed.form && typeof parsed.form === "object" ? parsed.form as Partial<PurchaseIntentForm> : null;
+    const purchaseResult = parsed.purchase_result && typeof parsed.purchase_result === "object"
+      ? parsed.purchase_result as PurchaseIntentResult
+      : null;
+    const selectedPlanKey = String(parsed.selected_plan_key || "").trim();
+    if (!selectedPlanKey || !form || !purchaseResult?.purchase_intent_id) return null;
+    return {
+      selectedPlanKey,
+      form: { ...EMPTY_PURCHASE_FORM, ...form },
+      purchaseResult,
+      agreementResult: parsed.agreement_result && typeof parsed.agreement_result === "object"
+        ? parsed.agreement_result as PurchaseAgreementResult
+        : null,
+      purchaseSubmissionKey: String(parsed.purchase_submission_key || "").trim(),
+    };
+  } catch (_) {
+    return null;
+  }
 }
 
 function normalizePackage(raw: unknown): AlphaScreenPackage | null {
@@ -621,7 +702,8 @@ function PurchaseIntentPanel({
   onChange,
   onSubmit,
   onContinueToAgreement,
-  onBack,
+  onBackToPricing,
+  onBackToSignup,
 }: {
   selectedPlan: AlphaScreenPackage | null;
   form: PurchaseIntentForm;
@@ -634,7 +716,8 @@ function PurchaseIntentPanel({
   onChange: <K extends keyof PurchaseIntentForm>(field: K, value: PurchaseIntentForm[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onContinueToAgreement: () => void;
-  onBack: () => void;
+  onBackToPricing: () => void;
+  onBackToSignup: () => void;
 }) {
   if (!selectedPlan) {
     return (
@@ -785,17 +868,19 @@ function PurchaseIntentPanel({
               <ArrowRight className="h-4 w-4" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={onBack}
-            disabled={agreementStatus === "preparing"}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Back to pricing
-          </button>
           <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
             No payment details are collected here. Secure checkout opens after agreement signing.
           </p>
+        </div>
+        <div className="mt-5 flex justify-start">
+          <button
+            type="button"
+            onClick={onBackToSignup}
+            disabled={agreementStatus === "preparing"}
+            className={`${CHECKOUT_BACK_LINK_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            &larr; Back
+          </button>
         </div>
       </div>
     );
@@ -1006,14 +1091,6 @@ function PurchaseIntentPanel({
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
-          type="button"
-          onClick={onBack}
-          disabled={status === "submitting"}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Back to pricing
-        </button>
-        <button
           type="submit"
           disabled={status === "submitting"}
           className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A1547] px-6 py-3.5 text-sm font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1027,6 +1104,16 @@ function PurchaseIntentPanel({
         <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/50">
           Payment details are not collected in this step.
         </p>
+      </div>
+      <div className="mt-5 flex justify-start">
+        <button
+          type="button"
+          onClick={onBackToPricing}
+          disabled={status === "submitting"}
+          className={`${CHECKOUT_BACK_LINK_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
+        >
+          &larr; Back
+        </button>
       </div>
     </form>
   );
@@ -1056,6 +1143,7 @@ export default function AlphaScreenPricingPage() {
   const [purchaseStatus, setPurchaseStatus] = useState<PurchaseIntentStatus>("idle");
   const [purchaseError, setPurchaseError] = useState("");
   const [purchaseResult, setPurchaseResult] = useState<PurchaseIntentResult | null>(null);
+  const [purchaseSubmissionKey, setPurchaseSubmissionKey] = useState("");
   const [agreementStatus, setAgreementStatus] = useState<AgreementPrepStatus>("idle");
   const [agreementError, setAgreementError] = useState("");
   const [agreementResult, setAgreementResult] = useState<PurchaseAgreementResult | null>(null);
@@ -1098,6 +1186,7 @@ export default function AlphaScreenPricingPage() {
     setPurchaseStatus("idle");
     setPurchaseError("");
     setPurchaseResult(null);
+    setPurchaseSubmissionKey("");
     setAgreementStatus("idle");
     setAgreementError("");
     setAgreementResult(null);
@@ -1118,6 +1207,43 @@ export default function AlphaScreenPricingPage() {
       step: purchaseStatus === "success" ? "agreement_review" : "buyer_intake",
     });
   };
+
+  const backToSignupForm = () => {
+    if (agreementStatus === "preparing") return;
+    setPurchaseStatus("idle");
+    setPurchaseError("");
+    setAgreementError("");
+    trackEvent("signup_back_clicked", {
+      plan: selectedPlanKey,
+      step: "agreement_created",
+    });
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search || "");
+    if (params.get("checkout_recovery") !== "agreement_created") return;
+
+    const recovery = loadCheckoutRecoveryState();
+    if (!recovery) return;
+
+    setSelectedPlanKey(recovery.selectedPlanKey);
+    setSelectedBillingCadence(recovery.form.billing_cadence === "annual" ? "annual" : "monthly");
+    setPurchaseForm(recovery.form);
+    setPurchaseResult(recovery.purchaseResult);
+    setPurchaseSubmissionKey(recovery.purchaseSubmissionKey);
+    setAgreementResult(recovery.agreementResult);
+    setAgreementStatus(agreementSigningHref(recovery.agreementResult) ? "ready" : "idle");
+    setPurchaseStatus("success");
+    setCheckoutModalOpen(true);
+    setPurchaseError("");
+    setAgreementError("");
+
+    params.delete("checkout_recovery");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash || "#signup-modal"}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, []);
 
   const updateSelectedBillingCadence = (cadence: BillingCadenceKey) => {
     setSelectedBillingCadence(cadence);
@@ -1167,21 +1293,21 @@ export default function AlphaScreenPricingPage() {
     setPurchaseStatus("submitting");
     setPurchaseError("");
 
-    const payload = {
-      plan_key: selectedPlan.plan_key,
-      billing_cadence: purchaseForm.billing_cadence || defaultCadence(selectedPlan),
-      company_legal_name: cleanText(purchaseForm.company_legal_name, 120),
-      company_dba: cleanText(purchaseForm.company_dba, 120),
-      buyer_first_name: cleanText(purchaseForm.buyer_first_name, 80),
-      buyer_last_name: cleanText(purchaseForm.buyer_last_name, 80),
-      buyer_email: cleanText(purchaseForm.buyer_email, 160),
-      buyer_phone: cleanText(purchaseForm.buyer_phone, 40),
-      buyer_title: cleanText(purchaseForm.buyer_title, 100),
-      first_role_prepay_selected: purchaseForm.first_role_prepay_selected === true,
-      source_path: typeof window !== "undefined" ? window.location.pathname : "/alphascreen/pricing",
-      agreement_acknowledged: purchaseForm.agreement_acknowledged,
-      contact_acknowledged: purchaseForm.contact_acknowledged,
-    };
+    const payload = buildPurchasePayload(purchaseForm, selectedPlan);
+    const nextSubmissionKey = purchasePayloadKey(payload);
+
+    if (purchaseResult?.purchase_intent_id && purchaseSubmissionKey === nextSubmissionKey) {
+      setPurchaseStatus("success");
+      setPurchaseError("");
+      saveCheckoutRecoveryState({
+        selectedPlanKey,
+        form: purchaseForm,
+        purchaseResult,
+        agreementResult,
+        purchaseSubmissionKey,
+      });
+      return;
+    }
 
     try {
       const response = await fetch(purchaseIntentEndpoint(), {
@@ -1215,10 +1341,18 @@ export default function AlphaScreenPricingPage() {
       }
 
       setPurchaseResult(body);
+      setPurchaseSubmissionKey(nextSubmissionKey);
       setPurchaseStatus("success");
       setAgreementStatus("idle");
       setAgreementError("");
       setAgreementResult(null);
+      saveCheckoutRecoveryState({
+        selectedPlanKey: selectedPlan.plan_key,
+        form: purchaseForm,
+        purchaseResult: body,
+        agreementResult: null,
+        purchaseSubmissionKey: nextSubmissionKey,
+      });
       trackEvent("lead_form_submit_succeeded", {
         form_id: "alphascreen-signup-profile",
         form_type: "signup_profile",
@@ -1278,6 +1412,13 @@ export default function AlphaScreenPricingPage() {
         return;
       }
       setAgreementStatus("ready");
+      saveCheckoutRecoveryState({
+        selectedPlanKey,
+        form: purchaseForm,
+        purchaseResult,
+        agreementResult: body,
+        purchaseSubmissionKey,
+      });
       trackEvent("signup_step_completed", {
         plan: selectedPlanKey,
         step: "agreement_prepare",
@@ -1449,14 +1590,6 @@ export default function AlphaScreenPricingPage() {
               </div>
               <button
                 type="button"
-                onClick={backToPricing}
-                disabled={purchaseStatus === "submitting" || agreementStatus === "preparing"}
-                className="hidden flex-shrink-0 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
-              >
-                Back
-              </button>
-              <button
-                type="button"
                 onClick={closeCheckoutModal}
                 disabled={purchaseStatus === "submitting" || agreementStatus === "preparing"}
                 className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[#0A1547]/10 bg-[#F8F9FD] text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1478,7 +1611,8 @@ export default function AlphaScreenPricingPage() {
                 onChange={updatePurchaseField}
                 onSubmit={handlePurchaseSubmit}
                 onContinueToAgreement={handleContinueToAgreement}
-                onBack={backToPricing}
+                onBackToPricing={backToPricing}
+                onBackToSignup={backToSignupForm}
               />
             </div>
           </div>

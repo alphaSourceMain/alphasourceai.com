@@ -23,6 +23,8 @@ const POLLABLE_STATUSES = new Set<ReturnStatus>(["payment_pending", "activation_
 const MAX_STATUS_POLLS = 12;
 const STATUS_POLL_INTERVAL_MS = 4000;
 const PASSWORD_SETUP_PREVIEW_PATH = "/checkout/password-setup-preview";
+const CHECKOUT_BACK_LINK_CLASS =
+  "inline-flex text-sm font-semibold text-[#A380F6] transition-colors hover:text-[#0A1547]";
 
 function envText(key: string): string {
   const env = typeof import.meta !== "undefined" && import.meta.env
@@ -374,13 +376,6 @@ export default function CheckoutSubscriptionSuccessPage() {
   return (
     <section className="min-h-[calc(100vh-160px)] bg-[#F8F9FD] px-6 py-16 lg:py-20">
       <div className="mx-auto max-w-4xl">
-        <a
-          href={backHref}
-          className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-xs font-black text-[#0A1547] shadow-sm transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {backLabel}
-        </a>
         <div className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
             <div
@@ -495,6 +490,12 @@ export default function CheckoutSubscriptionSuccessPage() {
               For security, account access is completed only after payment confirmation and account setup are finished.
             </p>
           </div>
+        </div>
+        <div className="mt-5 flex justify-start">
+          <a href={backHref} className={CHECKOUT_BACK_LINK_CLASS}>
+            <ArrowLeft className="mr-1 mt-0.5 h-3.5 w-3.5" />
+            {backLabel}
+          </a>
         </div>
       </div>
     </section>

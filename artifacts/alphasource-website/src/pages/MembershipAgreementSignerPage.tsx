@@ -74,6 +74,10 @@ const stripePublishableKey = firstText(
   (env as Record<string, unknown>).VITE_STRIPE_PUBLIC_KEY,
   (env as Record<string, unknown>).STRIPE_PUBLISHABLE_KEY,
 );
+const CHECKOUT_RECOVERY_STORAGE_KEY = "alphascreen:retail_checkout_recovery:v1";
+const CHECKOUT_BACK_LINK_CLASS =
+  "inline-flex text-sm font-semibold text-[#A380F6] transition-colors hover:text-[#0A1547]";
+const AGREEMENT_SLOW_LOAD_MS = 8000;
 
 function openCheckoutUrl(checkoutUrl: string): void {
   const url = String(checkoutUrl || "").trim();
@@ -177,6 +181,24 @@ function firstRolePrepayAgreementCopy(selected: boolean | null): string {
   return "";
 }
 
+function hasAgreementCreatedRecovery(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return parsed.version === 1 && Boolean(parsed.purchase_result) && Boolean(parsed.agreement_result);
+  } catch (_) {
+    return false;
+  }
+}
+
+function agreementBackHref(): string {
+  return hasAgreementCreatedRecovery()
+    ? "/alphascreen/pricing?checkout_recovery=agreement_created#signup-modal"
+    : "/alphascreen/pricing#pricing-demo";
+}
+
 export default function MembershipAgreementSignerPage({ params }: SignerPageProps) {
   const token = useMemo(() => {
     const raw = String(params?.token || "").trim();
@@ -194,6 +216,7 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
 
   const [session, setSession] = useState<SignerSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slowLoading, setSlowLoading] = useState(false);
   const [sessionError, setSessionError] = useState("");
 
   const [typedName, setTypedName] = useState("");
@@ -212,6 +235,7 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
   const [hasSignature, setHasSignature] = useState(false);
   const embeddedCheckoutContainerRef = useRef<HTMLDivElement | null>(null);
   const embeddedCheckoutInstanceRef = useRef<{ unmount?: () => void; destroy?: () => void } | null>(null);
+  const backHref = useMemo(() => agreementBackHref(), []);
 
   const prepareCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -257,6 +281,16 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
     });
     return () => window.cancelAnimationFrame(rafId);
   }, [loading, sessionError, session, prepareCanvas]);
+
+  useEffect(() => {
+    if (!loading) {
+      setSlowLoading(false);
+      return undefined;
+    }
+    if (typeof window === "undefined") return undefined;
+    const timer = window.setTimeout(() => setSlowLoading(true), AGREEMENT_SLOW_LOAD_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
 
   const getPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -329,7 +363,13 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
     }
 
     setLoading(true);
+    setSlowLoading(false);
     setSessionError("");
+    console.info("[agreement-signer] session_load_started", {
+      route_present: true,
+      token_present: Boolean(token),
+      backend_configured: Boolean(backendBase),
+    });
 
     try {
       const response = await fetch(`${backendBase}/membership-agreements/session`, {
@@ -339,6 +379,11 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
         body: JSON.stringify({ token }),
       });
       const text = await response.text();
+      console.info("[agreement-signer] session_load_response", {
+        ok: response.ok,
+        status: response.status,
+        body_present: Boolean(text),
+      });
       if (!response.ok) {
         throw new Error(extractErrorMessage(text, "Could not load agreement session."));
       }
@@ -355,8 +400,12 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
       if (!sessionPayload) throw new Error("Could not load agreement session.");
 
       const resolvedState = String(sessionPayload.state || "").trim();
+      const agreementId = String(sessionPayload.agreement_id || "").trim();
+      if (!agreementId || !resolvedState) {
+        throw new Error("Agreement session response was incomplete. Please refresh or contact support.");
+      }
       setSession({
-        agreement_id: String(sessionPayload.agreement_id || "").trim(),
+        agreement_id: agreementId,
         state: resolvedState,
         status: String(sessionPayload.status || "").trim(),
         is_current: Boolean(sessionPayload.is_current),
@@ -394,6 +443,10 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
     } catch (error) {
       setSession(null);
       setSessionError(error instanceof Error ? error.message : "Could not load agreement session.");
+      console.info("[agreement-signer] session_load_failed", {
+        token_present: Boolean(token),
+        error_name: error instanceof Error ? error.name : "unknown",
+      });
     } finally {
       setLoading(false);
     }
@@ -649,13 +702,6 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
       style={{ fontFamily: "'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
     >
       <div className="mx-auto w-full max-w-5xl space-y-4">
-        <a
-          href="/alphascreen/pricing#pricing-demo"
-          className="inline-flex items-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-2 text-xs font-black text-[#0A1547] shadow-sm transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to pricing
-        </a>
         <div
           className="rounded-2xl bg-white px-5 py-4 sm:px-6"
           style={{ border: "1px solid rgba(10,21,71,0.08)", boxShadow: "0 8px 26px rgba(10,21,71,0.08)" }}
@@ -686,7 +732,28 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
           style={{ border: "1px solid rgba(10,21,71,0.08)", boxShadow: "0 8px 26px rgba(10,21,71,0.08)" }}
         >
           {loading ? (
-            <p className="text-sm font-semibold text-[#0A1547]/55">Loading agreement session...</p>
+            <div className="rounded-xl border border-[#0A1547]/10 bg-[#F8F9FD] px-4 py-3">
+              <p className="text-sm font-semibold text-[#0A1547]/65">Loading agreement session...</p>
+              {slowLoading ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold leading-relaxed text-amber-700">
+                    Still loading agreement. Refresh this page, or contact support if it does not continue.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadSession();
+                      }}
+                      className={CHECKOUT_BACK_LINK_CLASS}
+                    >
+                      Refresh
+                    </button>
+                    <a href="/support/" className={CHECKOUT_BACK_LINK_CLASS}>Contact support</a>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : sessionError ? (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
               <p className="flex items-start gap-2 text-sm font-semibold text-red-600">
@@ -958,6 +1025,12 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
           ) : (
             <p className="text-sm font-semibold text-[#0A1547]/55">This agreement is no longer available.</p>
           )}
+        </div>
+        <div className="flex justify-start">
+          <a href={backHref} className={CHECKOUT_BACK_LINK_CLASS}>
+            <ArrowLeft className="mr-1 mt-0.5 h-3.5 w-3.5" />
+            Back
+          </a>
         </div>
         {embeddedCheckout ? (
           <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6">
