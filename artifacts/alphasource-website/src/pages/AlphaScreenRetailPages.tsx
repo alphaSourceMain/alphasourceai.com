@@ -613,7 +613,7 @@ export function AlphaScreenRoiPage() {
                   </div>
                   <div>
                     <p className="text-3xl font-black text-[#0A1547]">{estimate.hours.toFixed(1)} hrs</p>
-                    <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Screening hours represented</p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Estimated team hours saved</p>
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-[#0A1547]/60">
