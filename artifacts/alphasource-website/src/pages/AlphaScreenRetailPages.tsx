@@ -606,9 +606,18 @@ export function AlphaScreenRoiPage() {
 
               <div className="mt-5 rounded-lg border border-[#02D99D]/25 bg-[#02D99D]/10 p-5">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A1547]/45">Estimated potential savings</p>
-                <p className="mt-2 text-3xl font-black text-[#0A1547]">{formatUsd(potentialSavings)}</p>
-                <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
-                  Estimated difference between manual initial-screening labor cost and the selected alphaScreen membership, role, and additional-interview costs.
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-3xl font-black text-[#0A1547]">{formatUsd(potentialSavings)}</p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Estimated cost difference</p>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-black text-[#0A1547]">{estimate.hours.toFixed(1)} hrs</p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#0A1547]/45">Screening hours represented</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-[#0A1547]/60">
+                  Estimated screening time represented by the inputs above. Actual time recovered depends on your review process, role complexity, and candidate volume.
                 </p>
                 <p className="mt-3 text-sm font-semibold leading-relaxed text-[#0A1547]/60">
                   <strong>Additional value</strong> may also come from <strong>efficiency gains</strong> when hiring managers can spend recovered screening time on higher-value work.
