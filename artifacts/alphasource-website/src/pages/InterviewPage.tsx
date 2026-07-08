@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { Upload, FileText, Trash2, Check, ArrowRight, ChevronRight } from "lucide-react";
+import { Upload, FileText, Trash2, Check, ArrowRight, ChevronRight, ChevronDown } from "lucide-react";
 import {
   candidatePhoneCountries,
   getCandidatePhoneError,
@@ -92,6 +92,7 @@ const inputCls =
   "w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[#0A1547] text-sm " +
   "placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#A380F6]/20 " +
   "focus:border-[#A380F6] transition-all";
+const selectCls = `${inputCls} h-[42px] appearance-none pr-10 leading-5`;
 
 const errorCls = "text-red-500 text-[10px] mt-1 font-semibold";
 const isValidResumeFile = (file: File | null | undefined) =>
@@ -1069,18 +1070,24 @@ export default function InterviewPage() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#0A1547]/40 block mb-1.5">
                     Country <span className="text-red-400">*</span>
                   </label>
-                  <select
-                    value={phoneCountry}
-                    onChange={(e) => {
-                      setPhoneCountry(normalizeCandidatePhoneCountry(e.target.value));
-                      setErrors((er) => ({ ...er, phone: "", submit: "" }));
-                    }}
-                    className={inputCls}
-                  >
-                    {candidatePhoneCountries.map((country) => (
-                      <option key={country.value} value={country.value}>{country.label}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={phoneCountry}
+                      onChange={(e) => {
+                        setPhoneCountry(normalizeCandidatePhoneCountry(e.target.value));
+                        setErrors((er) => ({ ...er, phone: "", submit: "" }));
+                      }}
+                      className={selectCls}
+                    >
+                      {candidatePhoneCountries.map((country) => (
+                        <option key={country.value} value={country.value}>{country.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0A1547]/35"
+                      aria-hidden="true"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#0A1547]/40 block mb-1.5">
