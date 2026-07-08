@@ -499,21 +499,6 @@ function InterviewCompletePage() {
   );
 }
 
-function InterviewTokenAlias({ params }: { params?: { role_token?: string } }) {
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    const roleToken = String(params?.role_token || "").trim();
-    if (!roleToken) {
-      setLocation("/interview");
-      return;
-    }
-    setLocation(`/interview/${encodeURIComponent(roleToken)}`);
-  }, [params?.role_token, setLocation]);
-
-  return null;
-}
-
 /* ── Router ─────────────────────────────────────────────── */
 function Router() {
   const [location] = useLocation();
@@ -526,10 +511,16 @@ function Router() {
     location.startsWith("/interview/") ||
     location === "/interview-access" ||
     location.startsWith("/interview-access/") ||
+    location === "/interview-host" ||
     location.startsWith("/interview-host/") ||
+    location === "/text-interview" ||
     location.startsWith("/text-interview/") ||
+    location === "/membership-agreement/sign" ||
     location.startsWith("/membership-agreement/sign/") ||
     location === "/pwreset" ||
+    location === "/pwreset/" ||
+    location === "/accommodation" ||
+    location.startsWith("/accommodation/") ||
     location === "/accommodation-request" ||
     location.startsWith("/accommodation-request/") ||
     location === "/interview-cvi" ||
@@ -561,14 +552,20 @@ function Router() {
   } else if (isInterview) {
     content = (
       <Switch>
+        <Route path="/accommodation/:role_token" component={AccommodationRequestPage} />
+        <Route path="/accommodation" component={AccommodationRequestPage} />
         <Route path="/accommodation-request/:role_token" component={AccommodationRequestPage} />
         <Route path="/accommodation-request" component={AccommodationRequestPage} />
-        <Route path="/interview-access/:role_token" component={InterviewTokenAlias} />
-        <Route path="/interview-host/:role_token" component={InterviewTokenAlias} />
+        <Route path="/interview-access/:role_token" component={InterviewPage} />
+        <Route path="/interview-host/:role_token" component={InterviewPage} />
+        <Route path="/interview-host" component={InterviewPage} />
         <Route path="/text-interview/:token" component={TextInterviewPage} />
+        <Route path="/text-interview" component={TextInterviewPage} />
         <Route path="/membership-agreement/sign/:token" component={MembershipAgreementSignerRoute} />
+        <Route path="/membership-agreement/sign" component={MembershipAgreementSignerRoute} />
         <Route path="/interview/terms" component={CandidateTermsPage} />
         <Route path="/pwreset" component={PwResetPage} />
+        <Route path="/pwreset/" component={PwResetPage} />
         <Route path="/interview-access" component={InterviewPage} />
         <Route path="/interview-cvi" component={InterviewCviPage} />
         <Route path="/interview-complete" component={InterviewCompletePage} />

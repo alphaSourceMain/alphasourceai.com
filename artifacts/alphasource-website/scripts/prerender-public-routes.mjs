@@ -979,6 +979,34 @@ function writeRoute(route, html) {
 }
 
 function writeStaticRoutingFile() {
+  const spaRouteRules = [
+    "/dashboard /index.html 200",
+    "/dashboard/* /index.html 200",
+    "/admin /index.html 200",
+    "/admin/* /index.html 200",
+    "/checkout /index.html 200",
+    "/checkout/* /index.html 200",
+    "/membership-agreement /index.html 200",
+    "/membership-agreement/* /index.html 200",
+    "/interview /index.html 200",
+    "/interview/* /index.html 200",
+    "/interview-access /index.html 200",
+    "/interview-access/* /index.html 200",
+    "/interview-host /index.html 200",
+    "/interview-host/* /index.html 200",
+    "/text-interview /index.html 200",
+    "/text-interview/* /index.html 200",
+    "/candidate /index.html 200",
+    "/candidate/* /index.html 200",
+    "/automation /index.html 200",
+    "/automation/* /index.html 200",
+    "/pwreset /index.html 200",
+    "/pwreset/ /index.html 200",
+    "/accommodation /index.html 200",
+    "/accommodation/* /index.html 200",
+    "/accommodation-request /index.html 200",
+    "/accommodation-request/* /index.html 200",
+  ];
   const lines = [
     "# Public prerendered routes. Keep these before the SPA fallback.",
     ...publicRoutes
@@ -990,17 +1018,7 @@ function writeStaticRoutingFile() {
       ]),
     "",
     "# Authenticated and dynamic app routes remain client-rendered SPA routes.",
-    "/dashboard/* /index.html 200",
-    "/admin/* /index.html 200",
-    "/checkout/* /index.html 200",
-    "/membership-agreement/* /index.html 200",
-    "/interview/* /index.html 200",
-    "/interview-access/* /index.html 200",
-    "/interview-host/* /index.html 200",
-    "/text-interview/* /index.html 200",
-    "/automation/* /index.html 200",
-    "/pwreset /index.html 200",
-    "/accommodation-request/* /index.html 200",
+    ...spaRouteRules,
     "/* /index.html 200",
     "",
   ];

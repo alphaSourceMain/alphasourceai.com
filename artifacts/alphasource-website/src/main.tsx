@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import App from "./App";
 import { initSentry, isSentryEnabled } from "./lib/sentry";
@@ -38,6 +39,27 @@ function AppCrashFallback() {
       </div>
     </section>
   );
+}
+
+class RootErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.error("[root] render_failed", {
+      route: typeof window !== "undefined" ? window.location.pathname : "",
+      error_name: error instanceof Error ? error.name : "unknown",
+      component_stack_present: Boolean(info.componentStack),
+    });
+  }
+
+  render() {
+    if (this.state.hasError) return <AppCrashFallback />;
+    return this.props.children;
+  }
 }
 
 if (import.meta.env.DEV && typeof window !== "undefined") {
@@ -92,12 +114,16 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   };
 }
 
-const app = isSentryEnabled() ? (
-  <Sentry.ErrorBoundary showDialog={false} fallback={<AppCrashFallback />}>
-    <App />
-  </Sentry.ErrorBoundary>
-) : (
-  <App />
+const app = (
+  <RootErrorBoundary>
+    {isSentryEnabled() ? (
+      <Sentry.ErrorBoundary showDialog={false} fallback={<AppCrashFallback />}>
+        <App />
+      </Sentry.ErrorBoundary>
+    ) : (
+      <App />
+    )}
+  </RootErrorBoundary>
 );
 
 createRoot(document.getElementById("root")!).render(app);

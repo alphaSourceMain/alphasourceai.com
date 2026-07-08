@@ -142,7 +142,7 @@ function readRoleToken(): string {
   if (typeof window === "undefined") return "";
   try {
     const path = String(window.location.pathname || "");
-    const pathMatch = path.match(/^\/interview\/([^/?#]+)/);
+    const pathMatch = path.match(/^\/(?:interview|interview-access|interview-host)\/([^/?#]+)/);
     if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]).trim();
 
     const url = new URL(window.location.href);
