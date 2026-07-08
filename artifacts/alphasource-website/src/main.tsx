@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import App from "./App";
 import { initSentry, isSentryEnabled } from "./lib/sentry";
@@ -9,6 +9,7 @@ initSentry();
 
 function removePublicCheckoutStaticFallback() {
   if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-react-route-ready", "true");
   document.getElementById("public-checkout-static-fallback")?.remove();
 }
 
@@ -60,6 +61,15 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { hasError: b
     if (this.state.hasError) return <AppCrashFallback />;
     return this.props.children;
   }
+}
+
+function ReactReadyMarker() {
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(removePublicCheckoutStaticFallback);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  return null;
 }
 
 if (import.meta.env.DEV && typeof window !== "undefined") {
@@ -116,6 +126,7 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
 
 const app = (
   <RootErrorBoundary>
+    <ReactReadyMarker />
     {isSentryEnabled() ? (
       <Sentry.ErrorBoundary showDialog={false} fallback={<AppCrashFallback />}>
         <App />
@@ -127,4 +138,3 @@ const app = (
 );
 
 createRoot(document.getElementById("root")!).render(app);
-window.requestAnimationFrame(removePublicCheckoutStaticFallback);
