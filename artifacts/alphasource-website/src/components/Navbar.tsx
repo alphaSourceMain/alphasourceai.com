@@ -1,4 +1,5 @@
 import { useState, useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -122,22 +123,36 @@ export default function Navbar() {
     { label: "FAQ", href: "/faq" },
   ];
 
-  return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 overflow-visible transition-all duration-300 ${
-        scrolled
-          ? "bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100"
-          : "bg-white/80 backdrop-blur-sm"
-      }`}
-    >
-      {setupSpotlightVisible && (
+  const pageDimOverlay = setupSpotlightVisible && typeof document !== "undefined"
+    ? createPortal(
         <button
           type="button"
           aria-label="Dismiss sign-in guidance"
-          className="fixed inset-0 z-10 cursor-default bg-slate-900/30 backdrop-grayscale"
+          className="fixed inset-0 z-40 cursor-default bg-slate-900/35 backdrop-grayscale"
           onClick={() => setSetupSpotlightVisible(false)}
-        />
-      )}
+        />,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      {pageDimOverlay}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 overflow-visible transition-all duration-300 ${
+          scrolled
+            ? "bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100"
+            : "bg-white/80 backdrop-blur-sm"
+        }`}
+      >
+        {setupSpotlightVisible && (
+          <button
+            type="button"
+            aria-label="Dismiss sign-in guidance"
+            className="absolute inset-0 z-10 cursor-default bg-slate-900/30 backdrop-grayscale"
+            onClick={() => setSetupSpotlightVisible(false)}
+          />
+        )}
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -391,5 +406,6 @@ export default function Navbar() {
         </div>
       )}
     </nav>
+    </>
   );
 }
