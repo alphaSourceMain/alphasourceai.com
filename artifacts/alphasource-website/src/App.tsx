@@ -25,6 +25,7 @@ import {
   AlphaScreenRoiPage,
   AlphaScreenSecurityPage,
 } from "@/pages/AlphaScreenRetailPages";
+import AlphaScreenRetailJourneyMockupsPage from "@/pages/AlphaScreenRetailJourneyMockupsPage";
 import CheckoutSubscriptionSuccessPage from "@/pages/CheckoutSubscriptionSuccessPage";
 import PasswordSetupPreviewPage from "@/pages/PasswordSetupPreviewPage";
 import AboutPage from "@/pages/AboutPage";
@@ -589,6 +590,8 @@ function Router() {
           <Route path="/"            component={HomePage} />
           <Route path="/alphascreen/pricing/" component={AlphaScreenPricingRoute} />
           <Route path="/alphascreen/pricing" component={AlphaScreenPricingRoute} />
+          <Route path="/alphascreen/retail-journey-mockups/" component={AlphaScreenRetailJourneyMockupsPage} />
+          <Route path="/alphascreen/retail-journey-mockups" component={AlphaScreenRetailJourneyMockupsPage} />
           <Route path="/alphascreen/how-it-works/" component={AlphaScreenHowItWorksPage} />
           <Route path="/alphascreen/how-it-works" component={AlphaScreenHowItWorksPage} />
           <Route path="/alphascreen/security/" component={AlphaScreenSecurityPage} />
