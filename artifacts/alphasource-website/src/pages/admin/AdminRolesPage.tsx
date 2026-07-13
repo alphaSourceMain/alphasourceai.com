@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, Link2, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Upload } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import InfoTooltip from "@/components/InfoTooltip";
 import RoleActionsMenu from "@/components/roles/RoleActionsMenu";
@@ -14,6 +14,8 @@ type RoleType = "Basic" | "Detailed" | "Technical";
 type SortKey  = "name" | "entity" | "created" | "type";
 type SortDir  = "asc" | "desc";
 type RoleStatusFilter = "active" | "inactive" | "all";
+
+const roleTableGridClass = "grid min-w-[1000px] grid-cols-[minmax(220px,1.5fr)_minmax(135px,1fr)_108px_90px_minmax(130px,.9fr)_80px_64px_56px_112px] items-center px-5";
 
 interface Role {
   id: string;
@@ -920,7 +922,7 @@ export default function AdminRolesPage() {
       >
         {/* Header */}
         <div
-          className="grid min-w-[1010px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_54px_112px] items-center px-5 py-3 border-b"
+          className={`${roleTableGridClass} py-3 border-b`}
           style={dividerStyle}
         >
           <button
@@ -945,18 +947,17 @@ export default function AdminRolesPage() {
             Created <SortIcon col="created" />
           </button>
           <button
-            className="flex items-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
+            className="flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
             style={mutedTextStyle}
             onClick={() => handleSort("type")}
           >
             Type <SortIcon col="type" />
           </button>
-          <p className="text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Usage</p>
+          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Usage</p>
           <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Add’l Int.</p>
-          <p className="text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Rubric</p>
-          <p className="text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>JD</p>
-          <p className="text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Link</p>
-          <p className="text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</p>
+          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Rubric</p>
+          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>JD</p>
+          <p className="text-right text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</p>
         </div>
 
         {/* Rows */}
@@ -975,7 +976,7 @@ export default function AdminRolesPage() {
               return (
                 <div
                   key={role.id}
-                  className="grid min-w-[1010px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_54px_112px] items-center px-5 py-3.5 border-b as-shell-dropdown-item transition-colors"
+                  className={`${roleTableGridClass} py-3.5 border-b as-shell-dropdown-item transition-colors`}
                   style={dividerStyle}
                 >
                   {/* Name + parent */}
@@ -1010,19 +1011,23 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* Type badge */}
-                  <span
-                    className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold w-fit"
-                    style={{ backgroundColor: tc.bg, color: tc.text }}
-                  >
-                    {role.type}
-                  </span>
+                  <div className="flex justify-center">
+                    <span
+                      className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold w-fit"
+                      style={{ backgroundColor: tc.bg, color: tc.text }}
+                    >
+                      {role.type}
+                    </span>
+                  </div>
 
                   {/* Usage */}
-                  <p className="text-xs font-bold pr-2" style={mutedTextStyle}>
-                    {role.remainingInterviews == null || role.usedInterviews == null
-                      ? "—"
-                      : `${role.remainingInterviews} left / ${role.usedInterviews} used`}
-                  </p>
+                  <div className="flex justify-center pr-2">
+                    <p className="text-center text-xs font-bold" style={mutedTextStyle}>
+                      {role.remainingInterviews == null || role.usedInterviews == null
+                        ? "—"
+                        : `${role.remainingInterviews} left / ${role.usedInterviews} used`}
+                    </p>
+                  </div>
 
                   {/* Add'l interviews */}
                   <p className="text-center text-xs font-bold" style={mutedTextStyle}>
@@ -1051,45 +1056,36 @@ export default function AdminRolesPage() {
                     )}
                   </div>
 
-                  {/* Link status */}
-                  <div className="flex justify-center">
-                    {!role.isInactive && role.token ? (
-                      <span className="inline-flex p-1.5" title="Interview link available" aria-label="Interview link available" style={{ color: "#7C5FCC" }}>
-                        <Link2 className="w-4 h-4" />
-                      </span>
-                    ) : (
-                      <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
-                    )}
-                  </div>
-
                   {/* Actions */}
-                  <RoleActionsMenu
-                    open={openRoleActionsId === role.id}
-                    onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
-                    roleTitle={role.name}
-                    canManageRole
-                    canCopyInterviewLink={!role.isInactive && Boolean(role.token)}
-                    copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
-                    hasJobDescription={role.hasJD}
-                    hasRubric={role.hasRubric}
-                    openingJobDescription={openingJd[role.id] === true}
-                    loadingRubric={loadingRubric[role.id] === true}
-                    replacementEligibility={role.jobDescriptionReplacement}
-                    updatingStatus={updatingRoleStatus[role.id] === true}
-                    deleting={deletingRoles[role.id] === true}
-                    isInactive={Boolean(role.isInactive)}
-                    onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
-                    onCopyInterviewLink={() => { void handleCopy(role); }}
-                    onViewJobDescription={() => { void openRoleJd(role); }}
-                    onViewRubric={() => { void openRoleRubric(role); }}
-                    onReplaceJobDescription={() => {
-                      if (!role.jobDescriptionReplacement.eligible) return;
-                      setOpenRoleActionsId(null);
-                      setReplacementRole(role);
-                    }}
-                    onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
-                    onDeleteRole={() => setRoleDeleteConfirm({ role })}
-                  />
+                  <div className="flex justify-end">
+                    <RoleActionsMenu
+                      open={openRoleActionsId === role.id}
+                      onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
+                      roleTitle={role.name}
+                      canManageRole
+                      canCopyInterviewLink={!role.isInactive && Boolean(role.token)}
+                      copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
+                      hasJobDescription={role.hasJD}
+                      hasRubric={role.hasRubric}
+                      openingJobDescription={openingJd[role.id] === true}
+                      loadingRubric={loadingRubric[role.id] === true}
+                      replacementEligibility={role.jobDescriptionReplacement}
+                      updatingStatus={updatingRoleStatus[role.id] === true}
+                      deleting={deletingRoles[role.id] === true}
+                      isInactive={Boolean(role.isInactive)}
+                      onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
+                      onCopyInterviewLink={() => { void handleCopy(role); }}
+                      onViewJobDescription={() => { void openRoleJd(role); }}
+                      onViewRubric={() => { void openRoleRubric(role); }}
+                      onReplaceJobDescription={() => {
+                        if (!role.jobDescriptionReplacement.eligible) return;
+                        setOpenRoleActionsId(null);
+                        setReplacementRole(role);
+                      }}
+                      onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
+                      onDeleteRole={() => setRoleDeleteConfirm({ role })}
+                    />
+                  </div>
                 </div>
               );
             })

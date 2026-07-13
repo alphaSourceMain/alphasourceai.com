@@ -3,7 +3,6 @@ import {
   FileText,
   Upload,
   Trash2,
-  Link2,
   X,
   ChevronDown,
   ChevronUp,
@@ -1057,7 +1056,7 @@ export default function RolesPage() {
     }
   };
 
-  const roleTableColumnCount = 8;
+  const roleTableColumnCount = 7;
 
   return (
     <DashboardLayout title="Roles">
@@ -1270,7 +1269,16 @@ export default function RolesPage() {
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[960px] w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[19%]" />
+              <col className="w-[12%]" />
+              <col className="w-[17%]" />
+              <col className="w-[7%]" />
+              <col className="w-[7%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr className="border-b" style={dividerStyle}>
                 {/* Role — sortable */}
@@ -1295,10 +1303,10 @@ export default function RolesPage() {
                     <SortIcon active={sortKey === "entity"} dir={sortDir} />
                   </button>
                 </th>
-                <th className="text-left px-4 py-3.5 whitespace-nowrap">
+                <th className="px-4 py-3.5 text-center whitespace-nowrap">
                   <button
                     onClick={() => handleSort("type")}
-                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                    className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
                     style={mutedTextStyle}
                   >
                     Type
@@ -1306,10 +1314,10 @@ export default function RolesPage() {
                   </button>
                 </th>
                 {/* Usage — sortable */}
-                <th className="text-left px-4 py-3.5 whitespace-nowrap">
+                <th className="px-4 py-3.5 text-center whitespace-nowrap">
                   <button
                     onClick={() => handleSort("left")}
-                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                    className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
                     style={mutedTextStyle}
                   >
                     Usage
@@ -1331,14 +1339,7 @@ export default function RolesPage() {
                     <InfoTooltip content="Job description file used as source input to generate this role's rubric" />
                   </span>
                 </th>
-                {/* Interview Link */}
-                <th className="text-center px-4 py-3.5 whitespace-nowrap">
-                  <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
-                    Interview Link
-                    <InfoTooltip content="Shareable link for candidates to start their AI interview" />
-                  </span>
-                </th>
-                <th className="text-center px-4 py-3.5 pr-6 text-[10px] font-black uppercase tracking-widest whitespace-nowrap" style={mutedTextStyle}>
+                <th className="px-4 py-3.5 pr-6 text-right text-[10px] font-black uppercase tracking-widest whitespace-nowrap" style={mutedTextStyle}>
                   Actions
                 </th>
               </tr>
@@ -1376,7 +1377,7 @@ export default function RolesPage() {
                   {/* Role name + date */}
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-bold text-sm leading-snug" style={primaryTextStyle}>{role.name}</p>
+                      <p className="break-words font-bold text-sm leading-snug" style={primaryTextStyle}>{role.name}</p>
                       {role.isInactive && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: "var(--as-surface-muted)", color: "var(--as-text-muted)" }}>
                           Inactive
@@ -1395,17 +1396,21 @@ export default function RolesPage() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <span className="text-sm font-semibold" style={mutedTextStyle}>{role.entityName}</span>
+                    <span className="block truncate text-sm font-semibold" title={role.entityName} style={mutedTextStyle}>{role.entityName}</span>
                   </td>
 
                   {/* Type */}
-                  <td className="px-4 py-4">
-                    <TypeBadge type={role.type} />
+                  <td className="px-4 py-4 text-center">
+                    <div className="flex justify-center">
+                      <TypeBadge type={role.type} />
+                    </div>
                   </td>
 
                   {/* Usage */}
-                  <td className="px-4 py-4">
-                    <UsageBar left={role.left} used={role.used} />
+                  <td className="px-4 py-4 text-center">
+                    <div className="flex justify-center">
+                      <UsageBar left={role.left} used={role.used} />
+                    </div>
                   </td>
 
                   {/* Rubric */}
@@ -1424,45 +1429,36 @@ export default function RolesPage() {
                     />
                   </td>
 
-                  {/* Interview Link */}
-                  <td className="px-4 py-4 text-center">
-                    {role.slugOrToken && !role.isInactive ? (
-                      <span className="inline-flex p-2" title="Interview link available" aria-label="Interview link available" style={{ color: "#7C5FCC" }}>
-                        <Link2 className="w-4 h-4" />
-                      </span>
-                    ) : (
-                      <span className="text-sm" style={subtleTextStyle}>—</span>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-4 pr-6 text-center">
-                    <RoleActionsMenu
-                      open={openRoleActionsId === role.id}
-                      onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
-                      roleTitle={role.name}
-                      canManageRole={canManageRoles}
-                      canCopyInterviewLink={Boolean(role.slugOrToken) && !role.isInactive}
-                      copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
-                      hasJobDescription={role.hasJD}
-                      hasRubric={role.hasRubric}
-                      openingJobDescription={Boolean(openingJd[role.id])}
-                      loadingRubric={false}
-                      replacementEligibility={role.jobDescriptionReplacement}
-                      updatingStatus={Boolean(updatingRoleStatus[role.id])}
-                      deleting={Boolean(deletingRoles[role.id])}
-                      isInactive={Boolean(role.isInactive)}
-                      onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
-                      onCopyInterviewLink={() => { void copyInterviewLink(role); }}
-                      onViewJobDescription={() => { void openRoleJd(role); }}
-                      onViewRubric={() => openRubricModal(role)}
-                      onReplaceJobDescription={() => {
-                        if (!role.jobDescriptionReplacement.eligible) return;
-                        setOpenRoleActionsId(null);
-                        setReplacementRole(role);
-                      }}
-                      onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
-                      onDeleteRole={() => setRoleDeleteConfirm({ role })}
-                    />
+                  <td className="px-4 py-4 pr-6 text-right">
+                    <div className="flex justify-end">
+                      <RoleActionsMenu
+                        open={openRoleActionsId === role.id}
+                        onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
+                        roleTitle={role.name}
+                        canManageRole={canManageRoles}
+                        canCopyInterviewLink={Boolean(role.slugOrToken) && !role.isInactive}
+                        copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
+                        hasJobDescription={role.hasJD}
+                        hasRubric={role.hasRubric}
+                        openingJobDescription={Boolean(openingJd[role.id])}
+                        loadingRubric={false}
+                        replacementEligibility={role.jobDescriptionReplacement}
+                        updatingStatus={Boolean(updatingRoleStatus[role.id])}
+                        deleting={Boolean(deletingRoles[role.id])}
+                        isInactive={Boolean(role.isInactive)}
+                        onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
+                        onCopyInterviewLink={() => { void copyInterviewLink(role); }}
+                        onViewJobDescription={() => { void openRoleJd(role); }}
+                        onViewRubric={() => openRubricModal(role)}
+                        onReplaceJobDescription={() => {
+                          if (!role.jobDescriptionReplacement.eligible) return;
+                          setOpenRoleActionsId(null);
+                          setReplacementRole(role);
+                        }}
+                        onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
+                        onDeleteRole={() => setRoleDeleteConfirm({ role })}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
