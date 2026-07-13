@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppearanceProvider } from "@/context/AppearanceContext";
+import { TrackingConsentProvider, useTrackingConsent } from "@/context/TrackingConsentContext";
 import { ClientProvider } from "@/context/ClientContext";
 import { AdminClientProvider } from "@/context/AdminClientContext";
 import Navbar from "@/components/Navbar";
@@ -13,6 +14,7 @@ import TawkWidget from "@/components/TawkWidget";
 import Seo from "@/components/Seo";
 import PageAnalytics from "@/components/PageAnalytics";
 import IDPixelLoader from "@/components/IDPixelLoader";
+import TrackingConsentNotice from "@/components/TrackingConsentNotice";
 
 /* Public pages */
 import HomePage from "@/pages/HomePage";
@@ -447,14 +449,31 @@ function DashboardGuard() {
 
 /* ── Admin dashboard guard ──────────────────────────────── */
 function AdminGuard() {
-  const { isAdminLoggedIn, adminAuthReady } = useAuth();
+  const { isAdminLoggedIn, adminAuthReady, resolveAdminAccess } = useAuth();
   const [, setLocation] = useLocation();
+  const [checkingAdminAccess, setCheckingAdminAccess] = useState(true);
 
   useEffect(() => {
-    if (adminAuthReady && !isAdminLoggedIn) setLocation("/");
-  }, [adminAuthReady, isAdminLoggedIn, setLocation]);
+    if (adminAuthReady && isAdminLoggedIn) {
+      setCheckingAdminAccess(false);
+      return;
+    }
 
-  if (!adminAuthReady) return null;
+    let active = true;
+    setCheckingAdminAccess(true);
+    void resolveAdminAccess().finally(() => {
+      if (active) setCheckingAdminAccess(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [adminAuthReady, isAdminLoggedIn, resolveAdminAccess]);
+
+  useEffect(() => {
+    if (!checkingAdminAccess && adminAuthReady && !isAdminLoggedIn) setLocation("/");
+  }, [adminAuthReady, checkingAdminAccess, isAdminLoggedIn, setLocation]);
+
+  if (checkingAdminAccess || !adminAuthReady) return null;
   if (!isAdminLoggedIn) return null;
 
   return (
@@ -502,6 +521,7 @@ function InterviewCompletePage() {
 /* ── Router ─────────────────────────────────────────────── */
 function Router() {
   const [location] = useLocation();
+  const { optionalTrackingAllowed } = useTrackingConsent();
   const normalizedLocation = location.length > 1 ? location.replace(/\/+$/, "") : location;
   const isDashboard = location === "/dashboard" || location.startsWith("/dashboard/");
   const isAdmin     = location === "/admin"     || location.startsWith("/admin/");
@@ -526,6 +546,7 @@ function Router() {
     location.startsWith("/accommodation-request/") ||
     location === "/interview-cvi" ||
     location === "/interview-complete";
+  const isPublicSite = !isDashboard && !isAdmin && !isAutomationDigestApproval && !isAutomationApproval && !isInterview;
   const isPublicTawkRoute = PUBLIC_TAWK_ROUTES.has(normalizedLocation);
 
   let content: ReactNode;
@@ -621,7 +642,7 @@ function Router() {
       <Footer />
       {isPublicTawkRoute && (
         <TawkWidget
-          enabled={(env as Record<string, unknown>).VITE_TAWK_PUBLIC_ENABLED === "true"}
+          enabled={optionalTrackingAllowed && (env as Record<string, unknown>).VITE_TAWK_PUBLIC_ENABLED === "true"}
           propertyId={String((env as Record<string, unknown>).VITE_TAWK_PUBLIC_PROPERTY_ID || "")}
           widgetId={String((env as Record<string, unknown>).VITE_TAWK_PUBLIC_WIDGET_ID || "")}
           variant="public"
@@ -637,6 +658,7 @@ function Router() {
       <PageAnalytics location={location} />
       <IDPixelLoader location={location} />
       {content}
+      <TrackingConsentNotice visible={isPublicSite} />
     </>
   );
 }
@@ -646,9 +668,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <Router />
-          </AuthProvider>
+          <TrackingConsentProvider>
+            <AuthProvider>
+              <Router />
+            </AuthProvider>
+          </TrackingConsentProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
