@@ -87,6 +87,13 @@ function errorStateFor(error: unknown): ReplacementErrorState {
       blockers: displayBlockers(requestError?.detail || null),
     };
   }
+  if (status === 409 && code === "ROLE_NOT_ACTIVE") {
+    return {
+      title: "Role is inactive",
+      message: "Only active roles can have their job description replaced. The existing role was not changed.",
+      blockers: [],
+    };
+  }
   if (status === 401 || status === 403 || code === "ROLE_REPLACEMENT_FORBIDDEN") {
     return {
       title: "Permission required",

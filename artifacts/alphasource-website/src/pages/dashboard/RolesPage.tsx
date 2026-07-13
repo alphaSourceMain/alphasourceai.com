@@ -3,19 +3,20 @@ import {
   FileText,
   Upload,
   Trash2,
-  Copy,
+  Link2,
   X,
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  RefreshCw,
 } from "lucide-react";
 import CurrentScopeBanner from "@/components/CurrentScopeBanner";
 import DashboardLayout from "@/components/DashboardLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import RoleActionsMenu from "@/components/roles/RoleActionsMenu";
 import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
 import { useClient } from "@/context/ClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
+import { normalizeRoleJdReplacementEligibility, type RoleJdReplacementEligibility } from "@/lib/roleJdReplacementEligibility";
 import { supabase } from "@/lib/supabaseClient";
 
 type InterviewType = "Basic" | "Detailed" | "Technical";
@@ -75,6 +76,7 @@ interface Role {
   slugOrToken: string;
   rubric: unknown;
   jobDescriptionUrl: string;
+  jobDescriptionReplacement: RoleJdReplacementEligibility;
   status?: string | null;
   closedAt?: string | null;
   closedBy?: string | null;
@@ -330,27 +332,20 @@ function UsageBar({ left, used }: { left: number; used: number }) {
 function DocButton({
   has,
   label,
-  onClick,
-  disabled,
 }: {
   has: boolean;
   label: string;
-  onClick: () => void;
-  disabled?: boolean;
 }) {
   if (!has) return <span className="text-sm" style={subtleTextStyle}>—</span>;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={`View ${label}`}
-      className="p-2 rounded-lg hover:text-[#A380F6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+    <span
+      title={`${label} available`}
+      aria-label={`${label} available`}
+      className="inline-flex p-2"
       style={mutedTextStyle}
-      aria-label={`View ${label}`}
     >
       <FileText className="w-4 h-4" />
-    </button>
+    </span>
   );
 }
 
@@ -389,6 +384,7 @@ export default function RolesPage() {
   const [roleStatusConfirm, setRoleStatusConfirm] = useState<{ role: Role; nextStatus: "active" | "inactive" } | null>(null);
   const [roleDeleteConfirm, setRoleDeleteConfirm] = useState<{ role: Role } | null>(null);
   const [replacementRole, setReplacementRole] = useState<Role | null>(null);
+  const [openRoleActionsId, setOpenRoleActionsId] = useState<string | null>(null);
   const [rubricModalRole, setRubricModalRole] = useState<Role | null>(null);
   const [rubricQuestions, setRubricQuestions] = useState<string[]>([]);
   const [rubricNotes, setRubricNotes] = useState("");
@@ -421,6 +417,7 @@ export default function RolesPage() {
     setRoleStatusConfirm(null);
     setRoleDeleteConfirm(null);
     setReplacementRole(null);
+    setOpenRoleActionsId(null);
     setRubricModalRole(null);
     setRubricQuestions([]);
     setRubricNotes("");
@@ -819,6 +816,7 @@ export default function RolesPage() {
               slugOrToken: String(item.slug_or_token || "").trim(),
               rubric,
               jobDescriptionUrl,
+              jobDescriptionReplacement: normalizeRoleJdReplacementEligibility(item.job_description_replacement),
               status,
               closedAt: String(item.closed_at || "").trim() || null,
               closedBy: String(item.closed_by || "").trim() || null,
@@ -1059,7 +1057,7 @@ export default function RolesPage() {
     }
   };
 
-  const roleTableColumnCount = canManageRoles ? 8 : 7;
+  const roleTableColumnCount = 8;
 
   return (
     <DashboardLayout title="Roles">
@@ -1334,18 +1332,15 @@ export default function RolesPage() {
                   </span>
                 </th>
                 {/* Interview Link */}
-                <th className="text-left px-4 py-3.5 whitespace-nowrap">
+                <th className="text-center px-4 py-3.5 whitespace-nowrap">
                   <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
                     Interview Link
                     <InfoTooltip content="Shareable link for candidates to start their AI interview" />
                   </span>
                 </th>
-                {/* Delete */}
-                {canManageRoles && (
-                  <th className="text-center px-4 py-3.5 pr-6 text-[10px] font-black uppercase tracking-widest whitespace-nowrap" style={mutedTextStyle}>
-                    Actions
-                  </th>
-                )}
+                <th className="text-center px-4 py-3.5 pr-6 text-[10px] font-black uppercase tracking-widest whitespace-nowrap" style={mutedTextStyle}>
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1418,7 +1413,6 @@ export default function RolesPage() {
                     <DocButton
                       has={role.hasRubric}
                       label="Rubric"
-                      onClick={() => openRubricModal(role)}
                     />
                   </td>
 
@@ -1427,78 +1421,49 @@ export default function RolesPage() {
                     <DocButton
                       has={role.hasJD}
                       label="JD"
-                      onClick={() => { void openRoleJd(role); }}
-                      disabled={Boolean(openingJd[role.id])}
                     />
                   </td>
 
                   {/* Interview Link */}
-                  <td className="px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() => { void copyInterviewLink(role); }}
-                      disabled={!role.slugOrToken || role.isInactive}
-                      title={role.isInactive ? "Inactive roles cannot accept new candidates." : undefined}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
-                      style={{
-                        backgroundColor: role.isInactive ? "var(--as-surface-muted)" : "rgba(163,128,246,0.12)",
-                        color: role.isInactive ? "var(--as-text-subtle)" : "#7C5FCC"
-                      }}
-                    >
-                      <Copy className="w-3 h-3" />
-                      Copy link
-                    </button>
+                  <td className="px-4 py-4 text-center">
+                    {role.slugOrToken && !role.isInactive ? (
+                      <span className="inline-flex p-2" title="Interview link available" aria-label="Interview link available" style={{ color: "#7C5FCC" }}>
+                        <Link2 className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="text-sm" style={subtleTextStyle}>—</span>
+                    )}
                   </td>
 
-                  {/* Delete */}
-                  {canManageRoles && (
-                    <td className="px-4 py-4 pr-6">
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            replacementTriggerRef.current = event.currentTarget;
-                            setReplacementRole(role);
-                          }}
-                          disabled={role.used > 0}
-                          title={role.used > 0 ? "Job descriptions cannot be replaced after candidate activity starts." : "Replace job description"}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-[#A380F6]/12 text-[#7C5FCC] hover:bg-[#A380F6]/18 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Replace job description
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
-                          disabled={Boolean(updatingRoleStatus[role.id])}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                            role.isInactive
-                              ? "text-[#009E73] bg-[#02D99D]/10 hover:bg-[#02D99D]/15"
-                              : ""
-                          }`}
-                          style={role.isInactive ? undefined : { backgroundColor: "var(--as-surface-muted)", color: "var(--as-text-muted)" }}
-                        >
-                          {role.isInactive ? "Reopen" : "Close"}
-                        </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRoleDeleteConfirm({ role })}
-                        disabled={Boolean(deletingRoles[role.id])}
-                        className="p-2 rounded-lg hover:text-red-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        style={subtleTextStyle}
-                        aria-label="Delete role"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      </div>
-                      {role.used > 0 && (
-                        <p className="mt-1 text-center text-[10px] font-semibold" style={subtleTextStyle}>
-                          Unavailable after candidate activity starts.
-                        </p>
-                      )}
-                    </td>
-                  )}
+                  <td className="px-4 py-4 pr-6 text-center">
+                    <RoleActionsMenu
+                      open={openRoleActionsId === role.id}
+                      onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
+                      roleTitle={role.name}
+                      canManageRole={canManageRoles}
+                      canCopyInterviewLink={Boolean(role.slugOrToken) && !role.isInactive}
+                      copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
+                      hasJobDescription={role.hasJD}
+                      hasRubric={role.hasRubric}
+                      openingJobDescription={Boolean(openingJd[role.id])}
+                      loadingRubric={false}
+                      replacementEligibility={role.jobDescriptionReplacement}
+                      updatingStatus={Boolean(updatingRoleStatus[role.id])}
+                      deleting={Boolean(deletingRoles[role.id])}
+                      isInactive={Boolean(role.isInactive)}
+                      onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
+                      onCopyInterviewLink={() => { void copyInterviewLink(role); }}
+                      onViewJobDescription={() => { void openRoleJd(role); }}
+                      onViewRubric={() => openRubricModal(role)}
+                      onReplaceJobDescription={() => {
+                        if (!role.jobDescriptionReplacement.eligible) return;
+                        setOpenRoleActionsId(null);
+                        setReplacementRole(role);
+                      }}
+                      onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
+                      onDeleteRole={() => setRoleDeleteConfirm({ role })}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

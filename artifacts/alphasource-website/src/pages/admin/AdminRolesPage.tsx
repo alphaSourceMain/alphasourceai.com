@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, Copy, Trash2, Upload, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Link2, Upload } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import RoleActionsMenu from "@/components/roles/RoleActionsMenu";
 import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
 import { useAdminClient, type AdminClient } from "@/context/AdminClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
+import { normalizeRoleJdReplacementEligibility, type RoleJdReplacementEligibility } from "@/lib/roleJdReplacementEligibility";
 import { supabase } from "@/lib/supabaseClient";
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -28,6 +30,7 @@ interface Role {
   type: RoleType;
   hasJD: boolean;
   jobDescriptionUrl: string;
+  jobDescriptionReplacement: RoleJdReplacementEligibility;
   hasRubric: boolean;
   rubricQuestions: string[];
   includedInterviewsPerRole: number | null;
@@ -213,7 +216,6 @@ export default function AdminRolesPage() {
   } = useAdminClient();
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [copied, setCopied] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState<boolean>(false);
   const [rolesError, setRolesError] = useState<string>("");
@@ -231,6 +233,7 @@ export default function AdminRolesPage() {
   const [roleStatusConfirm, setRoleStatusConfirm] = useState<{ role: Role; nextStatus: "active" | "inactive" } | null>(null);
   const [roleDeleteConfirm, setRoleDeleteConfirm] = useState<{ role: Role } | null>(null);
   const [replacementRole, setReplacementRole] = useState<Role | null>(null);
+  const [openRoleActionsId, setOpenRoleActionsId] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const replacementTriggerRef = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState({ title: "", type: "Basic", jdFileName: "" });
@@ -265,6 +268,7 @@ export default function AdminRolesPage() {
     setRoleStatusConfirm(null);
     setRoleDeleteConfirm(null);
     setReplacementRole(null);
+    setOpenRoleActionsId(null);
   }, [selectedClientId]);
 
   useEffect(() => {
@@ -361,6 +365,7 @@ export default function AdminRolesPage() {
               type: normalizeRoleType(item.interview_type),
               hasJD: Boolean(String(item.job_description_url || "").trim()),
               jobDescriptionUrl: String(item.job_description_url || "").trim(),
+              jobDescriptionReplacement: normalizeRoleJdReplacementEligibility(item.job_description_replacement),
               hasRubric: rubricQuestions.length > 0,
               rubricQuestions,
               includedInterviewsPerRole: toWholeNonNegative(item.included_interviews_per_role),
@@ -472,8 +477,6 @@ export default function AdminRolesPage() {
       setActionNotice({ tone: "error", text: "Could not copy link." });
       return;
     }
-    setCopied(role.id);
-    setTimeout(() => setCopied(null), 1500);
     setActionNotice({ tone: "success", text: "Link copied." });
   };
 
@@ -917,7 +920,7 @@ export default function AdminRolesPage() {
       >
         {/* Header */}
         <div
-          className="grid min-w-[1120px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_210px] items-center px-5 py-3 border-b"
+          className="grid min-w-[1010px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_54px_112px] items-center px-5 py-3 border-b"
           style={dividerStyle}
         >
           <button
@@ -969,11 +972,10 @@ export default function AdminRolesPage() {
           ) : (
             sorted.map((role) => {
               const tc = typeColors[role.type];
-              const isCopied = copied === role.id;
               return (
                 <div
                   key={role.id}
-                  className="grid min-w-[1120px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_210px] items-center px-5 py-3.5 border-b as-shell-dropdown-item transition-colors"
+                  className="grid min-w-[1010px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_54px_112px] items-center px-5 py-3.5 border-b as-shell-dropdown-item transition-colors"
                   style={dividerStyle}
                 >
                   {/* Name + parent */}
@@ -1029,96 +1031,65 @@ export default function AdminRolesPage() {
 
                   {/* Rubric icon */}
                   <div className="flex justify-center">
-                    <button
-                      onClick={() => {
-                        void openRoleRubric(role);
-                      }}
-                      disabled={loadingRubric[role.id] === true}
-                      className="p-1.5 rounded-lg text-[#0A1547]/30 dark:text-slate-400/45 hover:text-[#A380F6] hover:bg-[rgba(163,128,246,0.08)] transition-all"
-                      title="View rubric"
-                    >
-                      <FileText className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* JD icon */}
-                  <div className="flex justify-center">
-                    {role.hasJD ? (
-                      <button
-                        onClick={() => {
-                          void openRoleJd(role);
-                        }}
-                        disabled={openingJd[role.id] === true}
-                        className="p-1.5 rounded-lg text-[#0A1547]/30 dark:text-slate-400/45 hover:text-[#A380F6] hover:bg-[rgba(163,128,246,0.08)] transition-all"
-                        title="View job description"
-                      >
+                    {role.hasRubric ? (
+                      <span className="inline-flex p-1.5" title="Rubric available" aria-label="Rubric available" style={{ color: "#7C5FCC" }}>
                         <FileText className="w-4 h-4" />
-                      </button>
+                      </span>
                     ) : (
                       <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
                     )}
                   </div>
 
-                  {/* Copy link */}
-                  <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 w-fit"
-                    style={{
-                      backgroundColor: role.isInactive ? "var(--as-surface-muted)" : isCopied ? "#02D99D" : "#A380F6",
-                      color: role.isInactive ? "var(--as-text-subtle)" : "#FFFFFF",
-                    }}
-                    onClick={() => {
-                      void handleCopy(role);
-                    }}
-                    disabled={role.isInactive}
-                    title={role.isInactive ? "Inactive roles cannot accept new candidates." : undefined}
-                  >
-                    <Copy className="w-3 h-3" />
-                    {isCopied ? "Copied!" : "Copy link"}
-                  </button>
+                  {/* JD icon */}
+                  <div className="flex justify-center">
+                    {role.hasJD ? (
+                      <span className="inline-flex p-1.5" title="Job description available" aria-label="Job description available" style={{ color: "#7C5FCC" }}>
+                        <FileText className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
+                    )}
+                  </div>
+
+                  {/* Link status */}
+                  <div className="flex justify-center">
+                    {!role.isInactive && role.token ? (
+                      <span className="inline-flex p-1.5" title="Interview link available" aria-label="Interview link available" style={{ color: "#7C5FCC" }}>
+                        <Link2 className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
+                    )}
+                  </div>
 
                   {/* Actions */}
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        replacementTriggerRef.current = event.currentTarget;
-                        setReplacementRole(role);
-                      }}
-                      disabled={Number(role.usedInterviews || 0) > 0}
-                      title={Number(role.usedInterviews || 0) > 0 ? "Job descriptions cannot be replaced after candidate activity starts." : "Replace job description"}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-[#A380F6]/12 text-[#7C5FCC] hover:bg-[#A380F6]/18 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      Replace job description
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
-                      disabled={updatingRoleStatus[role.id] === true}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                        role.isInactive
-                          ? "text-[#009E73] bg-[#02D99D]/10 hover:bg-[#02D99D]/15"
-                          : "text-[#0A1547]/55 dark:text-slate-300/70 bg-[#0A1547]/5 dark:bg-white/5 hover:bg-[#0A1547]/10 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      {role.isInactive ? "Reopen" : "Close"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRoleDeleteConfirm({ role });
-                      }}
-                      disabled={deletingRoles[role.id] === true}
-                      className="p-1.5 rounded-lg text-[#0A1547]/25 dark:text-slate-400/45 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-                      title={`Delete ${role.name}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {Number(role.usedInterviews || 0) > 0 && (
-                    <p className="mt-1 text-center text-[10px] font-semibold" style={subtleTextStyle}>
-                      Unavailable after candidate activity starts.
-                    </p>
-                  )}
+                  <RoleActionsMenu
+                    open={openRoleActionsId === role.id}
+                    onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
+                    roleTitle={role.name}
+                    canManageRole
+                    canCopyInterviewLink={!role.isInactive && Boolean(role.token)}
+                    copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
+                    hasJobDescription={role.hasJD}
+                    hasRubric={role.hasRubric}
+                    openingJobDescription={openingJd[role.id] === true}
+                    loadingRubric={loadingRubric[role.id] === true}
+                    replacementEligibility={role.jobDescriptionReplacement}
+                    updatingStatus={updatingRoleStatus[role.id] === true}
+                    deleting={deletingRoles[role.id] === true}
+                    isInactive={Boolean(role.isInactive)}
+                    onTriggerFocus={(trigger) => { replacementTriggerRef.current = trigger; }}
+                    onCopyInterviewLink={() => { void handleCopy(role); }}
+                    onViewJobDescription={() => { void openRoleJd(role); }}
+                    onViewRubric={() => { void openRoleRubric(role); }}
+                    onReplaceJobDescription={() => {
+                      if (!role.jobDescriptionReplacement.eligible) return;
+                      setOpenRoleActionsId(null);
+                      setReplacementRole(role);
+                    }}
+                    onToggleRoleStatus={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
+                    onDeleteRole={() => setRoleDeleteConfirm({ role })}
+                  />
                 </div>
               );
             })
