@@ -4,6 +4,10 @@ import AdminLayout from "@/components/AdminLayout";
 import InfoTooltip from "@/components/InfoTooltip";
 import RoleActionsMenu from "@/components/roles/RoleActionsMenu";
 import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
+import {
+  ROLE_TABLE_ADMIN_GRID_TEMPLATE,
+  roleTableAlignmentClass,
+} from "@/components/roles/roleTableLayout";
 import { useAdminClient, type AdminClient } from "@/context/AdminClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
 import { normalizeRoleJdReplacementEligibility, type RoleJdReplacementEligibility } from "@/lib/roleJdReplacementEligibility";
@@ -14,8 +18,6 @@ type RoleType = "Basic" | "Detailed" | "Technical";
 type SortKey  = "name" | "entity" | "created" | "type";
 type SortDir  = "asc" | "desc";
 type RoleStatusFilter = "active" | "inactive" | "all";
-
-const roleTableGridClass = "grid min-w-[1000px] grid-cols-[minmax(220px,1.5fr)_minmax(135px,1fr)_108px_90px_minmax(130px,.9fr)_80px_64px_56px_112px] items-center px-5";
 
 interface Role {
   id: string;
@@ -922,42 +924,60 @@ export default function AdminRolesPage() {
       >
         {/* Header */}
         <div
-          className={`${roleTableGridClass} py-3 border-b`}
+          className={`${ROLE_TABLE_ADMIN_GRID_TEMPLATE} py-3 border-b`}
           style={dividerStyle}
         >
-          <button
-            className="flex items-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors text-left"
-            style={mutedTextStyle}
-            onClick={() => handleSort("name")}
-          >
-            Role <SortIcon col="name" />
-          </button>
-          <button
-            className="flex items-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
-            style={mutedTextStyle}
-            onClick={() => handleSort("entity")}
-          >
-            Entity <SortIcon col="entity" />
-          </button>
-          <button
-            className="flex items-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
-            style={mutedTextStyle}
-            onClick={() => handleSort("created")}
-          >
-            Created <SortIcon col="created" />
-          </button>
-          <button
-            className="flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
-            style={mutedTextStyle}
-            onClick={() => handleSort("type")}
-          >
-            Type <SortIcon col="type" />
-          </button>
-          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Usage</p>
-          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Add’l Int.</p>
-          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Rubric</p>
-          <p className="text-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>JD</p>
-          <p className="text-right text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</p>
+          <div className={roleTableAlignmentClass("role")}>
+            <button
+              className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
+              style={mutedTextStyle}
+              onClick={() => handleSort("name")}
+            >
+              Role <SortIcon col="name" />
+            </button>
+          </div>
+          <div className={roleTableAlignmentClass("entity")}>
+            <button
+              className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
+              style={mutedTextStyle}
+              onClick={() => handleSort("entity")}
+            >
+              Entity <SortIcon col="entity" />
+            </button>
+          </div>
+          <div className={roleTableAlignmentClass("entity")}>
+            <button
+              className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
+              style={mutedTextStyle}
+              onClick={() => handleSort("created")}
+            >
+              Created <SortIcon col="created" />
+            </button>
+          </div>
+          <div className={roleTableAlignmentClass("type")}>
+            <button
+              className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
+              style={mutedTextStyle}
+              onClick={() => handleSort("type")}
+            >
+              Type <SortIcon col="type" />
+            </button>
+          </div>
+          <div className={roleTableAlignmentClass("usage")}>
+            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Usage</span>
+          </div>
+          <div className={roleTableAlignmentClass("usage")}>
+            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Add’l Int.</span>
+          </div>
+          <div className={roleTableAlignmentClass("rubric")}>
+            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Rubric</span>
+          </div>
+          <div className={roleTableAlignmentClass("jobDescription")}>
+            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>JD</span>
+          </div>
+          <div className={roleTableAlignmentClass("actions")}>
+            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</span>
+          </div>
         </div>
 
         {/* Rows */}
@@ -976,42 +996,48 @@ export default function AdminRolesPage() {
               return (
                 <div
                   key={role.id}
-                  className={`${roleTableGridClass} py-3.5 border-b as-shell-dropdown-item transition-colors`}
+                  className={`${ROLE_TABLE_ADMIN_GRID_TEMPLATE} py-3.5 border-b as-shell-dropdown-item transition-colors`}
                   style={dividerStyle}
                 >
                   {/* Name + parent */}
-                  <div className="min-w-0 pr-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <p className="text-sm font-bold leading-snug truncate" style={primaryTextStyle}>{role.name}</p>
+                  <div className={roleTableAlignmentClass("role")}>
+                    <div className="min-w-0 w-full">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-bold leading-snug truncate" style={primaryTextStyle}>{role.name}</p>
+                        {role.isInactive && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: "color-mix(in srgb, var(--as-text) 7%, transparent)", color: "var(--as-text-muted)" }}>
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] mt-0.5 font-semibold truncate" style={subtleTextStyle}>
+                        Parent: {role.parentClientName}
+                      </p>
                       {role.isInactive && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: "color-mix(in srgb, var(--as-text) 7%, transparent)", color: "var(--as-text-muted)" }}>
-                          Inactive
-                        </span>
+                        <p className="text-[10px] mt-0.5 truncate" style={subtleTextStyle}>
+                          Recordings expire 14 days after role closure.
+                        </p>
                       )}
                     </div>
-                    <p className="text-[10px] mt-0.5 font-semibold truncate" style={subtleTextStyle}>
-                      Parent: {role.parentClientName}
-                    </p>
-                    {role.isInactive && (
-                      <p className="text-[10px] mt-0.5 truncate" style={subtleTextStyle}>
-                        Recordings expire 14 days after role closure.
-                      </p>
-                    )}
                   </div>
 
                   {/* Entity */}
-                  <p className="text-xs font-semibold truncate pr-2" style={mutedTextStyle}>
-                    {role.entityName || "—"}
-                  </p>
+                  <div className={roleTableAlignmentClass("entity")}>
+                    <p className="w-full text-xs font-semibold truncate" style={mutedTextStyle}>
+                      {role.entityName || "—"}
+                    </p>
+                  </div>
 
                   {/* Created */}
-                  <div className="pr-2">
+                  <div className={roleTableAlignmentClass("entity")}>
+                    <div className="w-full">
                     <p className="text-xs font-bold leading-snug" style={mutedTextStyle}>{role.createdDate}</p>
                     <p className="text-[10px] font-semibold mt-0.5" style={subtleTextStyle}>{role.createdTime}</p>
+                    </div>
                   </div>
 
                   {/* Type badge */}
-                  <div className="flex justify-center">
+                  <div className={roleTableAlignmentClass("type")}>
                     <span
                       className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold w-fit"
                       style={{ backgroundColor: tc.bg, color: tc.text }}
@@ -1021,7 +1047,7 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* Usage */}
-                  <div className="flex justify-center pr-2">
+                  <div className={roleTableAlignmentClass("usage")}>
                     <p className="text-center text-xs font-bold" style={mutedTextStyle}>
                       {role.remainingInterviews == null || role.usedInterviews == null
                         ? "—"
@@ -1030,12 +1056,14 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* Add'l interviews */}
-                  <p className="text-center text-xs font-bold" style={mutedTextStyle}>
-                    {role.purchasedInterviews == null ? "—" : role.purchasedInterviews}
-                  </p>
+                  <div className={roleTableAlignmentClass("usage")}>
+                    <p className="text-xs font-bold" style={mutedTextStyle}>
+                      {role.purchasedInterviews == null ? "—" : role.purchasedInterviews}
+                    </p>
+                  </div>
 
                   {/* Rubric icon */}
-                  <div className="flex justify-center">
+                  <div className={roleTableAlignmentClass("rubric")}>
                     {role.hasRubric ? (
                       <span className="inline-flex p-1.5" title="Rubric available" aria-label="Rubric available" style={{ color: "#7C5FCC" }}>
                         <FileText className="w-4 h-4" />
@@ -1046,7 +1074,7 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* JD icon */}
-                  <div className="flex justify-center">
+                  <div className={roleTableAlignmentClass("jobDescription")}>
                     {role.hasJD ? (
                       <span className="inline-flex p-1.5" title="Job description available" aria-label="Job description available" style={{ color: "#7C5FCC" }}>
                         <FileText className="w-4 h-4" />
@@ -1057,7 +1085,7 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex justify-end">
+                  <div className={roleTableAlignmentClass("actions")}>
                     <RoleActionsMenu
                       open={openRoleActionsId === role.id}
                       onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}

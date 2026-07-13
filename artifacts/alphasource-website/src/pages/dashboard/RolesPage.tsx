@@ -13,6 +13,10 @@ import DashboardLayout from "@/components/DashboardLayout";
 import InfoTooltip from "@/components/InfoTooltip";
 import RoleActionsMenu from "@/components/roles/RoleActionsMenu";
 import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
+import {
+  ROLE_TABLE_CLIENT_COLUMNS,
+  roleTableAlignmentClass,
+} from "@/components/roles/roleTableLayout";
 import { useClient } from "@/context/ClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
 import { normalizeRoleJdReplacementEligibility, type RoleJdReplacementEligibility } from "@/lib/roleJdReplacementEligibility";
@@ -1271,76 +1275,89 @@ export default function RolesPage() {
         <div className="overflow-x-auto">
           <table className="min-w-[960px] w-full table-fixed text-sm">
             <colgroup>
-              <col className="w-[28%]" />
-              <col className="w-[19%]" />
-              <col className="w-[12%]" />
-              <col className="w-[17%]" />
-              <col className="w-[7%]" />
-              <col className="w-[7%]" />
-              <col className="w-[10%]" />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.role.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.entity.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.type.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.usage.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.rubric.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.jobDescription.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.actions.width} />
             </colgroup>
             <thead>
               <tr className="border-b" style={dividerStyle}>
                 {/* Role — sortable */}
-                <th className="text-left px-6 py-3.5 whitespace-nowrap">
-                  <button
-                    onClick={() => handleSort("name")}
-                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
-                    style={mutedTextStyle}
-                  >
-                    Role
-                    <SortIcon active={sortKey === "name"} dir={sortDir} />
-                  </button>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.role.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("role")}>
+                    <button
+                      onClick={() => handleSort("name")}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      style={mutedTextStyle}
+                    >
+                      Role
+                      <SortIcon active={sortKey === "name"} dir={sortDir} />
+                    </button>
+                  </div>
                 </th>
-                {/* Type — sortable */}
-                <th className="text-left px-4 py-3.5 whitespace-nowrap">
-                  <button
-                    onClick={() => handleSort("entity")}
-                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
-                    style={mutedTextStyle}
-                  >
-                    Entity
-                    <SortIcon active={sortKey === "entity"} dir={sortDir} />
-                  </button>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.entity.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("entity")}>
+                    <button
+                      onClick={() => handleSort("entity")}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      style={mutedTextStyle}
+                    >
+                      Entity
+                      <SortIcon active={sortKey === "entity"} dir={sortDir} />
+                    </button>
+                  </div>
                 </th>
-                <th className="px-4 py-3.5 text-center whitespace-nowrap">
-                  <button
-                    onClick={() => handleSort("type")}
-                    className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
-                    style={mutedTextStyle}
-                  >
-                    Type
-                    <SortIcon active={sortKey === "type"} dir={sortDir} />
-                  </button>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.type.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("type")}>
+                    <button
+                      onClick={() => handleSort("type")}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      style={mutedTextStyle}
+                    >
+                      Type
+                      <SortIcon active={sortKey === "type"} dir={sortDir} />
+                    </button>
+                  </div>
                 </th>
                 {/* Usage — sortable */}
-                <th className="px-4 py-3.5 text-center whitespace-nowrap">
-                  <button
-                    onClick={() => handleSort("left")}
-                    className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
-                    style={mutedTextStyle}
-                  >
-                    Usage
-                    <InfoTooltip content="Interviews used vs. remaining quota for this role" />
-                    <SortIcon active={sortKey === "left"} dir={sortDir} />
-                  </button>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.usage.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("usage")}>
+                    <button
+                      onClick={() => handleSort("left")}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      style={mutedTextStyle}
+                    >
+                      Usage
+                      <InfoTooltip content="Interviews used vs. remaining quota for this role" />
+                      <SortIcon active={sortKey === "left"} dir={sortDir} />
+                    </button>
+                  </div>
                 </th>
                 {/* Rubric — not sortable (boolean doc) */}
-                <th className="text-center px-4 py-3.5 whitespace-nowrap">
-                  <span className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
-                    Rubric
-                    <InfoTooltip content="Role-specific interview question set and scoring rubric generated for this role" />
-                  </span>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.rubric.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("rubric")}>
+                    <span className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
+                      Rubric
+                      <InfoTooltip content="Role-specific interview question set and scoring rubric generated for this role" />
+                    </span>
+                  </div>
                 </th>
                 {/* JD — not sortable */}
-                <th className="text-center px-4 py-3.5 whitespace-nowrap">
-                  <span className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
-                    JD
-                    <InfoTooltip content="Job description file used as source input to generate this role's rubric" />
-                  </span>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.jobDescription.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("jobDescription")}>
+                    <span className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
+                      JD
+                      <InfoTooltip content="Job description file used as source input to generate this role's rubric" />
+                    </span>
+                  </div>
                 </th>
-                <th className="px-4 py-3.5 pr-6 text-right text-[10px] font-black uppercase tracking-widest whitespace-nowrap" style={mutedTextStyle}>
-                  Actions
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.actions.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("actions")}>
+                    <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</span>
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -1375,62 +1392,72 @@ export default function RolesPage() {
                   style={idx === sortedRoles.length - 1 ? { borderBottom: "none" } : dividerStyle}
                 >
                   {/* Role name + date */}
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="break-words font-bold text-sm leading-snug" style={primaryTextStyle}>{role.name}</p>
-                      {role.isInactive && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: "var(--as-surface-muted)", color: "var(--as-text-muted)" }}>
-                          Inactive
-                        </span>
-                      )}
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.role.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("role")}>
+                      <div className="min-w-0 w-full">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="break-words font-bold text-sm leading-snug" style={primaryTextStyle}>{role.name}</p>
+                          {role.isInactive && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: "var(--as-surface-muted)", color: "var(--as-text-muted)" }}>
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
+                          {role.date}
+                          {role.isInactive && role.inactiveReason ? ` • ${role.inactiveReason}` : ""}
+                        </p>
+                        {role.isInactive && (
+                          <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
+                            Recordings expire 14 days after role closure.
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
-                      {role.date}
-                      {role.isInactive && role.inactiveReason ? ` • ${role.inactiveReason}` : ""}
-                    </p>
-                    {role.isInactive && (
-                      <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
-                        Recordings expire 14 days after role closure.
-                      </p>
-                    )}
                   </td>
 
-                  <td className="px-4 py-4">
-                    <span className="block truncate text-sm font-semibold" title={role.entityName} style={mutedTextStyle}>{role.entityName}</span>
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.entity.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("entity")}>
+                      <span className="block w-full truncate text-sm font-semibold" title={role.entityName} style={mutedTextStyle}>{role.entityName}</span>
+                    </div>
                   </td>
 
                   {/* Type */}
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex justify-center">
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.type.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("type")}>
                       <TypeBadge type={role.type} />
                     </div>
                   </td>
 
                   {/* Usage */}
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex justify-center">
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.usage.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("usage")}>
                       <UsageBar left={role.left} used={role.used} />
                     </div>
                   </td>
 
                   {/* Rubric */}
-                  <td className="px-4 py-4 text-center">
-                    <DocButton
-                      has={role.hasRubric}
-                      label="Rubric"
-                    />
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.rubric.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("rubric")}>
+                      <DocButton
+                        has={role.hasRubric}
+                        label="Rubric"
+                      />
+                    </div>
                   </td>
 
                   {/* JD */}
-                  <td className="px-4 py-4 text-center">
-                    <DocButton
-                      has={role.hasJD}
-                      label="JD"
-                    />
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.jobDescription.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("jobDescription")}>
+                      <DocButton
+                        has={role.hasJD}
+                        label="JD"
+                      />
+                    </div>
                   </td>
 
-                  <td className="px-4 py-4 pr-6 text-right">
-                    <div className="flex justify-end">
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.actions.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("actions")}>
                       <RoleActionsMenu
                         open={openRoleActionsId === role.id}
                         onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
