@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, Copy, Trash2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, FileText, Copy, Trash2, Upload, RefreshCw } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
 import { useAdminClient, type AdminClient } from "@/context/AdminClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
 import { supabase } from "@/lib/supabaseClient";
@@ -26,6 +27,7 @@ interface Role {
   createdTs: number;
   type: RoleType;
   hasJD: boolean;
+  jobDescriptionUrl: string;
   hasRubric: boolean;
   rubricQuestions: string[];
   includedInterviewsPerRole: number | null;
@@ -228,7 +230,9 @@ export default function AdminRolesPage() {
   const [rubricModal, setRubricModal] = useState<{ roleName: string; questions: string[] } | null>(null);
   const [roleStatusConfirm, setRoleStatusConfirm] = useState<{ role: Role; nextStatus: "active" | "inactive" } | null>(null);
   const [roleDeleteConfirm, setRoleDeleteConfirm] = useState<{ role: Role } | null>(null);
+  const [replacementRole, setReplacementRole] = useState<Role | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const replacementTriggerRef = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState({ title: "", type: "Basic", jdFileName: "" });
   const hierarchyClients = useMemo(
     () => adminClients.filter((client) => client.id !== "all"),
@@ -260,6 +264,7 @@ export default function AdminRolesPage() {
     setRoleSearch("");
     setRoleStatusConfirm(null);
     setRoleDeleteConfirm(null);
+    setReplacementRole(null);
   }, [selectedClientId]);
 
   useEffect(() => {
@@ -355,6 +360,7 @@ export default function AdminRolesPage() {
               createdTs: created.ts,
               type: normalizeRoleType(item.interview_type),
               hasJD: Boolean(String(item.job_description_url || "").trim()),
+              jobDescriptionUrl: String(item.job_description_url || "").trim(),
               hasRubric: rubricQuestions.length > 0,
               rubricQuestions,
               includedInterviewsPerRole: toWholeNonNegative(item.included_interviews_per_role),
@@ -906,12 +912,12 @@ export default function AdminRolesPage() {
 
       {/* ── Roles table ───────────────────────────────────── */}
       <div
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl overflow-x-auto"
         style={surfaceCardStyle}
       >
         {/* Header */}
         <div
-          className="grid grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_104px] items-center px-5 py-3 border-b"
+          className="grid min-w-[1120px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_210px] items-center px-5 py-3 border-b"
           style={dividerStyle}
         >
           <button
@@ -967,7 +973,7 @@ export default function AdminRolesPage() {
               return (
                 <div
                   key={role.id}
-                  className="grid grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_104px] items-center px-5 py-3.5 border-b as-shell-dropdown-item transition-colors"
+                  className="grid min-w-[1120px] grid-cols-[minmax(150px,1fr)_120px_110px_78px_105px_76px_50px_50px_96px_210px] items-center px-5 py-3.5 border-b as-shell-dropdown-item transition-colors"
                   style={dividerStyle}
                 >
                   {/* Name + parent */}
@@ -1071,7 +1077,20 @@ export default function AdminRolesPage() {
                   </button>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        replacementTriggerRef.current = event.currentTarget;
+                        setReplacementRole(role);
+                      }}
+                      disabled={Number(role.usedInterviews || 0) > 0}
+                      title={Number(role.usedInterviews || 0) > 0 ? "Job descriptions cannot be replaced after candidate activity starts." : "Replace job description"}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-[#A380F6]/12 text-[#7C5FCC] hover:bg-[#A380F6]/18 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Replace job description
+                    </button>
                     <button
                       type="button"
                       onClick={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
@@ -1095,6 +1114,11 @@ export default function AdminRolesPage() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
+                  {Number(role.usedInterviews || 0) > 0 && (
+                    <p className="mt-1 text-center text-[10px] font-semibold" style={subtleTextStyle}>
+                      Unavailable after candidate activity starts.
+                    </p>
+                  )}
                 </div>
               );
             })
@@ -1115,6 +1139,23 @@ export default function AdminRolesPage() {
           )}
         </div>
       </div>
+      <ReplaceJobDescriptionModal
+        open={Boolean(replacementRole)}
+        role={replacementRole ? {
+          id: replacementRole.id,
+          clientId: replacementRole.clientId,
+          title: replacementRole.name,
+          status: replacementRole.status,
+          jobDescriptionUrl: replacementRole.jobDescriptionUrl,
+        } : null}
+        getSessionToken={getSessionToken}
+        onClose={() => setReplacementRole(null)}
+        onSuccess={() => {
+          setRefreshNonce((value) => value + 1);
+          setActionNotice({ tone: "success", text: "Job description replaced and role configuration rebuilt." });
+        }}
+        getRestoreFocusTarget={() => replacementTriggerRef.current}
+      />
       {roleStatusConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
           <button

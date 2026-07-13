@@ -8,10 +8,12 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  RefreshCw,
 } from "lucide-react";
 import CurrentScopeBanner from "@/components/CurrentScopeBanner";
 import DashboardLayout from "@/components/DashboardLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import ReplaceJobDescriptionModal from "@/components/roles/ReplaceJobDescriptionModal";
 import { useClient } from "@/context/ClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
 import { supabase } from "@/lib/supabaseClient";
@@ -354,14 +356,18 @@ function DocButton({
 
 export default function RolesPage() {
   const { clients, selectedClient, selectedClientId, loading: clientLoading, error: clientError, isGlobalAdmin, memberships } = useClient();
-  const selectedMembershipRole = String(
+  const selectedMembershipRoleValue = String(
     memberships.find((membership) => membership.client_id === selectedClientId)?.role ||
       selectedClient.role ||
       "",
   )
     .trim()
-    .toLowerCase();
-  const canManageRoles = isGlobalAdmin || selectedMembershipRole === "manager" || selectedMembershipRole === "admin";
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  const selectedMembershipRole = selectedMembershipRoleValue === "superadmin"
+    ? "super_admin"
+    : selectedMembershipRoleValue;
+  const canManageRoles = isGlobalAdmin || ["manager", "admin", "owner", "super_admin"].includes(selectedMembershipRole);
   const [roleTitle, setRoleTitle] = useState("");
   const [interviewType, setInterviewType] = useState<InterviewType>("Basic");
   const [jdFile, setJdFile] = useState<File | null>(null);
@@ -382,6 +388,7 @@ export default function RolesPage() {
   const [updatingRoleStatus, setUpdatingRoleStatus] = useState<Record<string, boolean>>({});
   const [roleStatusConfirm, setRoleStatusConfirm] = useState<{ role: Role; nextStatus: "active" | "inactive" } | null>(null);
   const [roleDeleteConfirm, setRoleDeleteConfirm] = useState<{ role: Role } | null>(null);
+  const [replacementRole, setReplacementRole] = useState<Role | null>(null);
   const [rubricModalRole, setRubricModalRole] = useState<Role | null>(null);
   const [rubricQuestions, setRubricQuestions] = useState<string[]>([]);
   const [rubricNotes, setRubricNotes] = useState("");
@@ -394,6 +401,7 @@ export default function RolesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const embeddedCheckoutContainerRef = useRef<HTMLDivElement>(null);
   const embeddedCheckoutInstanceRef = useRef<{ unmount?: () => void; destroy?: () => void } | null>(null);
+  const replacementTriggerRef = useRef<HTMLButtonElement>(null);
   const entityOptions = useMemo(
     () => buildEntityFilterOptions(clients, selectedClientId, { useParentNameLabel: true }),
     [clients, selectedClientId],
@@ -412,6 +420,7 @@ export default function RolesPage() {
     setUpdatingRoleStatus({});
     setRoleStatusConfirm(null);
     setRoleDeleteConfirm(null);
+    setReplacementRole(null);
     setRubricModalRole(null);
     setRubricQuestions([]);
     setRubricNotes("");
@@ -1444,7 +1453,20 @@ export default function RolesPage() {
                   {/* Delete */}
                   {canManageRoles && (
                     <td className="px-4 py-4 pr-6">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            replacementTriggerRef.current = event.currentTarget;
+                            setReplacementRole(role);
+                          }}
+                          disabled={role.used > 0}
+                          title={role.used > 0 ? "Job descriptions cannot be replaced after candidate activity starts." : "Replace job description"}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-[#A380F6]/12 text-[#7C5FCC] hover:bg-[#A380F6]/18 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Replace job description
+                        </button>
                         <button
                           type="button"
                           onClick={() => setRoleStatusConfirm({ role, nextStatus: role.isInactive ? "active" : "inactive" })}
@@ -1470,6 +1492,11 @@ export default function RolesPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                       </div>
+                      {role.used > 0 && (
+                        <p className="mt-1 text-center text-[10px] font-semibold" style={subtleTextStyle}>
+                          Unavailable after candidate activity starts.
+                        </p>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -1478,6 +1505,23 @@ export default function RolesPage() {
           </table>
         </div>
       </div>
+      <ReplaceJobDescriptionModal
+        open={Boolean(replacementRole)}
+        role={replacementRole ? {
+          id: replacementRole.id,
+          clientId: replacementRole.clientId || selectedClientId,
+          title: replacementRole.name,
+          status: replacementRole.status,
+          jobDescriptionUrl: replacementRole.jobDescriptionUrl,
+        } : null}
+        getSessionToken={getSessionToken}
+        onClose={() => setReplacementRole(null)}
+        onSuccess={() => {
+          setRolesReloadNonce((value) => value + 1);
+          setActionNotice({ tone: "success", text: "Job description replaced and role configuration rebuilt." });
+        }}
+        getRestoreFocusTarget={() => replacementTriggerRef.current}
+      />
       {roleStatusConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
           <button
