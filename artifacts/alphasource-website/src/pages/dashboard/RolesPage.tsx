@@ -1570,7 +1570,7 @@ export default function RolesPage() {
             aria-label="Close rubric modal"
           />
           <div
-            className="relative flex h-[94vh] w-full max-w-[58rem] flex-col overflow-hidden rounded-2xl"
+            className="relative flex w-full max-w-[58rem] max-h-[82vh] flex-col overflow-hidden rounded-2xl"
             style={modalSurfaceStyle}
           >
             <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={dividerStyle}>
@@ -1588,20 +1588,40 @@ export default function RolesPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 overflow-y-auto px-5 py-4">
               {rubricQuestions.length === 0 ? (
                 <p className="text-sm font-semibold" style={mutedTextStyle}>No rubric questions available.</p>
               ) : (
-                <ol className="list-decimal pl-5 text-sm space-y-2 font-semibold" style={primaryTextStyle}>
+                <ol className="space-y-2.5">
                   {rubricQuestions.map((question, idx) => (
-                    <li key={`${rubricModalRole.id}-${idx}`}>{question}</li>
+                    <li
+                      key={`${rubricModalRole.id}-${idx}`}
+                      className="flex items-start gap-3 rounded-lg border px-3.5 py-3"
+                      style={{ backgroundColor: "var(--as-surface-muted)", borderColor: "var(--as-border)" }}
+                    >
+                      <span
+                        className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-black"
+                        style={{ backgroundColor: "#A380F6", color: "#ffffff" }}
+                        aria-hidden="true"
+                      >
+                        {idx + 1}
+                      </span>
+                      <p className="min-w-0 text-sm font-semibold leading-6" style={primaryTextStyle}>{question}</p>
+                    </li>
                   ))}
                 </ol>
               )}
-              <div className="mt-4">
+            </div>
+            <div
+              className="shrink-0 border-t px-5 py-4"
+              style={{ ...dividerStyle, backgroundColor: "var(--as-surface-muted)" }}
+            >
                 <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={mutedTextStyle}>
                   Request Changes
                 </label>
+                <p className="mb-2 text-xs font-semibold" style={mutedTextStyle}>
+                  Tell us which questions or criteria should change.
+                </p>
                 <textarea
                   value={rubricNotes}
                   onChange={(e) => setRubricNotes(e.target.value)}
@@ -1612,8 +1632,8 @@ export default function RolesPage() {
                 {rubricError && (
                   <p className="mt-2 text-xs text-red-500 font-semibold">{rubricError}</p>
                 )}
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t px-5 py-4" style={dividerStyle}>
                 <button
                   type="button"
                   onClick={closeRubricModal}
@@ -1631,7 +1651,6 @@ export default function RolesPage() {
                 >
                   {rubricSending ? "Sending…" : "Request changes"}
                 </button>
-              </div>
             </div>
           </div>
         </div>
