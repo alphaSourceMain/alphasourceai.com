@@ -69,7 +69,8 @@ interface Role {
   clientId: string;
   name: string;
   entityName: string;
-  date: string;
+  createdDate: string;
+  createdTime: string;
   type: InterviewType;
   left: number;
   used: number;
@@ -83,7 +84,6 @@ interface Role {
   status?: string | null;
   closedAt?: string | null;
   closedBy?: string | null;
-  inactiveReason?: string | null;
   isInactive?: boolean;
 }
 
@@ -169,26 +169,16 @@ function toWholeNonNegative(value: unknown): number {
   return Math.max(0, Math.floor(n));
 }
 
-function formatRoleDate(value: unknown): { text: string; sortDate: number } {
+function formatRoleCreated(value: unknown): { date: string; time: string; sortDate: number } {
   const raw = String(value || "").trim();
-  if (!raw) return { text: "—", sortDate: 0 };
+  if (!raw) return { date: "—", time: "—", sortDate: 0 };
   const parsed = new Date(raw);
-  const time = parsed.getTime();
-  if (Number.isNaN(time)) return { text: "—", sortDate: 0 };
-  const formatted = parsed.toLocaleString("en-US", {
-    timeZone: "America/Chicago",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZoneName: "short",
-  });
-  const normalized = formatted
-    .replace(/\sGMT[+-]\d{1,2}(?::\d{2})?/g, "")
-    .replace(/\b(?:CDT|CST)\b/g, "CST");
-  return { text: normalized.includes("CST") ? normalized : `${normalized} CST`, sortDate: time };
+  if (Number.isNaN(parsed.getTime())) return { date: "—", time: "—", sortDate: 0 };
+  return {
+    date: parsed.toLocaleDateString(),
+    time: parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+    sortDate: parsed.getTime(),
+  };
 }
 
 function extractErrorMessage(text: string): string {
@@ -329,26 +319,6 @@ function UsageBar({ left, used }: { left: number; used: number }) {
         />
       </div>
     </div>
-  );
-}
-
-function DocButton({
-  has,
-  label,
-}: {
-  has: boolean;
-  label: string;
-}) {
-  if (!has) return <span className="text-sm" style={subtleTextStyle}>—</span>;
-  return (
-    <span
-      title={`${label} available`}
-      aria-label={`${label} available`}
-      className="inline-flex p-2"
-      style={mutedTextStyle}
-    >
-      <FileText className="w-4 h-4" />
-    </span>
   );
 }
 
@@ -799,7 +769,7 @@ export default function RolesPage() {
         const mappedRoles: Role[] = items
           .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
           .map((item) => {
-            const date = formatRoleDate(item.created_at);
+            const created = formatRoleCreated(item.created_at);
             const rubric = item.rubric ?? null;
             const questions = extractRubricQuestions(rubric);
             const jobDescriptionUrl = String(item.job_description_url || "").trim();
@@ -809,13 +779,14 @@ export default function RolesPage() {
               clientId: String(item.client_id || "").trim(),
               name: String(item.title || "").trim() || "Untitled Role",
               entityName: String(item.entity_name || "").trim() || selectedClient.name || "—",
-              date: date.text,
+              createdDate: created.date,
+              createdTime: created.time,
               type: mapInterviewType(item.interview_type),
               left: toWholeNonNegative(item.remaining_interviews),
               used: toWholeNonNegative(item.used_interviews),
               hasRubric: questions.length > 0,
               hasJD: Boolean(jobDescriptionUrl),
-              sortDate: date.sortDate,
+              sortDate: created.sortDate,
               slugOrToken: String(item.slug_or_token || "").trim(),
               rubric,
               jobDescriptionUrl,
@@ -823,7 +794,6 @@ export default function RolesPage() {
               status,
               closedAt: String(item.closed_at || "").trim() || null,
               closedBy: String(item.closed_by || "").trim() || null,
-              inactiveReason: String(item.inactive_reason || "").trim() || null,
               isInactive: status === "inactive",
             };
           })
@@ -1060,7 +1030,7 @@ export default function RolesPage() {
     }
   };
 
-  const roleTableColumnCount = 7;
+  const roleTableColumnCount = 6;
 
   return (
     <DashboardLayout title="Roles">
@@ -1276,11 +1246,10 @@ export default function RolesPage() {
           <table className="min-w-[960px] w-full table-fixed text-sm">
             <colgroup>
               <col className={ROLE_TABLE_CLIENT_COLUMNS.role.width} />
+              <col className={ROLE_TABLE_CLIENT_COLUMNS.created.width} />
               <col className={ROLE_TABLE_CLIENT_COLUMNS.entity.width} />
               <col className={ROLE_TABLE_CLIENT_COLUMNS.type.width} />
               <col className={ROLE_TABLE_CLIENT_COLUMNS.usage.width} />
-              <col className={ROLE_TABLE_CLIENT_COLUMNS.rubric.width} />
-              <col className={ROLE_TABLE_CLIENT_COLUMNS.jobDescription.width} />
               <col className={ROLE_TABLE_CLIENT_COLUMNS.actions.width} />
             </colgroup>
             <thead>
@@ -1295,6 +1264,18 @@ export default function RolesPage() {
                     >
                       Role
                       <SortIcon active={sortKey === "name"} dir={sortDir} />
+                    </button>
+                  </div>
+                </th>
+                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.created.horizontalPadding} py-3.5 whitespace-nowrap`}>
+                  <div className={roleTableAlignmentClass("created")}>
+                    <button
+                      onClick={() => handleSort("date")}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      style={mutedTextStyle}
+                    >
+                      Created
+                      <SortIcon active={sortKey === "date"} dir={sortDir} />
                     </button>
                   </div>
                 </th>
@@ -1336,24 +1317,6 @@ export default function RolesPage() {
                     </button>
                   </div>
                 </th>
-                {/* Rubric — not sortable (boolean doc) */}
-                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.rubric.horizontalPadding} py-3.5 whitespace-nowrap`}>
-                  <div className={roleTableAlignmentClass("rubric")}>
-                    <span className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
-                      Rubric
-                      <InfoTooltip content="Role-specific interview question set and scoring rubric generated for this role" />
-                    </span>
-                  </div>
-                </th>
-                {/* JD — not sortable */}
-                <th className={`${ROLE_TABLE_CLIENT_COLUMNS.jobDescription.horizontalPadding} py-3.5 whitespace-nowrap`}>
-                  <div className={roleTableAlignmentClass("jobDescription")}>
-                    <span className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>
-                      JD
-                      <InfoTooltip content="Job description file used as source input to generate this role's rubric" />
-                    </span>
-                  </div>
-                </th>
                 <th className={`${ROLE_TABLE_CLIENT_COLUMNS.actions.horizontalPadding} py-3.5 whitespace-nowrap`}>
                   <div className={roleTableAlignmentClass("actions")}>
                     <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</span>
@@ -1391,7 +1354,7 @@ export default function RolesPage() {
                   className="border-b transition-colors as-shell-dropdown-item"
                   style={idx === sortedRoles.length - 1 ? { borderBottom: "none" } : dividerStyle}
                 >
-                  {/* Role name + date */}
+                  {/* Role */}
                   <td className={`${ROLE_TABLE_CLIENT_COLUMNS.role.horizontalPadding} py-4`}>
                     <div className={roleTableAlignmentClass("role")}>
                       <div className="min-w-0 w-full">
@@ -1403,15 +1366,16 @@ export default function RolesPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
-                          {role.date}
-                          {role.isInactive && role.inactiveReason ? ` • ${role.inactiveReason}` : ""}
-                        </p>
-                        {role.isInactive && (
-                          <p className="text-[11px] mt-0.5" style={subtleTextStyle}>
-                            Recordings expire 14 days after role closure.
-                          </p>
-                        )}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Created */}
+                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.created.horizontalPadding} py-4`}>
+                    <div className={roleTableAlignmentClass("created")}>
+                      <div className="w-full">
+                        <p className="text-xs font-bold leading-snug" style={mutedTextStyle}>{role.createdDate}</p>
+                        <p className="text-[10px] font-semibold mt-0.5" style={subtleTextStyle}>{role.createdTime}</p>
                       </div>
                     </div>
                   </td>
@@ -1433,26 +1397,6 @@ export default function RolesPage() {
                   <td className={`${ROLE_TABLE_CLIENT_COLUMNS.usage.horizontalPadding} py-4`}>
                     <div className={roleTableAlignmentClass("usage")}>
                       <UsageBar left={role.left} used={role.used} />
-                    </div>
-                  </td>
-
-                  {/* Rubric */}
-                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.rubric.horizontalPadding} py-4`}>
-                    <div className={roleTableAlignmentClass("rubric")}>
-                      <DocButton
-                        has={role.hasRubric}
-                        label="Rubric"
-                      />
-                    </div>
-                  </td>
-
-                  {/* JD */}
-                  <td className={`${ROLE_TABLE_CLIENT_COLUMNS.jobDescription.horizontalPadding} py-4`}>
-                    <div className={roleTableAlignmentClass("jobDescription")}>
-                      <DocButton
-                        has={role.hasJD}
-                        label="JD"
-                      />
                     </div>
                   </td>
 

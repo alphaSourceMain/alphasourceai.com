@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, Upload } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import InfoTooltip from "@/components/InfoTooltip";
 import EditRoleRubricModal from "@/components/roles/EditRoleRubricModal";
@@ -951,7 +951,7 @@ export default function AdminRolesPage() {
               Entity <SortIcon col="entity" />
             </button>
           </div>
-          <div className={roleTableAlignmentClass("entity")}>
+          <div className={roleTableAlignmentClass("created")}>
             <button
               className="inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest hover:text-[#A380F6] transition-colors"
               style={mutedTextStyle}
@@ -974,12 +974,6 @@ export default function AdminRolesPage() {
           </div>
           <div className={roleTableAlignmentClass("usage")}>
             <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Add’l Int.</span>
-          </div>
-          <div className={roleTableAlignmentClass("rubric")}>
-            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Rubric</span>
-          </div>
-          <div className={roleTableAlignmentClass("jobDescription")}>
-            <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>JD</span>
           </div>
           <div className={roleTableAlignmentClass("actions")}>
             <span className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest" style={mutedTextStyle}>Actions</span>
@@ -1035,10 +1029,10 @@ export default function AdminRolesPage() {
                   </div>
 
                   {/* Created */}
-                  <div className={roleTableAlignmentClass("entity")}>
+                  <div className={roleTableAlignmentClass("created")}>
                     <div className="w-full">
-                    <p className="text-xs font-bold leading-snug" style={mutedTextStyle}>{role.createdDate}</p>
-                    <p className="text-[10px] font-semibold mt-0.5" style={subtleTextStyle}>{role.createdTime}</p>
+                      <p className="text-xs font-bold leading-snug" style={mutedTextStyle}>{role.createdDate}</p>
+                      <p className="text-[10px] font-semibold mt-0.5" style={subtleTextStyle}>{role.createdTime}</p>
                     </div>
                   </div>
 
@@ -1066,28 +1060,6 @@ export default function AdminRolesPage() {
                     <p className="text-xs font-bold" style={mutedTextStyle}>
                       {role.purchasedInterviews == null ? "—" : role.purchasedInterviews}
                     </p>
-                  </div>
-
-                  {/* Rubric icon */}
-                  <div className={roleTableAlignmentClass("rubric")}>
-                    {role.hasRubric ? (
-                      <span className="inline-flex p-1.5" title="Rubric available" aria-label="Rubric available" style={{ color: "#7C5FCC" }}>
-                        <FileText className="w-4 h-4" />
-                      </span>
-                    ) : (
-                      <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
-                    )}
-                  </div>
-
-                  {/* JD icon */}
-                  <div className={roleTableAlignmentClass("jobDescription")}>
-                    {role.hasJD ? (
-                      <span className="inline-flex p-1.5" title="Job description available" aria-label="Job description available" style={{ color: "#7C5FCC" }}>
-                        <FileText className="w-4 h-4" />
-                      </span>
-                    ) : (
-                      <span className="text-sm font-semibold" style={subtleTextStyle}>—</span>
-                    )}
                   </div>
 
                   {/* Actions */}
