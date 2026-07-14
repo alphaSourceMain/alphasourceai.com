@@ -710,7 +710,7 @@ function EnterpriseCard() {
           "15-minute interview cap",
           "Volume discounts",
           "Advanced scoring models available",
-          "Priority Support",
+          "Dedicated Support Agent",
         ].map((item) => (
           <div key={item} className="flex items-center gap-3 text-sm font-bold text-white/85">
             <CheckCircle className="h-4 w-4 flex-shrink-0 text-[#02D99D]" />

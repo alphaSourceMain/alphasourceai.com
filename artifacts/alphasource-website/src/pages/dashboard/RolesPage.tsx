@@ -1570,7 +1570,7 @@ export default function RolesPage() {
             aria-label="Close rubric modal"
           />
           <div
-            className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden"
+            className="relative w-full max-w-[58rem] max-h-[90vh] rounded-2xl overflow-hidden"
             style={modalSurfaceStyle}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b" style={dividerStyle}>
@@ -1588,7 +1588,7 @@ export default function RolesPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="px-5 py-4 overflow-y-auto max-h-[calc(85vh-72px)]">
+            <div className="px-5 py-4 overflow-y-auto max-h-[calc(90vh-72px)]">
               {rubricQuestions.length === 0 ? (
                 <p className="text-sm font-semibold" style={mutedTextStyle}>No rubric questions available.</p>
               ) : (
