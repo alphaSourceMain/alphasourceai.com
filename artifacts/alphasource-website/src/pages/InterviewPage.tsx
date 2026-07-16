@@ -11,6 +11,8 @@ import {
   normalizeCandidatePhoneCountry,
   type CandidatePhoneCountry,
 } from "../lib/candidatePhone";
+import { getCandidateFlowError } from "../lib/candidateFlowErrors";
+import { clearCandidateSubmissionKey, getOrCreateCandidateSubmissionKey } from "../lib/candidateSubmission";
 import { alphaSourceLogo } from "@/assets/branding";
 
 /* ── Checklist copy (verbatim) ───────────────────────────────────── */
@@ -96,6 +98,7 @@ const inputCls =
 const selectCls = `${inputCls} h-[42px] appearance-none pr-10 leading-5`;
 
 const errorCls = "text-red-500 text-[10px] mt-1 font-semibold";
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 const isValidResumeFile = (file: File | null | undefined) =>
   Boolean(file && /\.(pdf|doc|docx)$/i.test(String(file.name || "")));
 type DevicePreferences = {
@@ -233,6 +236,16 @@ export default function InterviewPage() {
         ...e,
         resume: "Resume must be a PDF, DOC, or DOCX file.",
       }));
+      return;
+    }
+    if (file.size <= 0) {
+      if (fileRef.current) fileRef.current.value = "";
+      setErrors((e) => ({ ...e, resume: "The resume file is empty." }));
+      return;
+    }
+    if (file.size > MAX_RESUME_BYTES) {
+      if (fileRef.current) fileRef.current.value = "";
+      setErrors((e) => ({ ...e, resume: "Resume must be 10 MB or smaller." }));
       return;
     }
     setResumeFile(file);
@@ -476,6 +489,7 @@ export default function InterviewPage() {
   }, []);
 
   async function handleSubmit() {
+    if (submitLoading) return;
     if (!validateStep1()) return;
 
     const normalizedPhone = normalizeCandidatePhone(phone, phoneCountry);
@@ -506,6 +520,7 @@ export default function InterviewPage() {
       body.append("phone", normalizedPhone);
       body.append("phone_country", phoneCountry);
       body.append("role_token", roleToken);
+      body.append("submission_key", getOrCreateCandidateSubmissionKey(roleToken));
       if (resumeFile) body.append("resume", resumeFile);
 
       const resp = await fetch(joinUrl(backendBase, "/api/candidate/submit"), {
@@ -514,12 +529,11 @@ export default function InterviewPage() {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const hint = String(data?.hint || "").trim();
-        const detail = String(data?.detail || "").trim();
-        const msg = detail || String(data?.error || "").trim() || "Could not submit your information.";
-        setErrors((e) => ({ ...e, submit: hint ? `${msg} ${hint}` : msg }));
+        if (data?.retryable === false) clearCandidateSubmissionKey(roleToken);
+        setErrors((e) => ({ ...e, submit: getCandidateFlowError(data, "Could not submit your information.") }));
         return;
       }
+      clearCandidateSubmissionKey(roleToken);
 
       const verifiedEmail = String(data?.email || email).trim();
       setInterviewAuth({
@@ -607,10 +621,7 @@ export default function InterviewPage() {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const hint = String(data?.hint || "").trim();
-        const detail = String(data?.detail || "").trim();
-        const msg = detail || String(data?.error || "").trim() || "Verification failed.";
-        setOtpError(hint ? `${msg} ${hint}` : msg);
+        setOtpError(getCandidateFlowError(data, "Verification failed."));
         return;
       }
 
@@ -665,10 +676,7 @@ export default function InterviewPage() {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const hint = String(data?.hint || "").trim();
-        const detail = String(data?.detail || "").trim();
-        const msg = detail || String(data?.error || "").trim() || "Could not start interview.";
-        setStartError(hint ? `${msg} ${hint}` : msg);
+        setStartError(getCandidateFlowError(data, "Could not start interview."));
         return;
       }
 
