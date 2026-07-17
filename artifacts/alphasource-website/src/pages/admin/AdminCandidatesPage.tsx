@@ -40,6 +40,13 @@ interface RecordingModalState {
   duration?: number | null;
 }
 
+interface ResetModalState {
+  candidate: Candidate;
+  loading: boolean;
+  eligible: boolean;
+  detail: string | null;
+}
+
 type SortKey = "name" | "client" | "entity" | "role" | "created" | "resume" | "interview" | "overall";
 type SortDir = "asc" | "desc";
 
@@ -230,6 +237,10 @@ export default function AdminCandidatesPage() {
   const [recordingBusy, setRecordingBusy] = useState<Record<string, boolean>>({});
   const [deleteBusy, setDeleteBusy] = useState<Record<string, boolean>>({});
   const [recordingModal, setRecordingModal] = useState<RecordingModalState | null>(null);
+  const [resetModal, setResetModal] = useState<ResetModalState | null>(null);
+  const [resetReason, setResetReason] = useState("technical_issue");
+  const [resetDetail, setResetDetail] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
   const hierarchyClients = useMemo(
     () => adminClients.filter((client) => client.id !== "all"),
     [adminClients],
@@ -268,6 +279,78 @@ export default function AdminCandidatesPage() {
     const token = String(session?.access_token || "").trim();
     if (!token) throw new Error("Missing session token.");
     return token;
+  };
+
+  const openResetModal = async (candidate: Candidate) => {
+    if (!backendBase || !candidate.roleId || !candidate.clientId) {
+      setActionNotice({ tone: "error", text: "Candidate reset information is unavailable." });
+      return;
+    }
+    setResetReason("technical_issue");
+    setResetDetail("");
+    setResetModal({ candidate, loading: true, eligible: false, detail: null });
+    try {
+      const token = await getSessionToken();
+      const params = new URLSearchParams({ client_id: candidate.clientId, role_id: candidate.roleId });
+      const response = await fetch(`${backendBase}/admin/interview-recovery/${encodeURIComponent(candidate.id)}/eligibility?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "omit",
+      });
+      const text = await response.text();
+      const payload = parseJsonSafe(text) as { eligible?: unknown; detail?: unknown } | null;
+      setResetModal((current) => current && current.candidate.id === candidate.id ? {
+        ...current,
+        loading: false,
+        eligible: payload?.eligible === true,
+        detail: typeof payload?.detail === "string" ? payload.detail : (response.ok ? null : extractErrorMessage(text)),
+      } : current);
+    } catch (error) {
+      setResetModal((current) => current && current.candidate.id === candidate.id ? {
+        ...current,
+        loading: false,
+        eligible: false,
+        detail: error instanceof Error ? error.message : "Could not review reset eligibility.",
+      } : current);
+    }
+  };
+
+  const submitReset = async (mode: "reset_only" | "reset_and_send") => {
+    if (!resetModal || resetModal.loading || !resetModal.eligible || resetBusy) return;
+    if (resetReason === "other" && !resetDetail.trim()) {
+      setActionNotice({ tone: "error", text: "Provide a brief explanation when selecting Other." });
+      return;
+    }
+    setResetBusy(true);
+    try {
+      const candidate = resetModal.candidate;
+      const token = await getSessionToken();
+      const idempotencyKey = typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${candidate.id}`;
+      const response = await fetch(`${backendBase}/admin/interview-recovery/${encodeURIComponent(candidate.id)}/reset`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        credentials: "omit",
+        body: JSON.stringify({
+          client_id: candidate.clientId,
+          role_id: candidate.roleId,
+          reason_code: resetReason,
+          reason_detail: resetDetail.trim() || null,
+          mode,
+          idempotency_key: idempotencyKey,
+        }),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(extractErrorMessage(text));
+      setResetModal(null);
+      setActionNotice({ tone: "success", text: "Interview access reset. A new interview attempt is available." });
+      setRefreshNonce((value) => value + 1);
+    } catch (error) {
+      setActionNotice({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not reset interview access.",
+      });
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   const openCandidateResume = async (candidate: Candidate) => {
@@ -963,6 +1046,13 @@ export default function AdminCandidatesPage() {
                           {recordingBusy[c.id] === true ? "Opening..." : "Recording"}
                         </button>
                       )}
+                      <button
+                        className="px-3 py-1 rounded-full text-[11px] font-bold transition-colors border hover:bg-[var(--as-hover)]"
+                        style={{ backgroundColor: "var(--as-surface)", borderColor: "var(--as-border)", color: "var(--as-text-muted)" }}
+                        onClick={() => { void openResetModal(c); }}
+                      >
+                        Reset access
+                      </button>
                     </div>
 
                     {/* Delete */}
@@ -1079,6 +1169,43 @@ export default function AdminCandidatesPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {resetModal && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
+          <button type="button" className="absolute inset-0 bg-[#0A1547]/45" aria-label="Close reset interview access" onClick={() => !resetBusy && setResetModal(null)} />
+          <div className="relative w-full max-w-md rounded-2xl p-5" style={modalSurfaceStyle}>
+            <p className="text-[10px] font-black uppercase tracking-widest" style={subtleTextStyle}>Interview access</p>
+            <h3 className="mt-1 text-base font-black" style={primaryTextStyle}>Reset {resetModal.candidate.name}&apos;s interview access</h3>
+            {resetModal.loading ? (
+              <p className="mt-4 text-sm font-semibold" style={mutedTextStyle}>Reviewing eligibility…</p>
+            ) : !resetModal.eligible ? (
+              <div className="mt-4 rounded-xl px-3 py-3 text-sm font-semibold" style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "#B91C1C" }}>
+                {resetModal.detail || "This attempt is not eligible for reset."}
+              </div>
+            ) : (
+              <>
+                <p className="mt-3 text-sm" style={mutedTextStyle}>This creates one new approved attempt and invalidates old access codes.</p>
+                <label className="mt-4 block text-xs font-black uppercase tracking-wider" style={mutedTextStyle}>Reason</label>
+                <select className={selectCls + " mt-1 w-full"} style={fieldSurfaceStyle} value={resetReason} onChange={(event) => setResetReason(event.target.value)} disabled={resetBusy}>
+                  <option value="technical_issue">Technical issue</option>
+                  <option value="candidate_disconnected">Candidate disconnected</option>
+                  <option value="incorrect_candidate_information">Incorrect candidate information</option>
+                  <option value="admin_approved_replacement">Admin-approved replacement</option>
+                  <option value="resume_upload_problem">Resume upload problem</option>
+                  <option value="other">Other</option>
+                </select>
+                {resetReason === "other" && (
+                  <textarea className="mt-2 w-full rounded-xl border px-3 py-2 text-sm" style={fieldSurfaceStyle} value={resetDetail} onChange={(event) => setResetDetail(event.target.value)} placeholder="Brief explanation" rows={3} disabled={resetBusy} />
+                )}
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button type="button" className="px-3 py-2 rounded-full text-xs font-bold border" style={{ borderColor: "var(--as-border)", color: "var(--as-text-muted)" }} onClick={() => setResetModal(null)} disabled={resetBusy}>Cancel</button>
+                  <button type="button" className="px-3 py-2 rounded-full text-xs font-bold border" style={{ borderColor: "var(--as-border)", color: "var(--as-text-muted)" }} onClick={() => { void submitReset("reset_only"); }} disabled={resetBusy}>Reset only</button>
+                  <button type="button" className="px-3 py-2 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#A380F6" }} onClick={() => { void submitReset("reset_and_send"); }} disabled={resetBusy}>{resetBusy ? "Resetting…" : "Reset & send"}</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

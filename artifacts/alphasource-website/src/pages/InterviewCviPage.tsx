@@ -71,6 +71,7 @@ const STARTUP_REMOTE_TIMEOUT_MS = 12000;
 // The Tavus prompt checks silence after 4-5 seconds; 45 seconds with no utterance is well beyond normal prompt progression.
 const PROGRESS_STALL_MS = 45000;
 const PROGRESS_WATCHDOG_INTERVAL_MS = 5000;
+const IDLE_ENGAGEMENT_GRACE_MS = 30000;
 const TIME_WARNING_THRESHOLD_SECONDS = 120;
 const GRACEFUL_WRAP_THRESHOLD_SECONDS = 60;
 const FORCE_END_THRESHOLD_SECONDS = 15;
@@ -200,6 +201,13 @@ function formatCountdown(seconds: number | null): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
+function isCandidateAnswerProgress(text: string): boolean {
+  const normalized = String(text || "").trim();
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < 5 || /\?\s*$/.test(normalized)) return false;
+  return /\b(i|my|we|because|example|python|javascript|typescript|sql|project|team|built|led|managed|implemented|designed)\b/i.test(normalized);
+}
+
 export default function InterviewCviPage() {
   const [, setLocation] = useLocation();
   const [session] = useState<LiveSessionState | null>(() => readLiveState());
@@ -231,6 +239,8 @@ export default function InterviewCviPage() {
   const lastProgressAtRef = useRef<number | null>(null);
   const progressRecoveryAttemptedRef = useRef(false);
   const progressRecoveryInFlightRef = useRef(false);
+  const lastAiSpeechAtRef = useRef<number | null>(null);
+  const lastAiSpeechStoppedAtRef = useRef<number | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -343,6 +353,30 @@ export default function InterviewCviPage() {
     }
   }, [clearAutoEndTimers, leaveLiveRoute, session, teardownCall]);
 
+  const sendLifecycleTelemetry = useCallback((event: string, reason?: string, useBeacon = false) => {
+    const payload = {
+      conversation_id: String(session?.conversation_id || "").trim(),
+      interview_id: String(session?.interview_id || "").trim(),
+      role_token: String(session?.role_token || "").trim(),
+      event,
+      reason,
+    };
+    if (!backendBase || !payload.conversation_id || !payload.interview_id || !payload.role_token) return;
+    const url = joinUrl(backendBase, "/tavus/client-telemetry");
+    try {
+      if (useBeacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([JSON.stringify(payload)], { type: "application/json" }));
+        return;
+      }
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+    } catch {}
+  }, [session]);
+
   const sendTimeLimitMessage = useCallback((text: string) => {
     try {
       callRef.current?.sendAppMessage?.({
@@ -376,6 +410,14 @@ export default function InterviewCviPage() {
   }, [endInterview, sendTimeLimitMessage]);
 
   useEffect(() => () => clearAutoEndTimers(), [clearAutoEndTimers]);
+
+  useEffect(() => {
+    const onPageHide = () => {
+      if (!endTriggeredRef.current) sendLifecycleTelemetry("browser_closed_or_navigation", "browser_closed_or_navigation", true);
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [sendLifecycleTelemetry]);
 
   useEffect(() => {
     if (!session?.conversation_url) {
@@ -472,22 +514,24 @@ export default function InterviewCviPage() {
       }
     };
 
-    const markProgressStalled = (reason: "progress_stalled" | "disconnected") => {
+    const markProgressStalled = (reason: "watchdog_timeout" | "reconnect_failed") => {
       if (!alive || endTriggeredRef.current) return;
       stopProgressWatchdog();
       setLoading(false);
       setConnectionNotice("");
       setProgressStalled(true);
       setError(
-        reason === "disconnected"
+        reason === "reconnect_failed"
           ? "The interview connection could not be restored. Please contact support before trying again."
           : "The interview stopped progressing and cannot continue. Please contact support before trying again.",
       );
+      sendLifecycleTelemetry(reason === "watchdog_timeout" ? "watchdog_timeout" : "reconnect_failed", reason);
       void endInterview(reason, true);
     };
 
     const beginProgressWatchdog = () => {
       stopProgressWatchdog();
+      sendLifecycleTelemetry("watchdog_started");
       progressWatchdogTimer = window.setInterval(async () => {
         if (!alive || endTriggeredRef.current) {
           stopProgressWatchdog();
@@ -497,9 +541,12 @@ export default function InterviewCviPage() {
 
         const lastProgressAt = lastProgressAtRef.current;
         if (!lastProgressAt || Date.now() - lastProgressAt < PROGRESS_STALL_MS) return;
+        // Allow a full candidate-engagement grace interval after the AI has
+        // finished speaking before treating silence as a stalled conversation.
+        if (lastAiSpeechStoppedAtRef.current && Date.now() - lastAiSpeechStoppedAtRef.current < IDLE_ENGAGEMENT_GRACE_MS) return;
 
         if (progressRecoveryAttemptedRef.current) {
-          markProgressStalled("progress_stalled");
+          markProgressStalled("watchdog_timeout");
           return;
         }
 
@@ -507,6 +554,7 @@ export default function InterviewCviPage() {
         progressRecoveryInFlightRef.current = true;
         reconnectingRef.current = true;
         setConnectionNotice("The interview paused. Reconnecting...");
+        sendLifecycleTelemetry("reconnect_attempted", "watchdog_timeout");
         try {
           await call.leave().catch(() => {});
           if (!alive || endTriggeredRef.current) return;
@@ -519,9 +567,10 @@ export default function InterviewCviPage() {
           if (!alive || endTriggeredRef.current) return;
           lastProgressAtRef.current = Date.now();
           setConnectionNotice("Connection restored. The interview is resuming.");
+          sendLifecycleTelemetry("reconnect_succeeded");
           syncParticipants();
         } catch {
-          markProgressStalled("disconnected");
+          markProgressStalled("reconnect_failed");
         } finally {
           reconnectingRef.current = false;
           progressRecoveryInFlightRef.current = false;
@@ -541,6 +590,8 @@ export default function InterviewCviPage() {
         lastProgressAtRef.current = null;
         progressRecoveryAttemptedRef.current = false;
         progressRecoveryInFlightRef.current = false;
+        lastAiSpeechAtRef.current = null;
+        lastAiSpeechStoppedAtRef.current = null;
 
         const daily = await loadDailySdk();
         if (!alive) return;
@@ -572,11 +623,27 @@ export default function InterviewCviPage() {
         register("app-message", (event) => {
           const data = event?.data ?? event ?? {};
           const eventType = String(data?.event_type || data?.eventType || "").toLowerCase();
-          if (eventType === "conversation.utterance") {
-            progressObservedRef.current = true;
+          const utteranceRole = String(data?.properties?.role || data?.role || "").toLowerCase();
+          const speech = String(data?.properties?.speech || data?.properties?.text || data?.speech || data?.text || "");
+          const isReplicaUtterance =
+            eventType === "conversation.utterance" &&
+            (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
+          const isCandidateUtterance =
+            eventType === "conversation.utterance" &&
+            (utteranceRole === "candidate" || utteranceRole === "user" || utteranceRole === "participant");
+          if (eventType === "conversation.started_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
+            lastAiSpeechAtRef.current = Date.now();
             lastProgressAtRef.current = Date.now();
-            progressRecoveryAttemptedRef.current = false;
-            setConnectionNotice("");
+          }
+          if (eventType === "conversation.stopped_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
+            lastAiSpeechStoppedAtRef.current = Date.now();
+          }
+          if (eventType === "conversation.utterance") {
+            if (isReplicaUtterance || (isCandidateUtterance && isCandidateAnswerProgress(speech))) {
+              progressObservedRef.current = true;
+              lastProgressAtRef.current = Date.now();
+              setConnectionNotice("");
+            }
           }
           if (eventType === "conversation.tool_call" || eventType === "conversation.toolcall") {
             const toolName = String(
@@ -592,31 +659,27 @@ export default function InterviewCviPage() {
               return;
             }
           }
-          const utteranceRole = String(data?.properties?.role || data?.role || "").toLowerCase();
-          const speech = String(data?.properties?.speech || data?.properties?.text || data?.speech || data?.text || "").toLowerCase();
-          const isReplicaUtterance =
-            eventType === "conversation.utterance" &&
-            (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
+          const speechLower = speech.toLowerCase();
           if (
             isReplicaUtterance &&
             (
-              speech.includes("concludes the interview") ||
-              speech.includes("ending the session") ||
-              speech.includes("end the session") ||
-              speech.includes("ending the interview") ||
-              speech.includes("end the interview")
+              speechLower.includes("concludes the interview") ||
+              speechLower.includes("ending the session") ||
+              speechLower.includes("end the session") ||
+              speechLower.includes("ending the interview") ||
+              speechLower.includes("end the interview")
             ) &&
             !closeEndTimerRef.current
           ) {
             closeEndTimerRef.current = window.setTimeout(() => {
               closeEndTimerRef.current = null;
-              void endInterview("closing_utterance");
+              void endInterview("completed_normally");
             }, CLOSING_UTTERANCE_END_DELAY_MS);
             return;
           }
           const payloadText = JSON.stringify(data || {}).toLowerCase();
           if (/call_ended|call-ended|meeting-ended|meeting_ended|room_left|room-left|session_ended|session-ended|conversation_ended|conversation-ended|interview_ended|interview-ended/.test(payloadText)) {
-            void endInterview("ended_payload");
+            void endInterview("vendor_end_event");
           }
         });
 
@@ -654,7 +717,7 @@ export default function InterviewCviPage() {
       handlers = [];
       void teardownCall();
     };
-  }, [clearStartupTimer, endInterview, leaveLiveRoute, session, syncParticipants, teardownCall]);
+  }, [clearStartupTimer, endInterview, leaveLiveRoute, sendLifecycleTelemetry, session, syncParticipants, teardownCall]);
 
   useEffect(() => {
     const maxMinutes = session?.max_interview_minutes;
