@@ -31,6 +31,44 @@ type DailyParticipant = {
   };
 };
 
+type RemoteParticipantEvidence = {
+  remotePresent: boolean;
+  remoteAudioReady: boolean;
+  remoteVideoReady: boolean;
+};
+
+export type ReconnectRecoveryPhase =
+  | "idle"
+  | "reconnecting_transport"
+  | "awaiting_remote_presence"
+  | "awaiting_remote_media"
+  | "awaiting_practical_progress"
+  | "recovered"
+  | "failed";
+
+export type ReconnectProgressSource = "replica_started_speaking" | "replica_utterance";
+
+export type ReconnectRecoveryState = {
+  phase: ReconnectRecoveryPhase;
+  attempt: 0 | 1;
+  startedAt: number | null;
+  localJoinedAt: number | null;
+  remotePresent: boolean;
+  remoteAudioReady: boolean;
+  remoteVideoReady: boolean;
+  progressAt: number | null;
+  progressSource: ReconnectProgressSource | null;
+  terminalAt: number | null;
+};
+
+export type ReconnectRecoveryEvent =
+  | { type: "start"; at: number }
+  | { type: "local_joined"; at: number }
+  | ({ type: "remote_state"; at: number } & RemoteParticipantEvidence)
+  | { type: "practical_progress"; at: number; source: ReconnectProgressSource }
+  | { type: "deadline"; at: number }
+  | { type: "join_failed"; at: number };
+
 type DailyEvent = {
   action?: string;
   error?: unknown;
@@ -71,6 +109,7 @@ const STARTUP_REMOTE_TIMEOUT_MS = 12000;
 // The Tavus prompt checks silence after 4-5 seconds; 45 seconds with no utterance is well beyond normal prompt progression.
 const PROGRESS_STALL_MS = 45000;
 const PROGRESS_WATCHDOG_INTERVAL_MS = 5000;
+const RECOVERY_PROGRESS_TIMEOUT_MS = 30000;
 const IDLE_ENGAGEMENT_GRACE_MS = 30000;
 const TIME_WARNING_THRESHOLD_SECONDS = 120;
 const GRACEFUL_WRAP_THRESHOLD_SECONDS = 60;
@@ -179,6 +218,126 @@ function extractTrack(slot?: DailyTrackSlot): MediaStreamTrack | null {
   return slot.persistentTrack || slot.track || null;
 }
 
+function isRemoteTrackReady(slot?: DailyTrackSlot): boolean {
+  if (!slot) return false;
+  const state = String(slot.state || "").toLowerCase();
+  const track = slot.persistentTrack || slot.track || null;
+  return Boolean(track && track.readyState !== "ended" && state === "playable");
+}
+
+export function createReconnectRecoveryState(): ReconnectRecoveryState {
+  return {
+    phase: "idle",
+    attempt: 0,
+    startedAt: null,
+    localJoinedAt: null,
+    remotePresent: false,
+    remoteAudioReady: false,
+    remoteVideoReady: false,
+    progressAt: null,
+    progressSource: null,
+    terminalAt: null,
+  };
+}
+
+export function isReconnectRecoveryActive(state: ReconnectRecoveryState): boolean {
+  return (
+    state.phase === "reconnecting_transport" ||
+    state.phase === "awaiting_remote_presence" ||
+    state.phase === "awaiting_remote_media" ||
+    state.phase === "awaiting_practical_progress"
+  );
+}
+
+export function reconnectRecoveryNotice(state: ReconnectRecoveryState): string {
+  if (state.phase === "reconnecting_transport") return "Reconnecting to the interview…";
+  if (
+    state.phase === "awaiting_remote_presence" ||
+    state.phase === "awaiting_remote_media" ||
+    state.phase === "awaiting_practical_progress"
+  ) {
+    return "Reconnected. Waiting for the interviewer to resume…";
+  }
+  if (state.phase === "recovered") return "Connection restored.";
+  return "";
+}
+
+function isReconnectProgressSource(value: unknown): value is ReconnectProgressSource {
+  return value === "replica_started_speaking" || value === "replica_utterance";
+}
+
+export function advanceReconnectRecovery(
+  state: ReconnectRecoveryState,
+  event: ReconnectRecoveryEvent,
+): ReconnectRecoveryState {
+  if (state.phase === "recovered" || state.phase === "failed") return state;
+
+  if (event.type === "start") {
+    if (state.phase !== "idle" || state.attempt !== 0) return state;
+    return {
+      ...createReconnectRecoveryState(),
+      phase: "reconnecting_transport",
+      attempt: 1,
+      startedAt: event.at,
+    };
+  }
+
+  if (state.phase === "idle") return state;
+
+  if (event.type === "join_failed" || event.type === "deadline") {
+    return {
+      ...state,
+      phase: "failed",
+      terminalAt: event.at,
+    };
+  }
+
+  if (event.type === "local_joined") {
+    if (state.phase !== "reconnecting_transport") return state;
+    return {
+      ...state,
+      phase: "awaiting_remote_presence",
+      localJoinedAt: event.at,
+    };
+  }
+
+  if (event.type === "remote_state") {
+    if (state.localJoinedAt === null) return state;
+    const remotePresent = Boolean(event.remotePresent);
+    const remoteAudioReady = remotePresent && Boolean(event.remoteAudioReady);
+    const remoteVideoReady = remotePresent && Boolean(event.remoteVideoReady);
+    return {
+      ...state,
+      phase: !remotePresent
+        ? "awaiting_remote_presence"
+        : !remoteAudioReady
+          ? "awaiting_remote_media"
+          : "awaiting_practical_progress",
+      remotePresent,
+      remoteAudioReady,
+      remoteVideoReady,
+    };
+  }
+
+  if (
+    event.type === "practical_progress" &&
+    isReconnectProgressSource(event.source) &&
+    state.phase === "awaiting_practical_progress" &&
+    state.remotePresent &&
+    state.remoteAudioReady
+  ) {
+    return {
+      ...state,
+      phase: "recovered",
+      progressAt: event.at,
+      progressSource: event.source,
+      terminalAt: event.at,
+    };
+  }
+
+  return state;
+}
+
 function setElementTrack(element: HTMLMediaElement | null, track: MediaStreamTrack | null): void {
   if (!element) return;
   if (!track) {
@@ -239,6 +398,7 @@ export default function InterviewCviPage() {
   const lastProgressAtRef = useRef<number | null>(null);
   const progressRecoveryAttemptedRef = useRef(false);
   const progressRecoveryInFlightRef = useRef(false);
+  const progressRecoveryStateRef = useRef<ReconnectRecoveryState>(createReconnectRecoveryState());
   const lastAiSpeechAtRef = useRef<number | null>(null);
   const lastAiSpeechStoppedAtRef = useRef<number | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -263,15 +423,15 @@ export default function InterviewCviPage() {
     }
   }, []);
 
-  const syncParticipants = useCallback((participants?: Record<string, DailyParticipant>) => {
+  const syncParticipants = useCallback((participants?: Record<string, DailyParticipant>): RemoteParticipantEvidence => {
     const map = participants || callRef.current?.participants?.() || {};
     const list = Object.values(map);
     const local = list.find((p) => Boolean(p?.local));
-    const remote = list.find((p) => !p?.local);
+    const remotes = list.filter((p) => !p?.local);
 
     const localVideoTrack = extractTrack(local?.tracks?.video);
-    const remoteVideoTrack = extractTrack(remote?.tracks?.video);
-    const remoteAudioTrack = extractTrack(remote?.tracks?.audio);
+    const remoteVideoTrack = remotes.map((remote) => extractTrack(remote?.tracks?.video)).find(Boolean) || null;
+    const remoteAudioTrack = remotes.map((remote) => extractTrack(remote?.tracks?.audio)).find(Boolean) || null;
 
     setElementTrack(localVideoRef.current, localVideoTrack);
     setElementTrack(remoteVideoRef.current, remoteVideoTrack);
@@ -286,6 +446,11 @@ export default function InterviewCviPage() {
       setLoading(false);
       setError("");
     }
+    return {
+      remotePresent: remotes.length > 0,
+      remoteAudioReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.audio)),
+      remoteVideoReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.video)),
+    };
   }, [clearStartupTimer]);
 
   const teardownCall = useCallback(async () => {
@@ -432,6 +597,7 @@ export default function InterviewCviPage() {
     let call: DailyCallObject | null = null;
     let handlers: Array<[string, (event?: DailyEvent) => void]> = [];
     let progressWatchdogTimer: number | null = null;
+    let progressRecoveryDeadlineTimer: number | null = null;
 
     const register = (event: string, handler: (payload?: DailyEvent) => void) => {
       call?.on(event, handler);
@@ -514,19 +680,74 @@ export default function InterviewCviPage() {
       }
     };
 
+    const clearProgressRecoveryDeadline = () => {
+      if (progressRecoveryDeadlineTimer) {
+        window.clearTimeout(progressRecoveryDeadlineTimer);
+        progressRecoveryDeadlineTimer = null;
+      }
+    };
+
+    const transitionRecovery = (event: ReconnectRecoveryEvent) => {
+      const previous = progressRecoveryStateRef.current;
+      const next = advanceReconnectRecovery(previous, event);
+      progressRecoveryStateRef.current = next;
+      if (next !== previous && (isReconnectRecoveryActive(next) || next.phase === "recovered")) {
+        setConnectionNotice(reconnectRecoveryNotice(next));
+      }
+      return { previous, next };
+    };
+
     const markProgressStalled = (reason: "watchdog_timeout" | "reconnect_failed") => {
       if (!alive || endTriggeredRef.current) return;
+      clearProgressRecoveryDeadline();
+      progressRecoveryInFlightRef.current = false;
+      reconnectingRef.current = false;
       stopProgressWatchdog();
       setLoading(false);
       setConnectionNotice("");
       setProgressStalled(true);
-      setError(
-        reason === "reconnect_failed"
-          ? "The interview connection could not be restored. Please contact support before trying again."
-          : "The interview stopped progressing and cannot continue. Please contact support before trying again.",
-      );
+      setError("The interview stopped progressing and cannot continue. Please contact support before trying again.");
       sendLifecycleTelemetry(reason === "watchdog_timeout" ? "watchdog_timeout" : "reconnect_failed", reason);
       void endInterview(reason, true);
+    };
+
+    const failProgressRecovery = (event: Extract<ReconnectRecoveryEvent, { type: "deadline" | "join_failed" }>) => {
+      const { previous, next } = transitionRecovery(event);
+      if (previous === next || next.phase !== "failed") return;
+      markProgressStalled("reconnect_failed");
+    };
+
+    const beginProgressRecoveryDeadline = () => {
+      if (progressRecoveryDeadlineTimer) return;
+      progressRecoveryDeadlineTimer = window.setTimeout(() => {
+        progressRecoveryDeadlineTimer = null;
+        if (!alive || endTriggeredRef.current) return;
+        failProgressRecovery({ type: "deadline", at: Date.now() });
+      }, RECOVERY_PROGRESS_TIMEOUT_MS);
+    };
+
+    const observeRecoveryRemoteState = (evidence: RemoteParticipantEvidence) => {
+      if (!isReconnectRecoveryActive(progressRecoveryStateRef.current)) return;
+      transitionRecovery({
+        type: "remote_state",
+        at: Date.now(),
+        ...evidence,
+      });
+    };
+
+    const completeProgressRecovery = (source: ReconnectProgressSource, progressAt: number) => {
+      const { previous, next } = transitionRecovery({
+        type: "practical_progress",
+        at: progressAt,
+        source,
+      });
+      if (previous === next || next.phase !== "recovered") return false;
+      clearProgressRecoveryDeadline();
+      progressRecoveryInFlightRef.current = false;
+      reconnectingRef.current = false;
+      lastProgressAtRef.current = progressAt;
+      sendLifecycleTelemetry("reconnect_succeeded");
+      return true;
     };
 
     const beginProgressWatchdog = () => {
@@ -537,7 +758,14 @@ export default function InterviewCviPage() {
           stopProgressWatchdog();
           return;
         }
-        if (!progressObservedRef.current || progressRecoveryInFlightRef.current || !call) return;
+        if (
+          !progressObservedRef.current ||
+          progressRecoveryInFlightRef.current ||
+          isReconnectRecoveryActive(progressRecoveryStateRef.current) ||
+          !call
+        ) {
+          return;
+        }
 
         const lastProgressAt = lastProgressAtRef.current;
         if (!lastProgressAt || Date.now() - lastProgressAt < PROGRESS_STALL_MS) return;
@@ -553,7 +781,8 @@ export default function InterviewCviPage() {
         progressRecoveryAttemptedRef.current = true;
         progressRecoveryInFlightRef.current = true;
         reconnectingRef.current = true;
-        setConnectionNotice("The interview paused. Reconnecting...");
+        transitionRecovery({ type: "start", at: Date.now() });
+        beginProgressRecoveryDeadline();
         sendLifecycleTelemetry("reconnect_attempted", "watchdog_timeout");
         try {
           await call.leave().catch(() => {});
@@ -565,15 +794,15 @@ export default function InterviewCviPage() {
             startVideoOff: false,
           });
           if (!alive || endTriggeredRef.current) return;
-          lastProgressAtRef.current = Date.now();
-          setConnectionNotice("Connection restored. The interview is resuming.");
-          sendLifecycleTelemetry("reconnect_succeeded");
-          syncParticipants();
+          transitionRecovery({ type: "local_joined", at: Date.now() });
+          observeRecoveryRemoteState(syncParticipants());
         } catch {
-          markProgressStalled("reconnect_failed");
+          failProgressRecovery({ type: "join_failed", at: Date.now() });
         } finally {
           reconnectingRef.current = false;
-          progressRecoveryInFlightRef.current = false;
+          if (!isReconnectRecoveryActive(progressRecoveryStateRef.current)) {
+            progressRecoveryInFlightRef.current = false;
+          }
         }
       }, PROGRESS_WATCHDOG_INTERVAL_MS);
     };
@@ -590,6 +819,7 @@ export default function InterviewCviPage() {
         lastProgressAtRef.current = null;
         progressRecoveryAttemptedRef.current = false;
         progressRecoveryInFlightRef.current = false;
+        progressRecoveryStateRef.current = createReconnectRecoveryState();
         lastAiSpeechAtRef.current = null;
         lastAiSpeechStoppedAtRef.current = null;
 
@@ -600,27 +830,45 @@ export default function InterviewCviPage() {
         callRef.current = call;
 
         register("joined-meeting", () => {
-          if (!alive) return;
+          if (!alive || endTriggeredRef.current) return;
           setLoading(false);
-          syncParticipants();
+          if (progressRecoveryStateRef.current.phase === "reconnecting_transport") {
+            transitionRecovery({ type: "local_joined", at: Date.now() });
+          }
+          observeRecoveryRemoteState(syncParticipants());
           void requestRecordingStart();
         });
-        register("participant-joined", (event) => syncParticipants(event?.participants));
-        register("participant-updated", (event) => syncParticipants(event?.participants));
-        register("participant-left", (event) => syncParticipants(event?.participants));
+        const syncParticipantEvent = (event?: DailyEvent) => {
+          if (!alive || endTriggeredRef.current) return;
+          observeRecoveryRemoteState(syncParticipants(event?.participants));
+        };
+        register("participant-joined", syncParticipantEvent);
+        register("participant-updated", syncParticipantEvent);
+        register("participant-left", syncParticipantEvent);
+        register("track-started", syncParticipantEvent);
+        register("track-stopped", syncParticipantEvent);
         register("left-meeting", () => {
           if (!alive || leavingRef.current || reconnectingRef.current) return;
+          if (isReconnectRecoveryActive(progressRecoveryStateRef.current)) {
+            failProgressRecovery({ type: "join_failed", at: Date.now() });
+            return;
+          }
           void leaveLiveRoute();
         });
         register("error", () => {
-          if (!alive) return;
+          if (!alive || endTriggeredRef.current) return;
+          if (isReconnectRecoveryActive(progressRecoveryStateRef.current)) {
+            failProgressRecovery({ type: "join_failed", at: Date.now() });
+            return;
+          }
           setError("Interview encountered an issue. Please finish and relaunch.");
         });
         register("camera-error", () => {
-          if (!alive) return;
+          if (!alive || endTriggeredRef.current) return;
           setError("Camera or microphone access failed. Please allow permissions and relaunch.");
         });
         register("app-message", (event) => {
+          if (!alive || endTriggeredRef.current) return;
           const data = event?.data ?? event ?? {};
           const eventType = String(data?.event_type || data?.eventType || "").toLowerCase();
           const utteranceRole = String(data?.properties?.role || data?.role || "").toLowerCase();
@@ -631,18 +879,35 @@ export default function InterviewCviPage() {
           const isCandidateUtterance =
             eventType === "conversation.utterance" &&
             (utteranceRole === "candidate" || utteranceRole === "user" || utteranceRole === "participant");
-          if (eventType === "conversation.started_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
-            lastAiSpeechAtRef.current = Date.now();
-            lastProgressAtRef.current = Date.now();
+          const isReplicaSpeaking =
+            eventType === "conversation.started_speaking" &&
+            (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
+          const recoveryWasActive = isReconnectRecoveryActive(progressRecoveryStateRef.current);
+          if (recoveryWasActive) {
+            observeRecoveryRemoteState(syncParticipants());
+          }
+          const progressAt = Date.now();
+          let recoveryCompleted = false;
+          if (isReplicaSpeaking) {
+            lastAiSpeechAtRef.current = progressAt;
+            recoveryCompleted = completeProgressRecovery("replica_started_speaking", progressAt);
+            if (!recoveryWasActive || recoveryCompleted) {
+              lastProgressAtRef.current = progressAt;
+            }
           }
           if (eventType === "conversation.stopped_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
-            lastAiSpeechStoppedAtRef.current = Date.now();
+            lastAiSpeechStoppedAtRef.current = progressAt;
           }
           if (eventType === "conversation.utterance") {
             if (isReplicaUtterance || (isCandidateUtterance && isCandidateAnswerProgress(speech))) {
               progressObservedRef.current = true;
-              lastProgressAtRef.current = Date.now();
-              setConnectionNotice("");
+              if (isReplicaUtterance && !recoveryCompleted) {
+                recoveryCompleted = completeProgressRecovery("replica_utterance", progressAt);
+              }
+              if (!recoveryWasActive || recoveryCompleted) {
+                lastProgressAtRef.current = progressAt;
+              }
+              if (!recoveryWasActive) setConnectionNotice("");
             }
           }
           if (eventType === "conversation.tool_call" || eventType === "conversation.toolcall") {
@@ -705,6 +970,7 @@ export default function InterviewCviPage() {
       alive = false;
       clearStartupTimer();
       stopProgressWatchdog();
+      clearProgressRecoveryDeadline();
       reconnectingRef.current = false;
       progressRecoveryInFlightRef.current = false;
       if (call?.off) {
