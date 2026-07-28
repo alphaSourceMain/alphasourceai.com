@@ -186,7 +186,10 @@ test("page wiring removes false success and preserves existing lifecycle paths",
     source,
     /await call\.join\([\s\S]{0,500}lastProgressAtRef\.current = Date\.now\(\)/,
   );
-  assert.equal(source.split('sendLifecycleTelemetry("reconnect_succeeded")').length - 1, 1);
+  assert.equal(
+    source.match(/sendLifecycleTelemetry\(\s*"reconnect_succeeded"/g)?.length || 0,
+    1,
+  );
   assert.equal(source.split("void endInterview(reason, true)").length - 1, 1);
   assert.match(source, /beginStartupWatchdog\(\)/);
   assert.match(source, /void endInterview\("completed_normally"\)/);

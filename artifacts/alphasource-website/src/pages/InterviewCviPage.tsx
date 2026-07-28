@@ -35,6 +35,20 @@ type RemoteParticipantEvidence = {
   remotePresent: boolean;
   remoteAudioReady: boolean;
   remoteVideoReady: boolean;
+  remoteParticipantCount: number;
+};
+
+type ReliabilityMetadata = Record<string, string | number | boolean>;
+
+export type ReliabilityDiagnosticEvent = {
+  event: string;
+  metadata: ReliabilityMetadata;
+};
+
+type RemoteDiagnosticContext = {
+  recoveryActive: boolean;
+  recoveryAttempt: 0 | 1;
+  recoveryPhase: ReconnectRecoveryPhase;
 };
 
 export type ReconnectRecoveryPhase =
@@ -120,6 +134,7 @@ const GRACEFUL_WRAP_NOTICE = "Less than 1 minute remaining. The interview is wra
 const TIME_WARNING_TEXT = "Time warning: about 2 minutes remain. Stop asking new substantive questions soon and begin wrapping up naturally.";
 const GRACEFUL_WRAP_TEXT = "Time limit wrap-up: stop asking new substantive questions now. Use the final closing line and end the interview.";
 const CLOSING_UTTERANCE_END_DELAY_MS = 5500;
+const MAX_PENDING_TELEMETRY_REQUESTS = 8;
 
 const env = (
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {}
@@ -338,6 +353,104 @@ export function advanceReconnectRecovery(
   return state;
 }
 
+function remoteMediaState(ready: boolean, present: boolean): "playable" | "unavailable" | "absent" {
+  if (!present) return "absent";
+  return ready ? "playable" : "unavailable";
+}
+
+export function deriveRemoteDiagnosticEvents(
+  previous: RemoteParticipantEvidence | null,
+  current: RemoteParticipantEvidence,
+  context: RemoteDiagnosticContext,
+): ReliabilityDiagnosticEvent[] {
+  const prior = previous || {
+    remotePresent: false,
+    remoteAudioReady: false,
+    remoteVideoReady: false,
+    remoteParticipantCount: 0,
+  };
+  const events: ReliabilityDiagnosticEvent[] = [];
+  const recoveryMetadata: ReliabilityMetadata = context.recoveryActive
+    ? {
+        recovery_attempt: context.recoveryAttempt,
+        recovery_phase: context.recoveryPhase,
+        is_recovery_active: true,
+      }
+    : {};
+  const participantMetadata = {
+    participant_role: "replica",
+    participant_count: current.remoteParticipantCount,
+    remote_participant_present: current.remotePresent,
+    ...recoveryMetadata,
+  };
+
+  if (!prior.remotePresent && current.remotePresent) {
+    events.push({ event: "daily_participant_joined", metadata: participantMetadata });
+    if (context.recoveryActive) {
+      events.push({ event: "reconnect_remote_presence", metadata: participantMetadata });
+    }
+  } else if (prior.remotePresent && !current.remotePresent) {
+    events.push({
+      event: "daily_participant_left",
+      metadata: participantMetadata,
+    });
+  }
+
+  for (const [kind, previousReady, currentReady] of [
+    ["audio", prior.remoteAudioReady, current.remoteAudioReady],
+    ["video", prior.remoteVideoReady, current.remoteVideoReady],
+  ] as const) {
+    if (!previousReady && currentReady) {
+      events.push({
+        event: "daily_remote_track_started",
+        metadata: {
+          track_kind: kind,
+          track_state: "playable",
+          ...participantMetadata,
+        },
+      });
+      if (kind === "audio" && context.recoveryActive) {
+        events.push({
+          event: "reconnect_remote_audio_ready",
+          metadata: {
+            remote_audio_state: "playable",
+            ...participantMetadata,
+          },
+        });
+      }
+    } else if (previousReady && !currentReady) {
+      events.push({
+        event: "daily_remote_track_stopped",
+        metadata: {
+          track_kind: kind,
+          track_state: "unavailable",
+          ...participantMetadata,
+        },
+      });
+    }
+  }
+
+  if (
+    context.recoveryActive &&
+    (
+      prior.remotePresent !== current.remotePresent ||
+      prior.remoteAudioReady !== current.remoteAudioReady ||
+      prior.remoteVideoReady !== current.remoteVideoReady
+    )
+  ) {
+    events.push({
+      event: "reconnect_remote_media_changed",
+      metadata: {
+        remote_audio_state: remoteMediaState(current.remoteAudioReady, current.remotePresent),
+        remote_video_state: remoteMediaState(current.remoteVideoReady, current.remotePresent),
+        ...participantMetadata,
+      },
+    });
+  }
+
+  return events;
+}
+
 function setElementTrack(element: HTMLMediaElement | null, track: MediaStreamTrack | null): void {
   if (!element) return;
   if (!track) {
@@ -401,6 +514,8 @@ export default function InterviewCviPage() {
   const progressRecoveryStateRef = useRef<ReconnectRecoveryState>(createReconnectRecoveryState());
   const lastAiSpeechAtRef = useRef<number | null>(null);
   const lastAiSpeechStoppedAtRef = useRef<number | null>(null);
+  const telemetrySequenceRef = useRef(0);
+  const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -450,6 +565,7 @@ export default function InterviewCviPage() {
       remotePresent: remotes.length > 0,
       remoteAudioReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.audio)),
       remoteVideoReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.video)),
+      remoteParticipantCount: Math.min(16, remotes.length),
     };
   }, [clearStartupTimer]);
 
@@ -518,27 +634,43 @@ export default function InterviewCviPage() {
     }
   }, [clearAutoEndTimers, leaveLiveRoute, session, teardownCall]);
 
-  const sendLifecycleTelemetry = useCallback((event: string, reason?: string, useBeacon = false) => {
+  const sendLifecycleTelemetry = useCallback((
+    event: string,
+    metadata: ReliabilityMetadata = {},
+    options: { reason?: string; terminal?: boolean } = {},
+  ) => {
+    const eventSequence = telemetrySequenceRef.current + 1;
+    const conversationId = String(session?.conversation_id || "").trim();
+    const roleToken = String(session?.role_token || "").trim();
     const payload = {
-      conversation_id: String(session?.conversation_id || "").trim(),
       interview_id: String(session?.interview_id || "").trim(),
-      role_token: String(session?.role_token || "").trim(),
       event,
-      reason,
+      event_sequence: eventSequence,
+      observed_at: new Date().toISOString(),
+      reason: options.reason,
+      metadata,
     };
-    if (!backendBase || !payload.conversation_id || !payload.interview_id || !payload.role_token) return;
+    if (!backendBase || !payload.interview_id || !conversationId || !roleToken) return;
+    telemetrySequenceRef.current = eventSequence;
     const url = joinUrl(backendBase, "/tavus/client-telemetry");
     try {
-      if (useBeacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
-        navigator.sendBeacon(url, new Blob([JSON.stringify(payload)], { type: "application/json" }));
-        return;
-      }
-      void fetch(url, {
+      const pendingLimit = options.terminal
+        ? MAX_PENDING_TELEMETRY_REQUESTS
+        : MAX_PENDING_TELEMETRY_REQUESTS - 1;
+      if (telemetryPendingRef.current.size >= pendingLimit) return;
+      const authorization = btoa(JSON.stringify([roleToken, conversationId]));
+      const request = fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `AlphaScreen-Telemetry ${authorization}`,
+        },
         body: JSON.stringify(payload),
         keepalive: true,
+      }).catch(() => {}).finally(() => {
+        telemetryPendingRef.current.delete(request);
       });
+      telemetryPendingRef.current.add(request);
     } catch {}
   }, [session]);
 
@@ -578,10 +710,34 @@ export default function InterviewCviPage() {
 
   useEffect(() => {
     const onPageHide = () => {
-      if (!endTriggeredRef.current) sendLifecycleTelemetry("browser_closed_or_navigation", "browser_closed_or_navigation", true);
+      if (!endTriggeredRef.current) {
+        sendLifecycleTelemetry(
+          "browser_closed_or_navigation",
+          { terminal_reason: "browser_closed_or_navigation" },
+          { reason: "browser_closed_or_navigation", terminal: true },
+        );
+      }
     };
+    const onOnline = () => sendLifecycleTelemetry("browser_online", { network_state: "online" });
+    const onOffline = () => sendLifecycleTelemetry("browser_offline", { network_state: "offline" });
+    const onVisibilityChange = () => sendLifecycleTelemetry("browser_visibility_changed", {
+      visibility_state:
+        document.visibilityState === "visible" ||
+        document.visibilityState === "hidden" ||
+        document.visibilityState === "prerender"
+          ? document.visibilityState
+          : "unknown",
+    });
     window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [sendLifecycleTelemetry]);
 
   useEffect(() => {
@@ -598,6 +754,7 @@ export default function InterviewCviPage() {
     let handlers: Array<[string, (event?: DailyEvent) => void]> = [];
     let progressWatchdogTimer: number | null = null;
     let progressRecoveryDeadlineTimer: number | null = null;
+    let previousRemoteEvidence: RemoteParticipantEvidence | null = null;
 
     const register = (event: string, handler: (payload?: DailyEvent) => void) => {
       call?.on(event, handler);
@@ -697,6 +854,56 @@ export default function InterviewCviPage() {
       return { previous, next };
     };
 
+    const boundedElapsed = (startAt: number | null, endAt: number) => (
+      startAt === null ? 0 : Math.min(3_600_000, Math.max(0, Math.round(endAt - startAt)))
+    );
+
+    const recoveryMetadata = (state = progressRecoveryStateRef.current): ReliabilityMetadata => ({
+      recovery_attempt: state.attempt,
+      recovery_phase: state.phase,
+      is_recovery_active: isReconnectRecoveryActive(state),
+    });
+
+    const remoteStateMetadata = (): ReliabilityMetadata => {
+      const evidence = previousRemoteEvidence || {
+        remotePresent: false,
+        remoteAudioReady: false,
+        remoteVideoReady: false,
+        remoteParticipantCount: 0,
+      };
+      return {
+        participant_count: evidence.remoteParticipantCount,
+        remote_participant_present: evidence.remotePresent,
+        remote_audio_state: remoteMediaState(evidence.remoteAudioReady, evidence.remotePresent),
+        remote_video_state: remoteMediaState(evidence.remoteVideoReady, evidence.remotePresent),
+      };
+    };
+
+    const recordProgressCheckpoint = (
+      source: "replica_started_speaking" | "replica_utterance" | "candidate_utterance",
+      progressAt: number,
+      resetSource: "progress_checkpoint" | "reconnect_practical_progress" = "progress_checkpoint",
+    ) => {
+      const priorProgressAt = lastProgressAtRef.current;
+      lastProgressAtRef.current = progressAt;
+      sendLifecycleTelemetry("progress_checkpoint_updated", {
+        progress_source: source,
+        elapsed_ms: boundedElapsed(priorProgressAt, progressAt),
+        watchdog_reset_source: resetSource,
+        ...recoveryMetadata(),
+      });
+    };
+
+    const recordReconnectLocalJoin = (at: number) => {
+      const { previous, next } = transitionRecovery({ type: "local_joined", at });
+      if (previous === next || next.phase !== "awaiting_remote_presence") return;
+      sendLifecycleTelemetry("reconnect_local_joined", {
+        meeting_state: "joined",
+        recovery_age_ms: boundedElapsed(next.startedAt, at),
+        ...recoveryMetadata(next),
+      });
+    };
+
     const markProgressStalled = (reason: "watchdog_timeout" | "reconnect_failed") => {
       if (!alive || endTriggeredRef.current) return;
       clearProgressRecoveryDeadline();
@@ -707,7 +914,28 @@ export default function InterviewCviPage() {
       setConnectionNotice("");
       setProgressStalled(true);
       setError("The interview stopped progressing and cannot continue. Please contact support before trying again.");
-      sendLifecycleTelemetry(reason === "watchdog_timeout" ? "watchdog_timeout" : "reconnect_failed", reason);
+      const at = Date.now();
+      sendLifecycleTelemetry(
+        "interview_terminal_requested",
+        {
+          terminal_reason: reason,
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, at),
+          recovery_age_ms: boundedElapsed(progressRecoveryStateRef.current.startedAt, at),
+          ...remoteStateMetadata(),
+          ...recoveryMetadata(),
+        },
+        { reason, terminal: true },
+      );
+      sendLifecycleTelemetry(
+        reason === "watchdog_timeout" ? "watchdog_timeout" : "reconnect_failed",
+        {
+          terminal_reason: reason,
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, at),
+          ...remoteStateMetadata(),
+          ...recoveryMetadata(),
+        },
+        { reason },
+      );
       void endInterview(reason, true);
     };
 
@@ -722,7 +950,15 @@ export default function InterviewCviPage() {
       progressRecoveryDeadlineTimer = window.setTimeout(() => {
         progressRecoveryDeadlineTimer = null;
         if (!alive || endTriggeredRef.current) return;
-        failProgressRecovery({ type: "deadline", at: Date.now() });
+        const at = Date.now();
+        sendLifecycleTelemetry("watchdog_deadline_evaluated", {
+          watchdog_evaluation: "recovery_deadline_expired",
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, at),
+          recovery_age_ms: boundedElapsed(progressRecoveryStateRef.current.startedAt, at),
+          ...remoteStateMetadata(),
+          ...recoveryMetadata(),
+        });
+        failProgressRecovery({ type: "deadline", at });
       }, RECOVERY_PROGRESS_TIMEOUT_MS);
     };
 
@@ -735,6 +971,22 @@ export default function InterviewCviPage() {
       });
     };
 
+    const syncParticipantsWithDiagnostics = (participants?: Record<string, DailyParticipant>) => {
+      const evidence = syncParticipants(participants);
+      observeRecoveryRemoteState(evidence);
+      const state = progressRecoveryStateRef.current;
+      const events = deriveRemoteDiagnosticEvents(previousRemoteEvidence, evidence, {
+        recoveryActive: isReconnectRecoveryActive(state),
+        recoveryAttempt: state.attempt,
+        recoveryPhase: state.phase,
+      });
+      previousRemoteEvidence = evidence;
+      for (const diagnostic of events) {
+        sendLifecycleTelemetry(diagnostic.event, diagnostic.metadata);
+      }
+      return evidence;
+    };
+
     const completeProgressRecovery = (source: ReconnectProgressSource, progressAt: number) => {
       const { previous, next } = transitionRecovery({
         type: "practical_progress",
@@ -745,14 +997,30 @@ export default function InterviewCviPage() {
       clearProgressRecoveryDeadline();
       progressRecoveryInFlightRef.current = false;
       reconnectingRef.current = false;
-      lastProgressAtRef.current = progressAt;
-      sendLifecycleTelemetry("reconnect_succeeded");
+      sendLifecycleTelemetry("reconnect_practical_progress", {
+        progress_source: source,
+        recovery_age_ms: boundedElapsed(next.startedAt, progressAt),
+        ...recoveryMetadata(next),
+      });
+      recordProgressCheckpoint(source, progressAt, "reconnect_practical_progress");
+      sendLifecycleTelemetry("reconnect_succeeded", {
+        progress_source: source,
+        recovery_age_ms: boundedElapsed(next.startedAt, progressAt),
+        remote_participant_present: next.remotePresent,
+        remote_audio_state: next.remoteAudioReady ? "playable" : "unavailable",
+        remote_video_state: next.remoteVideoReady ? "playable" : "unavailable",
+        ...recoveryMetadata(next),
+      });
       return true;
     };
 
     const beginProgressWatchdog = () => {
       stopProgressWatchdog();
-      sendLifecycleTelemetry("watchdog_started");
+      sendLifecycleTelemetry("watchdog_started", {
+        recovery_attempt: progressRecoveryStateRef.current.attempt,
+        recovery_phase: progressRecoveryStateRef.current.phase,
+        is_recovery_active: false,
+      });
       progressWatchdogTimer = window.setInterval(async () => {
         if (!alive || endTriggeredRef.current) {
           stopProgressWatchdog();
@@ -774,16 +1042,47 @@ export default function InterviewCviPage() {
         if (lastAiSpeechStoppedAtRef.current && Date.now() - lastAiSpeechStoppedAtRef.current < IDLE_ENGAGEMENT_GRACE_MS) return;
 
         if (progressRecoveryAttemptedRef.current) {
+          const at = Date.now();
+          sendLifecycleTelemetry("watchdog_deadline_evaluated", {
+            watchdog_evaluation: "post_recovery_progress_stale",
+            progress_age_ms: boundedElapsed(lastProgressAtRef.current, at),
+            recovery_age_ms: boundedElapsed(progressRecoveryStateRef.current.startedAt, at),
+            ...remoteStateMetadata(),
+            ...recoveryMetadata(),
+          });
           markProgressStalled("watchdog_timeout");
           return;
         }
 
+        const recoveryStartedAt = Date.now();
+        sendLifecycleTelemetry("watchdog_deadline_evaluated", {
+          watchdog_evaluation: "recovery_threshold_reached",
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
+          ...remoteStateMetadata(),
+          recovery_attempt: 0,
+          recovery_phase: "idle",
+          is_recovery_active: false,
+        });
         progressRecoveryAttemptedRef.current = true;
         progressRecoveryInFlightRef.current = true;
         reconnectingRef.current = true;
-        transitionRecovery({ type: "start", at: Date.now() });
+        transitionRecovery({ type: "start", at: recoveryStartedAt });
+        previousRemoteEvidence = {
+          remotePresent: false,
+          remoteAudioReady: false,
+          remoteVideoReady: false,
+          remoteParticipantCount: 0,
+        };
         beginProgressRecoveryDeadline();
-        sendLifecycleTelemetry("reconnect_attempted", "watchdog_timeout");
+        sendLifecycleTelemetry("reconnect_started", {
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
+          meeting_state: "reconnecting",
+          ...recoveryMetadata(),
+        }, { reason: "watchdog_timeout" });
+        sendLifecycleTelemetry("reconnect_attempted", {
+          progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
+          ...recoveryMetadata(),
+        }, { reason: "watchdog_timeout" });
         try {
           await call.leave().catch(() => {});
           if (!alive || endTriggeredRef.current) return;
@@ -794,8 +1093,8 @@ export default function InterviewCviPage() {
             startVideoOff: false,
           });
           if (!alive || endTriggeredRef.current) return;
-          transitionRecovery({ type: "local_joined", at: Date.now() });
-          observeRecoveryRemoteState(syncParticipants());
+          recordReconnectLocalJoin(Date.now());
+          syncParticipantsWithDiagnostics();
         } catch {
           failProgressRecovery({ type: "join_failed", at: Date.now() });
         } finally {
@@ -833,14 +1132,19 @@ export default function InterviewCviPage() {
           if (!alive || endTriggeredRef.current) return;
           setLoading(false);
           if (progressRecoveryStateRef.current.phase === "reconnecting_transport") {
-            transitionRecovery({ type: "local_joined", at: Date.now() });
+            recordReconnectLocalJoin(Date.now());
           }
-          observeRecoveryRemoteState(syncParticipants());
+          sendLifecycleTelemetry("daily_participant_joined", {
+            participant_role: "candidate",
+            meeting_state: "joined",
+            ...recoveryMetadata(),
+          });
+          syncParticipantsWithDiagnostics();
           void requestRecordingStart();
         });
         const syncParticipantEvent = (event?: DailyEvent) => {
           if (!alive || endTriggeredRef.current) return;
-          observeRecoveryRemoteState(syncParticipants(event?.participants));
+          syncParticipantsWithDiagnostics(event?.participants);
         };
         register("participant-joined", syncParticipantEvent);
         register("participant-updated", syncParticipantEvent);
@@ -849,6 +1153,11 @@ export default function InterviewCviPage() {
         register("track-stopped", syncParticipantEvent);
         register("left-meeting", () => {
           if (!alive || leavingRef.current || reconnectingRef.current) return;
+          sendLifecycleTelemetry("daily_participant_left", {
+            participant_role: "candidate",
+            meeting_state: "left",
+            ...recoveryMetadata(),
+          });
           if (isReconnectRecoveryActive(progressRecoveryStateRef.current)) {
             failProgressRecovery({ type: "join_failed", at: Date.now() });
             return;
@@ -884,16 +1193,39 @@ export default function InterviewCviPage() {
             (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
           const recoveryWasActive = isReconnectRecoveryActive(progressRecoveryStateRef.current);
           if (recoveryWasActive) {
-            observeRecoveryRemoteState(syncParticipants());
+            syncParticipantsWithDiagnostics();
           }
           const progressAt = Date.now();
+          const progressSource = isReplicaSpeaking
+            ? "replica_started_speaking"
+            : isReplicaUtterance
+              ? "replica_utterance"
+              : isCandidateUtterance
+                ? "candidate_utterance"
+                : null;
+          if (
+            eventType === "conversation.started_speaking" ||
+            eventType === "conversation.stopped_speaking" ||
+            eventType === "conversation.utterance" ||
+            eventType === "conversation.tool_call" ||
+            eventType === "conversation.toolcall"
+          ) {
+            sendLifecycleTelemetry("app_message_received", {
+              participant_role:
+                isReplicaSpeaking || isReplicaUtterance
+                  ? "replica"
+                  : isCandidateUtterance
+                    ? "candidate"
+                    : "unknown",
+              ...(progressSource ? { progress_source: progressSource } : {}),
+              ...recoveryMetadata(),
+            });
+          }
           let recoveryCompleted = false;
           if (isReplicaSpeaking) {
             lastAiSpeechAtRef.current = progressAt;
             recoveryCompleted = completeProgressRecovery("replica_started_speaking", progressAt);
-            if (!recoveryWasActive || recoveryCompleted) {
-              lastProgressAtRef.current = progressAt;
-            }
+            if (!recoveryWasActive) recordProgressCheckpoint("replica_started_speaking", progressAt);
           }
           if (eventType === "conversation.stopped_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
             lastAiSpeechStoppedAtRef.current = progressAt;
@@ -904,8 +1236,11 @@ export default function InterviewCviPage() {
               if (isReplicaUtterance && !recoveryCompleted) {
                 recoveryCompleted = completeProgressRecovery("replica_utterance", progressAt);
               }
-              if (!recoveryWasActive || recoveryCompleted) {
-                lastProgressAtRef.current = progressAt;
+              if (!recoveryWasActive) {
+                recordProgressCheckpoint(
+                  isReplicaUtterance ? "replica_utterance" : "candidate_utterance",
+                  progressAt,
+                );
               }
               if (!recoveryWasActive) setConnectionNotice("");
             }
@@ -957,7 +1292,7 @@ export default function InterviewCviPage() {
           startVideoOff: false,
         });
         if (!alive) return;
-        syncParticipants();
+        syncParticipantsWithDiagnostics();
         beginProgressWatchdog();
       } catch {
         if (!alive) return;
