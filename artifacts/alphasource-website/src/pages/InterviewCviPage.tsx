@@ -83,6 +83,40 @@ export type ReconnectRecoveryEvent =
   | { type: "deadline"; at: number }
   | { type: "join_failed"; at: number };
 
+export type CandidateSpeakingState = {
+  active: boolean;
+  startedAt: number | null;
+  expiresAt: number | null;
+  lastWatchdogDiagnosticAt: number | null;
+};
+
+export type ProgressWatchdogAction =
+  | "none"
+  | "skip_candidate_speaking"
+  | "candidate_speaking_expired"
+  | "start_recovery"
+  | "terminal";
+
+export type ProgressWatchdogEvaluation = {
+  action: ProgressWatchdogAction;
+  candidateSpeaking: CandidateSpeakingState;
+  emitDiagnostic: boolean;
+};
+
+export type ProgressWatchdogInput = {
+  now: number;
+  progressObserved: boolean;
+  lastProgressAt: number | null;
+  hasCall: boolean;
+  recoveryInFlight: boolean;
+  recoveryActive: boolean;
+  recoveryAttempted: boolean;
+  lastAiSpeechStoppedAt: number | null;
+  candidateSpeaking: CandidateSpeakingState;
+};
+
+export type CandidateSpeakingTransition = "started" | "ended" | null;
+
 type DailyEvent = {
   action?: string;
   error?: unknown;
@@ -125,6 +159,11 @@ const PROGRESS_STALL_MS = 45000;
 const PROGRESS_WATCHDOG_INTERVAL_MS = 5000;
 const RECOVERY_PROGRESS_TIMEOUT_MS = 30000;
 const IDLE_ENGAGEMENT_GRACE_MS = 30000;
+// The current interview design already uses a two-minute candidate warning.
+// This guard protects ordinary long answers without allowing a missing stop
+// event to suppress the watchdog for the remainder of the interview.
+export const CANDIDATE_SPEAKING_PROTECTION_MS = 120000;
+const CANDIDATE_SPEAKING_DIAGNOSTIC_INTERVAL_MS = 30000;
 const TIME_WARNING_THRESHOLD_SECONDS = 120;
 const GRACEFUL_WRAP_THRESHOLD_SECONDS = 60;
 const FORCE_END_THRESHOLD_SECONDS = 15;
@@ -135,6 +174,107 @@ const TIME_WARNING_TEXT = "Time warning: about 2 minutes remain. Stop asking new
 const GRACEFUL_WRAP_TEXT = "Time limit wrap-up: stop asking new substantive questions now. Use the final closing line and end the interview.";
 const CLOSING_UTTERANCE_END_DELAY_MS = 5500;
 const MAX_PENDING_TELEMETRY_REQUESTS = 8;
+
+export function createCandidateSpeakingState(): CandidateSpeakingState {
+  return {
+    active: false,
+    startedAt: null,
+    expiresAt: null,
+    lastWatchdogDiagnosticAt: null,
+  };
+}
+
+export function beginCandidateSpeaking(
+  state: CandidateSpeakingState,
+  at: number,
+): { state: CandidateSpeakingState; started: boolean } {
+  if (state.active) return { state, started: false };
+  return {
+    started: true,
+    state: {
+      active: true,
+      startedAt: at,
+      expiresAt: at + CANDIDATE_SPEAKING_PROTECTION_MS,
+      lastWatchdogDiagnosticAt: null,
+    },
+  };
+}
+
+export function endCandidateSpeaking(
+  state: CandidateSpeakingState,
+): { state: CandidateSpeakingState; ended: boolean } {
+  if (!state.active) return { state, ended: false };
+  return { state: createCandidateSpeakingState(), ended: true };
+}
+
+export function deriveCandidateSpeakingTransition(
+  eventType: unknown,
+  participantRole: unknown,
+): CandidateSpeakingTransition {
+  const normalizedEvent = String(eventType || "").trim().toLowerCase();
+  const normalizedRole = String(participantRole || "").trim().toLowerCase();
+  const isCandidate =
+    normalizedRole === "candidate" ||
+    normalizedRole === "user" ||
+    normalizedRole === "participant";
+  if (!isCandidate) return null;
+  if (normalizedEvent === "conversation.started_speaking") return "started";
+  if (normalizedEvent === "conversation.stopped_speaking") return "ended";
+  return null;
+}
+
+export function evaluateProgressWatchdog(
+  input: ProgressWatchdogInput,
+): ProgressWatchdogEvaluation {
+  const unchanged = (action: ProgressWatchdogAction = "none"): ProgressWatchdogEvaluation => ({
+    action,
+    candidateSpeaking: input.candidateSpeaking,
+    emitDiagnostic: false,
+  });
+
+  if (
+    !input.progressObserved ||
+    input.recoveryInFlight ||
+    input.recoveryActive ||
+    !input.hasCall ||
+    input.lastProgressAt === null
+  ) {
+    return unchanged();
+  }
+
+  if (input.now - input.lastProgressAt < PROGRESS_STALL_MS) return unchanged();
+
+  if (input.candidateSpeaking.active) {
+    const expiresAt = input.candidateSpeaking.expiresAt;
+    if (expiresAt !== null && input.now < expiresAt) {
+      const lastDiagnosticAt = input.candidateSpeaking.lastWatchdogDiagnosticAt;
+      const emitDiagnostic =
+        lastDiagnosticAt === null ||
+        input.now - lastDiagnosticAt >= CANDIDATE_SPEAKING_DIAGNOSTIC_INTERVAL_MS;
+      return {
+        action: "skip_candidate_speaking",
+        candidateSpeaking: emitDiagnostic
+          ? { ...input.candidateSpeaking, lastWatchdogDiagnosticAt: input.now }
+          : input.candidateSpeaking,
+        emitDiagnostic,
+      };
+    }
+    return {
+      action: "candidate_speaking_expired",
+      candidateSpeaking: createCandidateSpeakingState(),
+      emitDiagnostic: true,
+    };
+  }
+
+  if (
+    input.lastAiSpeechStoppedAt !== null &&
+    input.now - input.lastAiSpeechStoppedAt < IDLE_ENGAGEMENT_GRACE_MS
+  ) {
+    return unchanged();
+  }
+
+  return unchanged(input.recoveryAttempted ? "terminal" : "start_recovery");
+}
 
 const env = (
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {}
@@ -514,6 +654,7 @@ export default function InterviewCviPage() {
   const progressRecoveryStateRef = useRef<ReconnectRecoveryState>(createReconnectRecoveryState());
   const lastAiSpeechAtRef = useRef<number | null>(null);
   const lastAiSpeechStoppedAtRef = useRef<number | null>(null);
+  const candidateSpeakingStateRef = useRef<CandidateSpeakingState>(createCandidateSpeakingState());
   const telemetrySequenceRef = useRef(0);
   const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -880,7 +1021,12 @@ export default function InterviewCviPage() {
     };
 
     const recordProgressCheckpoint = (
-      source: "replica_started_speaking" | "replica_utterance" | "candidate_utterance",
+      source:
+        | "replica_started_speaking"
+        | "replica_utterance"
+        | "candidate_utterance"
+        | "candidate_speaking_started"
+        | "candidate_speaking_ended",
       progressAt: number,
       resetSource: "progress_checkpoint" | "reconnect_practical_progress" = "progress_checkpoint",
     ) => {
@@ -1026,27 +1172,54 @@ export default function InterviewCviPage() {
           stopProgressWatchdog();
           return;
         }
-        if (
-          !progressObservedRef.current ||
-          progressRecoveryInFlightRef.current ||
-          isReconnectRecoveryActive(progressRecoveryStateRef.current) ||
-          !call
-        ) {
+
+        const evaluationAt = Date.now();
+        const evaluation = evaluateProgressWatchdog({
+          now: evaluationAt,
+          progressObserved: progressObservedRef.current,
+          lastProgressAt: lastProgressAtRef.current,
+          hasCall: Boolean(call),
+          recoveryInFlight: progressRecoveryInFlightRef.current,
+          recoveryActive: isReconnectRecoveryActive(progressRecoveryStateRef.current),
+          recoveryAttempted: progressRecoveryAttemptedRef.current,
+          lastAiSpeechStoppedAt: lastAiSpeechStoppedAtRef.current,
+          candidateSpeaking: candidateSpeakingStateRef.current,
+        });
+        candidateSpeakingStateRef.current = evaluation.candidateSpeaking;
+
+        if (evaluation.action === "skip_candidate_speaking") {
+          if (evaluation.emitDiagnostic) {
+            sendLifecycleTelemetry("watchdog_deadline_evaluated", {
+              watchdog_evaluation: "candidate_speaking_active",
+              progress_age_ms: boundedElapsed(lastProgressAtRef.current, evaluationAt),
+              ...remoteStateMetadata(),
+              ...recoveryMetadata(),
+            });
+          }
           return;
         }
 
-        const lastProgressAt = lastProgressAtRef.current;
-        if (!lastProgressAt || Date.now() - lastProgressAt < PROGRESS_STALL_MS) return;
-        // Allow a full candidate-engagement grace interval after the AI has
-        // finished speaking before treating silence as a stalled conversation.
-        if (lastAiSpeechStoppedAtRef.current && Date.now() - lastAiSpeechStoppedAtRef.current < IDLE_ENGAGEMENT_GRACE_MS) return;
+        if (evaluation.action === "candidate_speaking_expired") {
+          sendLifecycleTelemetry("watchdog_deadline_evaluated", {
+            watchdog_evaluation: "candidate_speaking_protection_expired",
+            progress_age_ms: boundedElapsed(lastProgressAtRef.current, evaluationAt),
+            ...remoteStateMetadata(),
+            ...recoveryMetadata(),
+          });
+          // Expiry only removes the temporary protection. Ordinary watchdog
+          // handling resumes on the next bounded evaluation.
+          return;
+        }
 
-        if (progressRecoveryAttemptedRef.current) {
-          const at = Date.now();
+        if (evaluation.action === "none") {
+          return;
+        }
+
+        if (evaluation.action === "terminal") {
           sendLifecycleTelemetry("watchdog_deadline_evaluated", {
             watchdog_evaluation: "post_recovery_progress_stale",
-            progress_age_ms: boundedElapsed(lastProgressAtRef.current, at),
-            recovery_age_ms: boundedElapsed(progressRecoveryStateRef.current.startedAt, at),
+            progress_age_ms: boundedElapsed(lastProgressAtRef.current, evaluationAt),
+            recovery_age_ms: boundedElapsed(progressRecoveryStateRef.current.startedAt, evaluationAt),
             ...remoteStateMetadata(),
             ...recoveryMetadata(),
           });
@@ -1054,7 +1227,9 @@ export default function InterviewCviPage() {
           return;
         }
 
-        const recoveryStartedAt = Date.now();
+        const recoveryCall = call;
+        if (!recoveryCall) return;
+        const recoveryStartedAt = evaluationAt;
         sendLifecycleTelemetry("watchdog_deadline_evaluated", {
           watchdog_evaluation: "recovery_threshold_reached",
           progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
@@ -1084,9 +1259,9 @@ export default function InterviewCviPage() {
           ...recoveryMetadata(),
         }, { reason: "watchdog_timeout" });
         try {
-          await call.leave().catch(() => {});
+          await recoveryCall.leave().catch(() => {});
           if (!alive || endTriggeredRef.current) return;
-          await call.join({
+          await recoveryCall.join({
             url: session.conversation_url,
             userName: "Candidate",
             startAudioOff: false,
@@ -1121,6 +1296,7 @@ export default function InterviewCviPage() {
         progressRecoveryStateRef.current = createReconnectRecoveryState();
         lastAiSpeechAtRef.current = null;
         lastAiSpeechStoppedAtRef.current = null;
+        candidateSpeakingStateRef.current = createCandidateSpeakingState();
 
         const daily = await loadDailySdk();
         if (!alive) return;
@@ -1191,6 +1367,10 @@ export default function InterviewCviPage() {
           const isReplicaSpeaking =
             eventType === "conversation.started_speaking" &&
             (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
+          const candidateSpeakingTransition =
+            deriveCandidateSpeakingTransition(eventType, utteranceRole);
+          const isCandidateSpeaking = candidateSpeakingTransition === "started";
+          const isCandidateStoppedSpeaking = candidateSpeakingTransition === "ended";
           const recoveryWasActive = isReconnectRecoveryActive(progressRecoveryStateRef.current);
           if (recoveryWasActive) {
             syncParticipantsWithDiagnostics();
@@ -1202,7 +1382,11 @@ export default function InterviewCviPage() {
               ? "replica_utterance"
               : isCandidateUtterance
                 ? "candidate_utterance"
-                : null;
+                : isCandidateSpeaking
+                  ? "candidate_speaking_started"
+                  : isCandidateStoppedSpeaking
+                    ? "candidate_speaking_ended"
+                    : null;
           if (
             eventType === "conversation.started_speaking" ||
             eventType === "conversation.stopped_speaking" ||
@@ -1214,7 +1398,7 @@ export default function InterviewCviPage() {
               participant_role:
                 isReplicaSpeaking || isReplicaUtterance
                   ? "replica"
-                  : isCandidateUtterance
+                  : isCandidateSpeaking || isCandidateStoppedSpeaking || isCandidateUtterance
                     ? "candidate"
                     : "unknown",
               ...(progressSource ? { progress_source: progressSource } : {}),
@@ -1230,7 +1414,29 @@ export default function InterviewCviPage() {
           if (eventType === "conversation.stopped_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
             lastAiSpeechStoppedAtRef.current = progressAt;
           }
+          if (isCandidateSpeaking) {
+            const started = beginCandidateSpeaking(candidateSpeakingStateRef.current, progressAt);
+            candidateSpeakingStateRef.current = started.state;
+            if (started.started) {
+              progressObservedRef.current = true;
+              recordProgressCheckpoint("candidate_speaking_started", progressAt);
+              if (!recoveryWasActive) setConnectionNotice("");
+            }
+          }
+          if (isCandidateStoppedSpeaking) {
+            const stopped = endCandidateSpeaking(candidateSpeakingStateRef.current);
+            candidateSpeakingStateRef.current = stopped.state;
+            if (stopped.ended) {
+              progressObservedRef.current = true;
+              recordProgressCheckpoint("candidate_speaking_ended", progressAt);
+              if (!recoveryWasActive) setConnectionNotice("");
+            }
+          }
           if (eventType === "conversation.utterance") {
+            if (isCandidateUtterance) {
+              candidateSpeakingStateRef.current =
+                endCandidateSpeaking(candidateSpeakingStateRef.current).state;
+            }
             if (isReplicaUtterance || (isCandidateUtterance && isCandidateAnswerProgress(speech))) {
               progressObservedRef.current = true;
               if (isReplicaUtterance && !recoveryCompleted) {
@@ -1308,6 +1514,7 @@ export default function InterviewCviPage() {
       clearProgressRecoveryDeadline();
       reconnectingRef.current = false;
       progressRecoveryInFlightRef.current = false;
+      candidateSpeakingStateRef.current = createCandidateSpeakingState();
       if (call?.off) {
         for (const [eventName, handler] of handlers) {
           try {
