@@ -193,7 +193,7 @@ test("page wiring removes false success and preserves existing lifecycle paths",
   assert.equal(source.split("void endInterview(reason, true)").length - 1, 1);
   assert.match(source, /beginStartupWatchdog\(\)/);
   assert.match(source, /void endInterview\("completed_normally"\)/);
-  assert.match(source, /void endInterview\("time_limit_force_close"\)/);
+  assert.match(source, /void requestClosingProviderEnd\("time_limit_force_close"\)/);
   assert.match(source, /sendLifecycleTelemetry\(\s*"browser_closed_or_navigation"/);
   assert.match(source, /clearProgressRecoveryDeadline\(\)/);
 });
