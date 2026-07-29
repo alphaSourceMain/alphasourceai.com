@@ -117,6 +117,34 @@ export type ProgressWatchdogInput = {
 
 export type CandidateSpeakingTransition = "started" | "ended" | null;
 
+export type TimerTone = "normal" | "warning" | "urgent";
+
+export type InterviewBoundaryPhase = "closing_window" | "termination_window";
+
+export type InterviewTimeBoundaryState = {
+  wrapControlSent: boolean;
+  terminationControlSent: boolean;
+  finalAnnouncementSent: boolean;
+  shutdownScheduled: boolean;
+};
+
+export type InterviewTimeBoundaryAction =
+  | "send_wrap_control"
+  | "send_termination_control"
+  | "send_final_announcement"
+  | "schedule_provider_shutdown";
+
+export type InterviewTimeBoundaryEvaluation = {
+  state: InterviewTimeBoundaryState;
+  actions: InterviewTimeBoundaryAction[];
+};
+
+export type InterviewTimerRuntimeState = {
+  sessionKey: string;
+  startedAt: number;
+  boundaryState: InterviewTimeBoundaryState;
+};
+
 type DailyEvent = {
   action?: string;
   error?: unknown;
@@ -165,15 +193,149 @@ const IDLE_ENGAGEMENT_GRACE_MS = 30000;
 export const CANDIDATE_SPEAKING_PROTECTION_MS = 120000;
 const CANDIDATE_SPEAKING_DIAGNOSTIC_INTERVAL_MS = 30000;
 const TIME_WARNING_THRESHOLD_SECONDS = 120;
-const GRACEFUL_WRAP_THRESHOLD_SECONDS = 60;
-const FORCE_END_THRESHOLD_SECONDS = 15;
-const GRACEFUL_FORCE_END_DELAY_MS = 15000;
-const TIME_WARNING_NOTICE = "About 2 minutes remaining. The interviewer will begin wrapping up.";
-const GRACEFUL_WRAP_NOTICE = "Less than 1 minute remaining. The interview is wrapping up.";
-const TIME_WARNING_TEXT = "Time warning: about 2 minutes remain. Stop asking new substantive questions soon and begin wrapping up naturally.";
-const GRACEFUL_WRAP_TEXT = "Time limit wrap-up: stop asking new substantive questions now. Use the final closing line and end the interview.";
+const URGENT_WARNING_THRESHOLD_SECONDS = 60;
+const WRAP_CONTROL_THRESHOLD_SECONDS = 30;
+const TERMINATION_CONTROL_THRESHOLD_SECONDS = 10;
+const FINAL_PROVIDER_SHUTDOWN_DELAY_MS = 9000;
+const FINAL_CLOSING_UTTERANCE =
+  "Thanks for your time today. This concludes the interview, and I'm ending the session now.";
 const CLOSING_UTTERANCE_END_DELAY_MS = 5500;
 const MAX_PENDING_TELEMETRY_REQUESTS = 8;
+
+export function createInterviewTimeBoundaryState(): InterviewTimeBoundaryState {
+  return {
+    wrapControlSent: false,
+    terminationControlSent: false,
+    finalAnnouncementSent: false,
+    shutdownScheduled: false,
+  };
+}
+
+export function initializeInterviewTimerRuntime(
+  previous: InterviewTimerRuntimeState | null,
+  sessionKey: string,
+  startedAt: number,
+): InterviewTimerRuntimeState {
+  if (previous?.sessionKey === sessionKey) return previous;
+  return {
+    sessionKey,
+    startedAt,
+    boundaryState: createInterviewTimeBoundaryState(),
+  };
+}
+
+export function evaluateInterviewTimeBoundary(input: {
+  state: InterviewTimeBoundaryState;
+  remainingSeconds: number;
+  candidateSpeaking: boolean;
+  replicaSpeaking: boolean;
+  closingAnnouncementObserved?: boolean;
+}): InterviewTimeBoundaryEvaluation {
+  const remaining = Number.isFinite(input.remainingSeconds)
+    ? Math.max(0, Math.floor(input.remainingSeconds))
+    : Number.POSITIVE_INFINITY;
+
+  if (remaining <= TERMINATION_CONTROL_THRESHOLD_SECONDS) {
+    const actions: InterviewTimeBoundaryAction[] = [];
+    if (!input.state.terminationControlSent) actions.push("send_termination_control");
+    if (
+      !input.state.finalAnnouncementSent &&
+      !input.closingAnnouncementObserved
+    ) {
+      actions.push("send_final_announcement");
+    }
+    if (!input.state.shutdownScheduled) actions.push("schedule_provider_shutdown");
+    if (!actions.length) return { state: input.state, actions };
+    return {
+      state: {
+        ...input.state,
+        terminationControlSent: true,
+        finalAnnouncementSent:
+          input.state.finalAnnouncementSent ||
+          Boolean(input.closingAnnouncementObserved) ||
+          actions.includes("send_final_announcement"),
+        shutdownScheduled: true,
+      },
+      actions,
+    };
+  }
+
+  const naturalTurnBoundary = !input.candidateSpeaking && !input.replicaSpeaking;
+  if (
+    remaining <= WRAP_CONTROL_THRESHOLD_SECONDS &&
+    naturalTurnBoundary &&
+    !input.state.wrapControlSent
+  ) {
+    return {
+      state: { ...input.state, wrapControlSent: true },
+      actions: ["send_wrap_control"],
+    };
+  }
+
+  return { state: input.state, actions: [] };
+}
+
+export function timerToneForRemaining(seconds: number | null): TimerTone {
+  if (typeof seconds !== "number") return "normal";
+  if (seconds <= URGENT_WARNING_THRESHOLD_SECONDS) return "urgent";
+  if (seconds <= TIME_WARNING_THRESHOLD_SECONDS) return "warning";
+  return "normal";
+}
+
+export function buildHiddenInterviewBoundaryMessage(
+  conversationId: string,
+  phase: InterviewBoundaryPhase,
+) {
+  const behavior = phase === "closing_window"
+    ? {
+        turn_boundary: "wait_for_natural_break",
+        substantive_questions: "blocked",
+        candidate_question: "invite_once_if_practical",
+        after_candidate_question: "answer_briefly_then_close",
+        candidate_acknowledgment: "not_required",
+        provider_end: "after_concise_closing",
+      }
+    : {
+        turn_boundary: "next_available_break",
+        substantive_questions: "blocked",
+        candidate_question: "do_not_start",
+        candidate_acknowledgment: "not_required",
+        provider_end: "required",
+        closing: "immediate_concise",
+      };
+  return {
+    message_type: "conversation",
+    event_type: "conversation.append_llm_context",
+    conversation_id: conversationId,
+    properties: {
+      context: JSON.stringify({
+        control_state: phase,
+        visibility: "internal_only",
+        disclosure: "forbidden",
+        ...behavior,
+      }),
+    },
+  };
+}
+
+export function buildFinalClosingAnnouncementMessage(conversationId: string) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.echo",
+    conversation_id: conversationId,
+    properties: {
+      modality: "text",
+      text: FINAL_CLOSING_UTTERANCE,
+      done: true,
+    },
+  };
+}
+
+function monotonicNow(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
 
 export function createCandidateSpeakingState(): CandidateSpeakingState {
   return {
@@ -628,7 +790,6 @@ export default function InterviewCviPage() {
   const [finishBusy, setFinishBusy] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
-  const [timeNotice, setTimeNotice] = useState("");
   const [connectionNotice, setConnectionNotice] = useState("");
   const [progressStalled, setProgressStalled] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
@@ -638,14 +799,13 @@ export default function InterviewCviPage() {
   const leavingRef = useRef(false);
   const reconnectingRef = useRef(false);
   const endTriggeredRef = useRef(false);
-  const timeWarningSentRef = useRef(false);
-  const gracefulWrapSentRef = useRef(false);
-  const gracefulForceEndTimerRef = useRef<number | null>(null);
+  const timerRuntimeRef = useRef<InterviewTimerRuntimeState | null>(null);
+  const finalTerminationTimerRef = useRef<number | null>(null);
   const closeEndTimerRef = useRef<number | null>(null);
   const startupRemoteSeenRef = useRef(false);
   const startupRecoveryAttemptedRef = useRef(false);
   const startupTimerRef = useRef<number | null>(null);
-  const startMsRef = useRef<number>(Date.now());
+  const secondsRemainingRef = useRef<number | null>(null);
   const recordingStartRequestedRef = useRef(false);
   const progressObservedRef = useRef(false);
   const lastProgressAtRef = useRef<number | null>(null);
@@ -654,6 +814,8 @@ export default function InterviewCviPage() {
   const progressRecoveryStateRef = useRef<ReconnectRecoveryState>(createReconnectRecoveryState());
   const lastAiSpeechAtRef = useRef<number | null>(null);
   const lastAiSpeechStoppedAtRef = useRef<number | null>(null);
+  const replicaSpeakingRef = useRef(false);
+  const closingAnnouncementObservedRef = useRef(false);
   const candidateSpeakingStateRef = useRef<CandidateSpeakingState>(createCandidateSpeakingState());
   const telemetrySequenceRef = useRef(0);
   const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
@@ -669,9 +831,9 @@ export default function InterviewCviPage() {
   }, []);
 
   const clearAutoEndTimers = useCallback(() => {
-    if (gracefulForceEndTimerRef.current) {
-      window.clearTimeout(gracefulForceEndTimerRef.current);
-      gracefulForceEndTimerRef.current = null;
+    if (finalTerminationTimerRef.current) {
+      window.clearTimeout(finalTerminationTimerRef.current);
+      finalTerminationTimerRef.current = null;
     }
     if (closeEndTimerRef.current) {
       window.clearTimeout(closeEndTimerRef.current);
@@ -815,37 +977,88 @@ export default function InterviewCviPage() {
     } catch {}
   }, [session]);
 
-  const sendTimeLimitMessage = useCallback((text: string) => {
+  const sendHiddenBoundaryControl = useCallback((phase: InterviewBoundaryPhase): boolean => {
+    const conversationId = String(session?.conversation_id || "").trim();
+    const call = callRef.current;
+    if (!conversationId || !call?.sendAppMessage) return false;
     try {
-      callRef.current?.sendAppMessage?.({
-        event_type: "conversation.echo",
-        eventType: "conversation.echo",
-        properties: { text },
-      }, "*");
-    } catch {}
-  }, []);
-
-  const sendTimeWarning = useCallback((remaining: number) => {
-    if (timeWarningSentRef.current || endTriggeredRef.current) return;
-    timeWarningSentRef.current = true;
-    setTimeNotice(TIME_WARNING_NOTICE);
-    sendTimeLimitMessage(TIME_WARNING_TEXT);
-    console.log("[InterviewCviPage] time_warning_sent", { remaining_seconds: remaining });
-  }, [sendTimeLimitMessage]);
-
-  const requestGracefulWrap = useCallback((remaining: number) => {
-    if (gracefulWrapSentRef.current || endTriggeredRef.current) return;
-    gracefulWrapSentRef.current = true;
-    setTimeNotice(GRACEFUL_WRAP_NOTICE);
-    sendTimeLimitMessage(GRACEFUL_WRAP_TEXT);
-    console.log("[InterviewCviPage] graceful_wrap_requested", { remaining_seconds: remaining });
-    if (!gracefulForceEndTimerRef.current) {
-      gracefulForceEndTimerRef.current = window.setTimeout(() => {
-        gracefulForceEndTimerRef.current = null;
-        void endInterview("time_limit_graceful_close");
-      }, GRACEFUL_FORCE_END_DELAY_MS);
+      call.sendAppMessage(buildHiddenInterviewBoundaryMessage(conversationId, phase), "*");
+      return true;
+    } catch {
+      return false;
     }
-  }, [endInterview, sendTimeLimitMessage]);
+  }, [session?.conversation_id]);
+
+  const sendFinalClosingAnnouncement = useCallback((): boolean => {
+    const conversationId = String(session?.conversation_id || "").trim();
+    const call = callRef.current;
+    if (!conversationId || !call?.sendAppMessage) return false;
+    try {
+      call.sendAppMessage(buildFinalClosingAnnouncementMessage(conversationId), "*");
+      return true;
+    } catch {
+      return false;
+    }
+  }, [session?.conversation_id]);
+
+  const processTimeBoundary = useCallback((remaining: number) => {
+    if (endTriggeredRef.current) return;
+    const runtime = timerRuntimeRef.current;
+    const previousState = runtime?.boundaryState || createInterviewTimeBoundaryState();
+    const evaluation = evaluateInterviewTimeBoundary({
+      state: previousState,
+      remainingSeconds: remaining,
+      candidateSpeaking: candidateSpeakingStateRef.current.active,
+      replicaSpeaking: replicaSpeakingRef.current,
+      closingAnnouncementObserved: closingAnnouncementObservedRef.current,
+    });
+    if (!evaluation.actions.length) return;
+
+    let nextState = evaluation.state;
+    for (const action of evaluation.actions) {
+      if (action === "send_wrap_control") {
+        if (!sendHiddenBoundaryControl("closing_window")) {
+          nextState = { ...nextState, wrapControlSent: previousState.wrapControlSent };
+          continue;
+        }
+        console.log("[InterviewCviPage] closing_control_sent", { remaining_seconds: remaining });
+      }
+      if (action === "send_termination_control") {
+        if (!sendHiddenBoundaryControl("termination_window")) {
+          nextState = {
+            ...nextState,
+            terminationControlSent: previousState.terminationControlSent,
+          };
+          continue;
+        }
+        console.log("[InterviewCviPage] termination_control_sent", { remaining_seconds: remaining });
+      }
+      if (action === "send_final_announcement") {
+        if (!sendFinalClosingAnnouncement()) {
+          nextState = {
+            ...nextState,
+            finalAnnouncementSent: previousState.finalAnnouncementSent,
+          };
+          continue;
+        }
+        console.log("[InterviewCviPage] final_announcement_sent", { remaining_seconds: remaining });
+      }
+      if (action === "schedule_provider_shutdown" && !finalTerminationTimerRef.current) {
+        const delayMs = Math.max(
+          0,
+          Math.min(FINAL_PROVIDER_SHUTDOWN_DELAY_MS, Math.max(remaining - 1, 0) * 1000),
+        );
+        finalTerminationTimerRef.current = window.setTimeout(() => {
+          finalTerminationTimerRef.current = null;
+          void endInterview("time_limit_force_close");
+        }, delayMs);
+        console.log("[InterviewCviPage] provider_shutdown_scheduled", { remaining_seconds: remaining });
+      }
+    }
+    if (runtime) {
+      timerRuntimeRef.current = { ...runtime, boundaryState: nextState };
+    }
+  }, [endInterview, sendFinalClosingAnnouncement, sendHiddenBoundaryControl]);
 
   useEffect(() => () => clearAutoEndTimers(), [clearAutoEndTimers]);
 
@@ -1367,6 +1580,9 @@ export default function InterviewCviPage() {
           const isReplicaSpeaking =
             eventType === "conversation.started_speaking" &&
             (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
+          const isReplicaStoppedSpeaking =
+            eventType === "conversation.stopped_speaking" &&
+            (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent");
           const candidateSpeakingTransition =
             deriveCandidateSpeakingTransition(eventType, utteranceRole);
           const isCandidateSpeaking = candidateSpeakingTransition === "started";
@@ -1407,11 +1623,13 @@ export default function InterviewCviPage() {
           }
           let recoveryCompleted = false;
           if (isReplicaSpeaking) {
+            replicaSpeakingRef.current = true;
             lastAiSpeechAtRef.current = progressAt;
             recoveryCompleted = completeProgressRecovery("replica_started_speaking", progressAt);
             if (!recoveryWasActive) recordProgressCheckpoint("replica_started_speaking", progressAt);
           }
-          if (eventType === "conversation.stopped_speaking" && (utteranceRole === "replica" || utteranceRole === "assistant" || utteranceRole === "agent")) {
+          if (isReplicaStoppedSpeaking) {
+            replicaSpeakingRef.current = false;
             lastAiSpeechStoppedAtRef.current = progressAt;
           }
           if (isCandidateSpeaking) {
@@ -1451,6 +1669,10 @@ export default function InterviewCviPage() {
               if (!recoveryWasActive) setConnectionNotice("");
             }
           }
+          if (isCandidateStoppedSpeaking || isCandidateUtterance || isReplicaStoppedSpeaking) {
+            const remaining = secondsRemainingRef.current;
+            if (typeof remaining === "number") processTimeBoundary(remaining);
+          }
           if (eventType === "conversation.tool_call" || eventType === "conversation.toolcall") {
             const toolName = String(
               data?.name ??
@@ -1477,6 +1699,7 @@ export default function InterviewCviPage() {
             ) &&
             !closeEndTimerRef.current
           ) {
+            closingAnnouncementObservedRef.current = true;
             closeEndTimerRef.current = window.setTimeout(() => {
               closeEndTimerRef.current = null;
               void endInterview("completed_normally");
@@ -1515,6 +1738,7 @@ export default function InterviewCviPage() {
       reconnectingRef.current = false;
       progressRecoveryInFlightRef.current = false;
       candidateSpeakingStateRef.current = createCandidateSpeakingState();
+      replicaSpeakingRef.current = false;
       if (call?.off) {
         for (const [eventName, handler] of handlers) {
           try {
@@ -1525,29 +1749,31 @@ export default function InterviewCviPage() {
       handlers = [];
       void teardownCall();
     };
-  }, [clearStartupTimer, endInterview, leaveLiveRoute, sendLifecycleTelemetry, session, syncParticipants, teardownCall]);
+  }, [clearStartupTimer, endInterview, leaveLiveRoute, processTimeBoundary, sendLifecycleTelemetry, session, syncParticipants, teardownCall]);
 
   useEffect(() => {
     const maxMinutes = session?.max_interview_minutes;
     if (!maxMinutes || maxMinutes <= 0) {
       setSecondsRemaining(null);
-      setTimeNotice("");
+      secondsRemainingRef.current = null;
       return;
     }
 
-    startMsRef.current = Date.now();
+    const timerSessionKey = `${String(session?.conversation_id || "")}:${maxMinutes}`;
+    const previousRuntime = timerRuntimeRef.current;
+    const runtime = initializeInterviewTimerRuntime(
+      previousRuntime,
+      timerSessionKey,
+      monotonicNow(),
+    );
+    timerRuntimeRef.current = runtime;
+    if (runtime !== previousRuntime) closingAnnouncementObservedRef.current = false;
     let timer: number | null = null;
     const maxSeconds = maxMinutes * 60;
-    const shouldUseTwoMinuteWarning = maxSeconds > TIME_WARNING_THRESHOLD_SECONDS;
-    const gracefulWrapThreshold =
-      maxSeconds > GRACEFUL_WRAP_THRESHOLD_SECONDS
-        ? GRACEFUL_WRAP_THRESHOLD_SECONDS
-        : maxSeconds > FORCE_END_THRESHOLD_SECONDS + 10
-          ? FORCE_END_THRESHOLD_SECONDS + 10
-          : null;
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - startMsRef.current) / 1000);
+      const elapsed = Math.floor((monotonicNow() - runtime.startedAt) / 1000);
       const remaining = Math.max(maxSeconds - elapsed, 0);
+      secondsRemainingRef.current = remaining;
       setSecondsRemaining(remaining);
       if (endTriggeredRef.current) {
         if (timer) {
@@ -1556,19 +1782,12 @@ export default function InterviewCviPage() {
         }
         return;
       }
-      if (shouldUseTwoMinuteWarning && remaining > 0 && remaining <= TIME_WARNING_THRESHOLD_SECONDS) {
-        sendTimeWarning(remaining);
-      }
-      if (gracefulWrapThreshold != null && remaining > 0 && remaining <= gracefulWrapThreshold) {
-        requestGracefulWrap(remaining);
-      }
-      if (remaining <= FORCE_END_THRESHOLD_SECONDS) {
+      processTimeBoundary(remaining);
+      if (remaining <= 0) {
         if (timer) {
           window.clearInterval(timer);
           timer = null;
         }
-        console.log("[InterviewCviPage] force_close_triggered", { remaining_seconds: remaining });
-        void endInterview("time_limit_force_close");
       }
     };
 
@@ -1577,7 +1796,7 @@ export default function InterviewCviPage() {
     return () => {
       if (timer) window.clearInterval(timer);
     };
-  }, [endInterview, requestGracefulWrap, sendTimeWarning, session?.max_interview_minutes]);
+  }, [processTimeBoundary, session?.conversation_id, session?.max_interview_minutes]);
 
   useEffect(() => {
     if (!backendBase || !session?.interview_id || !session?.role_token) return;
@@ -1624,9 +1843,9 @@ export default function InterviewCviPage() {
 
   const timerLabel = useMemo(() => formatCountdown(secondsRemaining), [secondsRemaining]);
   const timerToneClass = useMemo(() => {
-    if (typeof secondsRemaining !== "number") return "bg-black/60 border-white/20 text-white";
-    if (secondsRemaining <= 60) return "bg-[#EF4444]/90 border-[#DC2626] text-white";
-    if (secondsRemaining <= 120) return "bg-[#FBBF24]/90 border-[#F59E0B] text-[#3A2600]";
+    const tone = timerToneForRemaining(secondsRemaining);
+    if (tone === "urgent") return "bg-[#EF4444]/90 border-[#DC2626] text-white";
+    if (tone === "warning") return "bg-[#FBBF24]/90 border-[#F59E0B] text-[#3A2600]";
     return "bg-black/60 border-white/20 text-white";
   }, [secondsRemaining]);
   const candidateAssistanceContact = useMemo(
@@ -1704,9 +1923,9 @@ export default function InterviewCviPage() {
               </div>
             )}
 
-            {(connectionNotice || timeNotice) && (
+            {connectionNotice && (
               <div className="absolute top-3 left-3 max-w-[calc(100%-8rem)] px-3 py-2 rounded-xl border border-[#F59E0B]/40 bg-[#FFFBEB]/95 text-[#3A2600] text-[11px] sm:text-xs font-bold shadow-sm pointer-events-none">
-                {connectionNotice || timeNotice}
+                {connectionNotice}
               </div>
             )}
           </div>
