@@ -50,6 +50,9 @@ test("summary strip, required filters, and all supported sorts are present", () 
 test("page preserves query state and implements apply, reset, pagination, loading, empty, and error states", () => {
   assert.match(page, /new URLSearchParams\(window\.location\.search\)/);
   assert.match(page, /window\.history\.replaceState/);
+  assert.match(page, /window\.history\.pushState/);
+  assert.match(page, /window\.addEventListener\("popstate", restoreFromHistory\)/);
+  assert.match(page, /window\.removeEventListener\("popstate", restoreFromHistory\)/);
   assert.match(page, /Apply filters/);
   assert.match(page, /Reset/);
   assert.match(page, /Previous/);
@@ -57,6 +60,47 @@ test("page preserves query state and implements apply, reset, pagination, loadin
   assert.match(page, /Loading interviews/);
   assert.match(page, /No interviews match the selected filters/);
   assert.match(page, /role="alert"/);
+});
+
+test("desktop filters use two ordered rows with a wide candidate search and trailing actions", () => {
+  const primaryRow = page.indexOf('data-testid="reliability-filter-row-primary"');
+  const secondaryRow = page.indexOf('data-testid="reliability-filter-row-secondary"');
+  const candidateSearch = page.indexOf(">Candidate Search<", secondaryRow);
+  const sort = page.indexOf(">Sort<", candidateSearch);
+  const direction = page.indexOf(">Direction<", sort);
+  const actions = page.indexOf('data-testid="reliability-filter-actions"', direction);
+  assert.ok(primaryRow >= 0);
+  assert.ok(secondaryRow > primaryRow);
+  assert.ok(candidateSearch > secondaryRow);
+  assert.ok(sort > candidateSearch);
+  assert.ok(direction > sort);
+  assert.ok(actions > direction);
+  assert.match(page, /reliability-filter-row-primary" className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7"/);
+  assert.match(page, /space-y-1 md:col-span-2 xl:col-span-3/);
+  assert.match(page, /reliability-filter-actions" className="flex flex-wrap items-center justify-end/);
+  assert.match(page, /aria-label="Candidate Search"/);
+});
+
+test("pagination defaults to 20 and exposes only the approved page-size options", () => {
+  assert.match(page, /type PageSize = 10 \| 20 \| 50 \| 100/);
+  assert.match(page, /const PAGE_SIZE_OPTIONS = \[10, 20, 50, 100\] as const/);
+  assert.match(page, /pageSize: 20/);
+  assert.match(page, /page_size: String\(filters\.pageSize\)/);
+  assert.match(page, /parsePageSize\(params\.get\("page_size"\)\)/);
+  assert.match(page, /aria-label="Rows per page"/);
+  assert.match(page, /PAGE_SIZE_OPTIONS\.map/);
+  assert.match(page, /return PAGE_SIZE_OPTIONS\.includes\(parsed as PageSize\) \? \(parsed as PageSize\) : 20/);
+  assert.doesNotMatch(page, /page_size: "25"/);
+});
+
+test("page-size changes preserve active state, reset page one, and clamp deleted-result pages", () => {
+  assert.match(page, /const changePageSize = \(pageSize: PageSize\) =>/);
+  assert.match(page, /const next = \{ \.\.\.filters, page: 1, pageSize \}/);
+  assert.match(page, /setDraftFilters\(next\)/);
+  assert.match(page, /setFilters\(next\)/);
+  assert.match(page, /payload\.pagination\.page !== filters\.page/);
+  assert.match(page, /filters\.page <= totalPages/);
+  assert.match(page, /\{ \.\.\.current, page: totalPages \}/);
 });
 
 test("detail panel exposes bounded reliability, processing, attempt, and ordered timeline views", () => {

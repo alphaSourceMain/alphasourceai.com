@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabaseClient";
 type TimeRange = "24h" | "7d" | "30d" | "90d";
 type SortField = "started_at" | "ended_at" | "duration" | "status" | "failure" | "processing_age";
 type SortDirection = "asc" | "desc";
+type PageSize = 10 | 20 | 50 | 100;
 
 interface Filters {
   timeRange: TimeRange;
@@ -37,6 +38,7 @@ interface Filters {
   sort: SortField;
   direction: SortDirection;
   page: number;
+  pageSize: PageSize;
 }
 
 interface ReliabilitySummary {
@@ -175,6 +177,8 @@ const EMPTY_SUMMARY: ReliabilitySummary = {
   processing_incomplete_or_overdue: 0,
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
 const DEFAULT_FILTERS: Filters = {
   timeRange: "7d",
   roleId: "",
@@ -187,6 +191,7 @@ const DEFAULT_FILTERS: Filters = {
   sort: "started_at",
   direction: "desc",
   page: 1,
+  pageSize: 20,
 };
 
 const env =
@@ -303,6 +308,11 @@ function StatusBadge({ value }: { value: unknown }) {
   );
 }
 
+function parsePageSize(value: string | null): PageSize {
+  const parsed = Number(value);
+  return PAGE_SIZE_OPTIONS.includes(parsed as PageSize) ? (parsed as PageSize) : 20;
+}
+
 function readInitialFilters(): Filters {
   if (typeof window === "undefined") return DEFAULT_FILTERS;
   const params = new URLSearchParams(window.location.search);
@@ -324,6 +334,7 @@ function readInitialFilters(): Filters {
       : "started_at",
     direction: direction === "asc" ? "asc" : "desc",
     page: Number.isInteger(page) && page > 0 ? page : 1,
+    pageSize: parsePageSize(params.get("page_size")),
   };
 }
 
@@ -331,7 +342,7 @@ function listQuery(filters: Filters, selectedClientId: string): URLSearchParams 
   const params = new URLSearchParams({
     time_range: filters.timeRange,
     page: String(filters.page),
-    page_size: "25",
+    page_size: String(filters.pageSize),
     sort: filters.sort,
     direction: filters.direction,
   });
@@ -550,6 +561,8 @@ export default function AdminInterviewReliabilityPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const urlSyncStartedRef = useRef(false);
+  const restoringHistoryRef = useRef(false);
 
   const getToken = useCallback(async () => {
     const {
@@ -601,8 +614,44 @@ export default function AdminInterviewReliabilityPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = listQuery(filters, selectedClientId);
-    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl === nextUrl) {
+      urlSyncStartedRef.current = true;
+      restoringHistoryRef.current = false;
+      return;
+    }
+    if (!urlSyncStartedRef.current || restoringHistoryRef.current) {
+      window.history.replaceState({ interviewReliability: true }, "", nextUrl);
+    } else {
+      window.history.pushState({ interviewReliability: true }, "", nextUrl);
+    }
+    urlSyncStartedRef.current = true;
+    restoringHistoryRef.current = false;
   }, [filters, selectedClientId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const restoreFromHistory = () => {
+      restoringHistoryRef.current = true;
+      const next = readInitialFilters();
+      setDraftFilters(next);
+      setFilters(next);
+      setDetailOpen(false);
+      setDetail(null);
+      setDetailError("");
+    };
+    window.addEventListener("popstate", restoreFromHistory);
+    return () => window.removeEventListener("popstate", restoreFromHistory);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !payload) return;
+    const totalPages = Math.max(1, Number(payload.pagination.total_pages) || 1);
+    if (payload.pagination.page !== filters.page || filters.page <= totalPages) return;
+    setDraftFilters((current) => ({ ...current, page: totalPages }));
+    setFilters((current) => ({ ...current, page: totalPages }));
+  }, [filters.page, loading, payload]);
 
   const applyFilters = (event: React.FormEvent) => {
     event.preventDefault();
@@ -625,6 +674,12 @@ export default function AdminInterviewReliabilityPage() {
     const nextPage = Math.max(1, Math.min(page, payload?.pagination.total_pages || 1));
     setDraftFilters((current) => ({ ...current, page: nextPage }));
     setFilters((current) => ({ ...current, page: nextPage }));
+  };
+
+  const changePageSize = (pageSize: PageSize) => {
+    const next = { ...filters, page: 1, pageSize };
+    setDraftFilters(next);
+    setFilters(next);
   };
 
   const openDetail = async (row: ReliabilityRow) => {
@@ -708,7 +763,7 @@ export default function AdminInterviewReliabilityPage() {
         </section>
 
         <form onSubmit={applyFilters} aria-label="Interview reliability filters" className="rounded-xl border p-3" style={surfaceStyle}>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+          <div data-testid="reliability-filter-row-primary" className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
             <label className="space-y-1">
               <span className="text-[10px] font-black uppercase" style={subtleTextStyle}>Time range</span>
               <select value={draftFilters.timeRange} onChange={(event) => setDraftFilters((current) => ({ ...current, timeRange: event.target.value as TimeRange }))} className={`${inputClass} w-full`} style={{ ...textStyle, borderColor: "var(--as-border)" }}>
@@ -777,11 +832,14 @@ export default function AdminInterviewReliabilityPage() {
                 <option value="not_applicable">Not applicable</option>
               </select>
             </label>
-            <label className="space-y-1">
-              <span className="text-[10px] font-black uppercase" style={subtleTextStyle}>Candidate</span>
+          </div>
+          <div data-testid="reliability-filter-row-secondary" className="mt-3 grid grid-cols-1 items-end gap-2 md:grid-cols-2 xl:grid-cols-7">
+            <label className="space-y-1 md:col-span-2 xl:col-span-3">
+              <span className="text-[10px] font-black uppercase" style={subtleTextStyle}>Candidate Search</span>
               <span className="relative block">
                 <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5" style={subtleTextStyle} />
                 <input
+                  aria-label="Candidate Search"
                   value={draftFilters.search}
                   onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value.slice(0, 80) }))}
                   maxLength={80}
@@ -791,8 +849,6 @@ export default function AdminInterviewReliabilityPage() {
                 />
               </span>
             </label>
-          </div>
-          <div className="mt-3 flex flex-wrap items-end justify-end gap-2">
             <label className="space-y-1">
               <span className="block text-[10px] font-black uppercase" style={subtleTextStyle}>Sort</span>
               <select
@@ -821,12 +877,14 @@ export default function AdminInterviewReliabilityPage() {
                 <option value="asc">Ascending</option>
               </select>
             </label>
-            <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black" style={{ ...mutedStyle, ...mutedTextStyle }}>
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
-            </button>
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded-full bg-[#0A1547] px-3 py-1.5 text-xs font-black text-white dark:bg-[#A380F6]">
-              <Filter className="h-3.5 w-3.5" /> Apply filters
-            </button>
+            <div data-testid="reliability-filter-actions" className="flex flex-wrap items-center justify-end gap-2 md:col-span-2 xl:col-span-2">
+              <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-black" style={{ ...mutedStyle, ...mutedTextStyle }}>
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
+              </button>
+              <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0A1547] px-3 text-xs font-black text-white dark:bg-[#A380F6]">
+                <Filter className="h-3.5 w-3.5" /> Apply filters
+              </button>
+            </div>
           </div>
         </form>
 
@@ -908,6 +966,20 @@ export default function AdminInterviewReliabilityPage() {
               Page {payload?.pagination.page || filters.page} of {payload?.pagination.total_pages || 1}
             </p>
             <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs font-semibold" style={mutedTextStyle}>
+                <span>Rows per page</span>
+                <select
+                  aria-label="Rows per page"
+                  value={filters.pageSize}
+                  onChange={(event) => changePageSize(parsePageSize(event.target.value))}
+                  className={`${inputClass} w-[72px]`}
+                  style={{ ...textStyle, borderColor: "var(--as-border)" }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((pageSize) => (
+                    <option key={pageSize} value={pageSize}>{pageSize}</option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => changePage((payload?.pagination.page || filters.page) - 1)}
