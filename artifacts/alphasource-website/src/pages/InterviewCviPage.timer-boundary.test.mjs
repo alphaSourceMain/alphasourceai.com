@@ -247,7 +247,7 @@ test("provider end request and confirmation are idempotent", () => {
   assert.strictEqual(confirmedAgain, confirmed);
 });
 
-test("post-closing replica violation interrupts once per inference", () => {
+test("post-closing replica violations share one bounded interrupt path", () => {
   const state = closingOnlyState();
   const first = recordPostClosingInterruption(state, "synthetic-inference");
   const duplicate = recordPostClosingInterruption(first.state, "synthetic-inference");
@@ -255,7 +255,8 @@ test("post-closing replica violation interrupts once per inference", () => {
 
   assert.equal(first.shouldInterrupt, true);
   assert.equal(duplicate.shouldInterrupt, false);
-  assert.equal(second.shouldInterrupt, true);
+  assert.equal(second.shouldInterrupt, false);
+  assert.equal(second.newViolation, true);
 });
 
 test("question-locked replica generation is interruptible without entering closing early", () => {
