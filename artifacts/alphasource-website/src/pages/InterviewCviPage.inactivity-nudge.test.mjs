@@ -190,7 +190,7 @@ test("every unsafe arming condition fails silent with a bounded reason", () => {
     [{ documentVisible: false }, "hidden_document"],
     [{ runtimeOwner: false }, "runtime_ownership_lost"],
     [{ phase: "QUESTION_LOCKED" }, "question_lock"],
-    [{ phase: "CLOSING_ONLY" }, "closing"],
+    [{ phase: "WIND_DOWN_ONLY" }, "closing"],
     [{ phase: "TERMINATION_ONLY" }, "termination"],
     [{ remainingSeconds: 45 }, "question_lock"],
   ];
@@ -280,7 +280,7 @@ test("deadline revalidates candidate, transport, reconnect, media, tab, and clos
     { documentVisible: false },
     { runtimeOwner: false },
     { remainingSeconds: 45 },
-    { phase: "CLOSING_ONLY" },
+    { phase: "WIND_DOWN_ONLY" },
   ];
   for (const override of cases) {
     assert.equal(deadline(armed(), 11_000, override).action, "suppressed");

@@ -204,7 +204,9 @@ export type TimerTone = "normal" | "warning" | "urgent";
 export type InterviewClosingPhase =
   | "INTERVIEWING"
   | "QUESTION_LOCKED"
-  | "CLOSING_ONLY"
+  | "WIND_DOWN_ONLY"
+  | "FORCED_WIND_DOWN"
+  | "FINAL_FAREWELL_ELIGIBLE"
   | "TERMINATION_ONLY"
   | "ENDED";
 
@@ -221,8 +223,10 @@ export type InterviewTimeBoundaryState = {
   phase: InterviewClosingPhase;
   questionLockControlSent: boolean;
   closingControlSent: boolean;
+  forcedWindDownEntered: boolean;
   terminationControlSent: boolean;
   candidateQuestionInvitationSent: boolean;
+  candidateQuestionInvitationSkipped: boolean;
   candidateQuestionReceived: boolean;
   candidateQuestionDeclined: boolean;
   candidateQuestionResponseStarted: boolean;
@@ -231,7 +235,9 @@ export type InterviewTimeBoundaryState = {
   closingFarewellPhase: ClosingFarewellPhase;
   invitationInferenceId: string;
   farewellInferenceId: string;
+  farewellProviderTurnKey: string | null;
   postClosingInterruptRequested: boolean;
+  finalFarewellEligibleRecorded: boolean;
   providerEndRequested: boolean;
   providerEndConfirmed: boolean;
   turnIndex: number;
@@ -240,9 +246,13 @@ export type InterviewTimeBoundaryState = {
 
 export type InterviewTimeBoundaryAction =
   | "send_question_lock_control"
-  | "send_closing_control"
+  | "send_wind_down_control"
+  | "send_forced_wind_down_control"
   | "send_candidate_question_invitation"
+  | "record_candidate_question_invitation_skipped"
   | "start_candidate_question_silence_timer"
+  | "record_final_farewell_eligible"
+  | "record_closing_farewell_reserved"
   | "send_termination_control"
   | "send_closing_farewell"
   | "ensure_provider_shutdown"
@@ -316,9 +326,11 @@ const CANDIDATE_SPEAKING_DIAGNOSTIC_INTERVAL_MS = 30000;
 const TIME_WARNING_THRESHOLD_SECONDS = 120;
 const URGENT_WARNING_THRESHOLD_SECONDS = 60;
 const QUESTION_LOCK_THRESHOLD_SECONDS = 45;
-const CLOSING_ONLY_THRESHOLD_SECONDS = 30;
+const WIND_DOWN_THRESHOLD_SECONDS = 30;
+const FORCED_WIND_DOWN_THRESHOLD_SECONDS = 20;
+const FINAL_FAREWELL_THRESHOLD_SECONDS = 15;
 const TERMINATION_CONTROL_THRESHOLD_SECONDS = 10;
-const MIN_INVITATION_REMAINING_SECONDS = 18;
+const MIN_INVITATION_REMAINING_SECONDS = 20;
 const CANDIDATE_QUESTION_SILENCE_MS = 6500;
 const FAREWELL_COMPLETION_TIMEOUT_MS = 12000;
 const MAX_INTERRUPTED_INFERENCE_KEYS = 16;
@@ -335,18 +347,20 @@ const CANDIDATE_INACTIVITY_LEASE_MS = 6000;
 const CANDIDATE_INACTIVITY_LEASE_RENEW_MS = 2000;
 const MAX_PROCESSED_INACTIVITY_TURNS = 24;
 const CANDIDATE_QUESTION_INVITATION =
-  "Before we finish, do you have one question for me?";
+  "Time is winding down. Thank you. Any final question?";
 const FINAL_CLOSING_UTTERANCE =
-  "Thanks for your time today. This concludes the interview, and I'm ending the session now.";
+  "Thank you for your time. This concludes the interview.";
 const MAX_PENDING_TELEMETRY_REQUESTS = 8;
 const closingRuntimeBySession = new Map<string, InterviewTimerRuntimeState>();
 
 const CLOSING_PHASE_ORDER: Record<InterviewClosingPhase, number> = {
   INTERVIEWING: 0,
   QUESTION_LOCKED: 1,
-  CLOSING_ONLY: 2,
-  TERMINATION_ONLY: 3,
-  ENDED: 4,
+  WIND_DOWN_ONLY: 2,
+  FORCED_WIND_DOWN: 3,
+  FINAL_FAREWELL_ELIGIBLE: 4,
+  TERMINATION_ONLY: 5,
+  ENDED: 6,
 };
 
 export function closingApplicationInferenceId(
@@ -364,8 +378,10 @@ export function createInterviewTimeBoundaryState(sessionKey = "unbound"): Interv
     phase: "INTERVIEWING",
     questionLockControlSent: false,
     closingControlSent: false,
+    forcedWindDownEntered: false,
     terminationControlSent: false,
     candidateQuestionInvitationSent: false,
+    candidateQuestionInvitationSkipped: false,
     candidateQuestionReceived: false,
     candidateQuestionDeclined: false,
     candidateQuestionResponseStarted: false,
@@ -374,7 +390,9 @@ export function createInterviewTimeBoundaryState(sessionKey = "unbound"): Interv
     closingFarewellPhase: "IDLE",
     invitationInferenceId: closingApplicationInferenceId(sessionKey, "invitation"),
     farewellInferenceId: closingApplicationInferenceId(sessionKey, "farewell"),
+    farewellProviderTurnKey: null,
     postClosingInterruptRequested: false,
+    finalFarewellEligibleRecorded: false,
     providerEndRequested: false,
     providerEndConfirmed: false,
     turnIndex: 0,
@@ -475,6 +493,7 @@ export function recordClosingFarewellSpeechEvent(
   state: InterviewTimeBoundaryState,
   event: NormalizedPalSpeakingEvent,
   activeConversationId: string,
+  expectedApplicationInferenceId = "",
 ): {
   state: InterviewTimeBoundaryState;
   matched: boolean;
@@ -482,11 +501,16 @@ export function recordClosingFarewellSpeechEvent(
 } {
   if (
     state.providerEndRequested ||
-    !event.inferenceId ||
-    event.inferenceId !== state.farewellInferenceId ||
     !activeConversationId ||
     event.conversationId !== activeConversationId
   ) {
+    return { state, matched: false, transition: "none" };
+  }
+  const explicitInferenceMatches = event.inferenceId === state.farewellInferenceId;
+  const directApplicationFallback =
+    !event.inferenceId &&
+    expectedApplicationInferenceId === state.farewellInferenceId;
+  if (!explicitInferenceMatches && !directApplicationFallback) {
     return { state, matched: false, transition: "none" };
   }
   if (event.kind === "started") {
@@ -494,16 +518,23 @@ export function recordClosingFarewellSpeechEvent(
       return { state, matched: true, transition: "none" };
     }
     return {
-      state: { ...state, closingFarewellPhase: "SPEAKING" },
+      state: {
+        ...state,
+        closingFarewellPhase: "SPEAKING",
+        farewellProviderTurnKey: event.turnKey,
+      },
       matched: true,
       transition: "speaking",
     };
   }
-  if (
-    state.closingFarewellPhase !== "DISPATCHED" &&
-    state.closingFarewellPhase !== "SPEAKING"
-  ) {
+  if (state.closingFarewellPhase !== "SPEAKING") {
     return { state, matched: true, transition: "none" };
+  }
+  if (
+    !state.farewellProviderTurnKey ||
+    state.farewellProviderTurnKey !== event.turnKey
+  ) {
+    return { state, matched: false, transition: "none" };
   }
   const transition = event.interrupted ? "interrupted" : "completed";
   return {
@@ -545,25 +576,27 @@ export function markClosingFarewellCompletionTimeout(
 export function closingProviderEndAllowed(
   state: InterviewTimeBoundaryState,
   remainingSeconds: number,
-  options: { hardDeadline?: boolean; providerTerminal?: boolean } = {},
+  options: { hardDeadline?: boolean } = {},
 ): boolean {
   if (state.providerEndRequested) return false;
-  if (options.hardDeadline || options.providerTerminal || remainingSeconds <= 0) return true;
-  if (remainingSeconds > TERMINATION_CONTROL_THRESHOLD_SECONDS) return false;
-  return (
-    state.closingFarewellPhase === "COMPLETED" ||
-    state.closingFarewellPhase === "INTERRUPTED"
-  );
+  if (options.hardDeadline || remainingSeconds <= 0) return true;
+  return state.closingFarewellPhase === "COMPLETED";
 }
 
-function reserveFarewellAction(
+function ensureFarewellReservation(
   state: InterviewTimeBoundaryState,
   actions: InterviewTimeBoundaryAction[],
+  dispatchAllowed: boolean,
 ): InterviewTimeBoundaryState {
   const reservation = reserveClosingFarewell(state);
-  if (!reservation.reserved) return reservation.state;
-  actions.push("send_closing_farewell", "ensure_provider_shutdown");
-  return reservation.state;
+  let nextState = reservation.state;
+  if (reservation.reserved) {
+    actions.push("record_closing_farewell_reserved", "ensure_provider_shutdown");
+  }
+  if (dispatchAllowed && nextState.closingFarewellPhase === "RESERVED") {
+    actions.push("send_closing_farewell", "ensure_provider_shutdown");
+  }
+  return nextState;
 }
 
 export function evaluateInterviewTimeBoundary(input: {
@@ -575,73 +608,30 @@ export function evaluateInterviewTimeBoundary(input: {
   closingAnnouncementObserved?: boolean;
 }): InterviewTimeBoundaryEvaluation {
   const remaining = Number.isFinite(input.remainingSeconds)
-    ? Math.max(0, Math.floor(input.remainingSeconds))
+    ? Math.max(0, input.remainingSeconds)
     : Number.POSITIVE_INFINITY;
   if (input.state.phase === "ENDED") return { state: input.state, actions: [] };
-
-  if (remaining <= TERMINATION_CONTROL_THRESHOLD_SECONDS) {
-    let state = advanceInterviewClosingPhase(input.state, "TERMINATION_ONLY");
-    const actions: InterviewTimeBoundaryAction[] = [];
-    if (!state.questionLockControlSent) {
-      actions.push("send_question_lock_control");
-      actions.push("interrupt_replica");
-      state = { ...state, questionLockControlSent: true };
-    }
-    if (!state.closingControlSent) {
-      actions.push("send_closing_control");
-      state = { ...state, closingControlSent: true };
-    }
-    if (!state.terminationControlSent) {
-      actions.push("send_termination_control");
-      state = { ...state, terminationControlSent: true };
-    }
-    if (
-      input.replicaSpeaking &&
-      !input.replicaSpeechIsApplicationControlled &&
-      !state.interruptedInferenceKeys.includes("termination-boundary")
-    ) {
-      actions.push("interrupt_replica");
-      state = {
-        ...state,
-        interruptedInferenceKeys: [
-          ...state.interruptedInferenceKeys,
-          "termination-boundary",
-        ].slice(-MAX_INTERRUPTED_INFERENCE_KEYS),
-      };
-    }
-    if (remaining > 0 && !state.closingFarewellSent && !input.closingAnnouncementObserved) {
-      state = reserveFarewellAction(state, actions);
-    } else if (!state.providerEndRequested) {
-      actions.push("ensure_provider_shutdown");
-    }
-    if (
-      closingProviderEndAllowed(state, remaining) &&
-      !actions.includes("request_provider_end")
-    ) actions.push("request_provider_end");
-    return { state, actions };
-  }
-
   let state = input.state;
   const actions: InterviewTimeBoundaryAction[] = [];
   if (remaining <= QUESTION_LOCK_THRESHOLD_SECONDS) {
     state = advanceInterviewClosingPhase(state, "QUESTION_LOCKED");
     if (!state.questionLockControlSent) {
       actions.push("send_question_lock_control");
-      actions.push("interrupt_replica");
       state = { ...state, questionLockControlSent: true };
     }
   }
 
-  if (remaining <= CLOSING_ONLY_THRESHOLD_SECONDS) {
-    state = advanceInterviewClosingPhase(state, "CLOSING_ONLY");
+  if (remaining <= WIND_DOWN_THRESHOLD_SECONDS) {
+    state = advanceInterviewClosingPhase(state, "WIND_DOWN_ONLY");
     if (!state.closingControlSent) {
-      actions.push("send_closing_control");
+      actions.push("send_wind_down_control");
       state = { ...state, closingControlSent: true };
     }
     const naturalTurnBoundary = !input.candidateSpeaking && !input.replicaSpeaking;
     if (
       naturalTurnBoundary &&
       !state.candidateQuestionInvitationSent &&
+      !state.candidateQuestionInvitationSkipped &&
       !state.closingFarewellSent
     ) {
       if (remaining >= MIN_INVITATION_REMAINING_SECONDS) {
@@ -649,9 +639,83 @@ export function evaluateInterviewTimeBoundary(input: {
         actions.push("start_candidate_question_silence_timer");
         state = { ...state, candidateQuestionInvitationSent: true };
       } else {
-        state = reserveFarewellAction(state, actions);
+        actions.push("record_candidate_question_invitation_skipped");
+        state = { ...state, candidateQuestionInvitationSkipped: true };
       }
     }
+  }
+
+  if (remaining <= FORCED_WIND_DOWN_THRESHOLD_SECONDS) {
+    const unauthorizedReplicaSpeech =
+      input.replicaSpeaking && !input.replicaSpeechIsApplicationControlled;
+    const blockingSpeech = input.candidateSpeaking || unauthorizedReplicaSpeech;
+    const forcedDecisionNeeded =
+      blockingSpeech ||
+      (!state.candidateQuestionInvitationSent && !state.candidateQuestionInvitationSkipped);
+    if (forcedDecisionNeeded && !state.forcedWindDownEntered) {
+      state = advanceInterviewClosingPhase(state, "FORCED_WIND_DOWN");
+      actions.push("send_forced_wind_down_control");
+      state = { ...state, forcedWindDownEntered: true };
+    }
+    if (blockingSpeech && !state.postClosingInterruptRequested) {
+      actions.push("interrupt_replica");
+      state = { ...state, postClosingInterruptRequested: true };
+    }
+    if (
+      !state.candidateQuestionInvitationSent &&
+      !state.candidateQuestionInvitationSkipped &&
+      !state.closingFarewellSent
+    ) {
+      if (remaining >= MIN_INVITATION_REMAINING_SECONDS) {
+        actions.push("send_candidate_question_invitation");
+        actions.push("start_candidate_question_silence_timer");
+        state = { ...state, candidateQuestionInvitationSent: true };
+      } else {
+        actions.push("record_candidate_question_invitation_skipped");
+        state = { ...state, candidateQuestionInvitationSkipped: true };
+      }
+    }
+  }
+
+  if (remaining <= FINAL_FAREWELL_THRESHOLD_SECONDS) {
+    state = advanceInterviewClosingPhase(state, "FINAL_FAREWELL_ELIGIBLE");
+    if (!state.finalFarewellEligibleRecorded) {
+      actions.push("record_final_farewell_eligible");
+      state = { ...state, finalFarewellEligibleRecorded: true };
+    }
+    if (!state.candidateQuestionInvitationSent && !state.candidateQuestionInvitationSkipped) {
+      actions.push("record_candidate_question_invitation_skipped");
+      state = { ...state, candidateQuestionInvitationSkipped: true };
+    }
+    const applicationSpeechActive =
+      input.replicaSpeaking && input.replicaSpeechIsApplicationControlled;
+    if (
+      input.replicaSpeaking &&
+      !input.replicaSpeechIsApplicationControlled &&
+      !state.postClosingInterruptRequested
+    ) {
+      actions.push("interrupt_replica");
+      state = { ...state, postClosingInterruptRequested: true };
+    }
+    state = ensureFarewellReservation(state, actions, !applicationSpeechActive);
+  }
+
+  if (remaining <= TERMINATION_CONTROL_THRESHOLD_SECONDS) {
+    state = advanceInterviewClosingPhase(state, "TERMINATION_ONLY");
+    if (!state.terminationControlSent) {
+      actions.push("send_termination_control");
+      state = { ...state, terminationControlSent: true };
+    }
+  }
+
+  if (remaining <= 0) {
+    actions.push("ensure_provider_shutdown");
+  }
+  if (
+    closingProviderEndAllowed(state, remaining, { hardDeadline: remaining <= 0 }) &&
+    !actions.includes("request_provider_end")
+  ) {
+    actions.push("request_provider_end");
   }
 
   return { state, actions };
@@ -679,7 +743,7 @@ export function buildHiddenInterviewBoundaryMessage(
         unfinished_coverage: "skip_for_bounded_duration",
         next_action: "remain_silent_until_application_closing_control",
       }
-    : phase === "CLOSING_ONLY"
+    : phase === "WIND_DOWN_ONLY" || phase === "FORCED_WIND_DOWN"
       ? {
           priority: "supersedes_all_question_generation",
           substantive_questions: "blocked",
@@ -688,13 +752,21 @@ export function buildHiddenInterviewBoundaryMessage(
           after_candidate_question: "remain_silent_for_application_farewell",
           candidate_acknowledgment: "not_required",
         }
-      : {
-          priority: "absolute_termination",
-          all_questions: "blocked",
-          candidate_question_invitation: "blocked",
-          candidate_acknowledgment: "not_required",
-          provider_end: "required",
-        };
+      : phase === "FINAL_FAREWELL_ELIGIBLE"
+        ? {
+            priority: "application_final_farewell_only",
+            all_questions: "blocked",
+            candidate_question_invitation: "blocked",
+            provider_speech: "blocked_until_application_farewell",
+            candidate_acknowledgment: "not_required",
+          }
+        : {
+            priority: "absolute_termination",
+            all_questions: "blocked",
+            candidate_question_invitation: "blocked",
+            candidate_acknowledgment: "not_required",
+            provider_end: "required",
+          };
   return {
     message_type: "conversation",
     event_type: "conversation.append_llm_context",
@@ -767,7 +839,7 @@ export function recordCandidateClosingTurn(
   kind: "question" | "decline",
 ): InterviewTimeBoundaryEvaluation {
   if (
-    state.phase !== "CLOSING_ONLY" ||
+    (state.phase !== "WIND_DOWN_ONLY" && state.phase !== "FORCED_WIND_DOWN") ||
     !state.candidateQuestionInvitationSent ||
     state.candidateQuestionReceived ||
     state.closingFarewellSent
@@ -784,16 +856,14 @@ export function recordCandidateClosingTurn(
       actions: [],
     };
   }
-  const actions: InterviewTimeBoundaryAction[] = [];
-  const reserved = reserveFarewellAction({
-    ...state,
-    candidateQuestionReceived: true,
-    candidateQuestionDeclined: true,
-    turnIndex: Math.min(10_000, state.turnIndex + 1),
-  }, actions);
   return {
-    state: reserved,
-    actions,
+    state: {
+      ...state,
+      candidateQuestionReceived: true,
+      candidateQuestionDeclined: true,
+      turnIndex: Math.min(10_000, state.turnIndex + 1),
+    },
+    actions: [],
   };
 }
 
@@ -801,7 +871,7 @@ export function recordCandidateQuestionResponseStarted(
   state: InterviewTimeBoundaryState,
 ): InterviewTimeBoundaryState {
   if (
-    state.phase !== "CLOSING_ONLY" ||
+    (state.phase !== "WIND_DOWN_ONLY" && state.phase !== "FORCED_WIND_DOWN") ||
     !state.candidateQuestionReceived ||
     state.candidateQuestionDeclined ||
     state.candidateQuestionResponseCompleted
@@ -815,29 +885,47 @@ export function recordCandidateQuestionResponseCompleted(
   if (!state.candidateQuestionResponseStarted || state.candidateQuestionResponseCompleted) {
     return { state, actions: [] };
   }
-  const actions: InterviewTimeBoundaryAction[] = [];
-  const reserved = reserveFarewellAction({
-    ...state,
-    candidateQuestionResponseCompleted: true,
-    turnIndex: Math.min(10_000, state.turnIndex + 1),
-  }, actions);
-  return { state: reserved, actions };
+  return {
+    state: {
+      ...state,
+      candidateQuestionResponseCompleted: true,
+      turnIndex: Math.min(10_000, state.turnIndex + 1),
+    },
+    actions: [],
+  };
 }
 
 export function recordCandidateQuestionSilence(
   state: InterviewTimeBoundaryState,
 ): InterviewTimeBoundaryEvaluation {
   if (
-    state.phase !== "CLOSING_ONLY" ||
+    (state.phase !== "WIND_DOWN_ONLY" && state.phase !== "FORCED_WIND_DOWN") ||
     !state.candidateQuestionInvitationSent ||
     state.candidateQuestionReceived ||
     state.closingFarewellSent
   ) {
     return { state, actions: [] };
   }
-  const actions: InterviewTimeBoundaryAction[] = [];
-  const reserved = reserveFarewellAction(state, actions);
-  return { state: reserved, actions };
+  return {
+    state: {
+      ...state,
+      candidateQuestionReceived: true,
+      candidateQuestionDeclined: true,
+    },
+    actions: [],
+  };
+}
+
+export function markCandidateQuestionInvitationDispatchFailed(
+  state: InterviewTimeBoundaryState,
+  invitationPreviouslySent = false,
+): InterviewTimeBoundaryState {
+  if (!state.candidateQuestionInvitationSent) return state;
+  return {
+    ...state,
+    candidateQuestionInvitationSent: invitationPreviouslySent,
+    candidateQuestionInvitationSkipped: true,
+  };
 }
 
 export function recordPostClosingInterruption(
@@ -851,7 +939,9 @@ export function recordPostClosingInterruption(
 } {
   if (
     state.phase !== "QUESTION_LOCKED" &&
-    state.phase !== "CLOSING_ONLY" &&
+    state.phase !== "WIND_DOWN_ONLY" &&
+    state.phase !== "FORCED_WIND_DOWN" &&
+    state.phase !== "FINAL_FAREWELL_ELIGIBLE" &&
     state.phase !== "TERMINATION_ONLY"
   ) {
     return { state, shouldInterrupt: false, newViolation: false, actions: [] };
@@ -860,24 +950,18 @@ export function recordPostClosingInterruption(
   if (state.interruptedInferenceKeys.includes(boundedKey)) {
     return { state, shouldInterrupt: false, newViolation: false, actions: [] };
   }
-  const shouldInterrupt = !state.postClosingInterruptRequested;
-  let nextState: InterviewTimeBoundaryState = {
+  const nextState: InterviewTimeBoundaryState = {
     ...state,
-    postClosingInterruptRequested: true,
     interruptedInferenceKeys: [
       ...state.interruptedInferenceKeys,
       boundedKey,
     ].slice(-MAX_INTERRUPTED_INFERENCE_KEYS),
   };
-  const actions: InterviewTimeBoundaryAction[] = shouldInterrupt ? ["interrupt_replica"] : [];
-  if (state.phase === "CLOSING_ONLY" || state.phase === "TERMINATION_ONLY") {
-    nextState = reserveFarewellAction(nextState, actions);
-  }
   return {
     state: nextState,
-    shouldInterrupt,
+    shouldInterrupt: false,
     newViolation: true,
-    actions,
+    actions: [],
   };
 }
 
@@ -1026,7 +1110,11 @@ function inactivityEligibilityFailure(
   eligibility: CandidateInactivityEligibility,
 ): CandidateInactivityNudgeReason | null {
   if (eligibility.phase === "QUESTION_LOCKED") return "question_lock";
-  if (eligibility.phase === "CLOSING_ONLY") return "closing";
+  if (
+    eligibility.phase === "WIND_DOWN_ONLY" ||
+    eligibility.phase === "FORCED_WIND_DOWN" ||
+    eligibility.phase === "FINAL_FAREWELL_ELIGIBLE"
+  ) return "closing";
   if (eligibility.phase === "TERMINATION_ONLY" || eligibility.phase === "ENDED") return "termination";
   if (typeof eligibility.remainingSeconds === "number" && eligibility.remainingSeconds <= QUESTION_LOCK_THRESHOLD_SECONDS) {
     return "question_lock";
@@ -1379,7 +1467,7 @@ export function releaseCandidateInactivityLease(
 
 export function remainingTimeBucket(remaining: number | null): "over_45" | "31_45" | "11_30" | "0_10" {
   if (typeof remaining !== "number" || remaining > QUESTION_LOCK_THRESHOLD_SECONDS) return "over_45";
-  if (remaining > CLOSING_ONLY_THRESHOLD_SECONDS) return "31_45";
+  if (remaining > WIND_DOWN_THRESHOLD_SECONDS) return "31_45";
   if (remaining > TERMINATION_CONTROL_THRESHOLD_SECONDS) return "11_30";
   return "0_10";
 }
@@ -2254,7 +2342,7 @@ export default function InterviewCviPage() {
 
   const requestClosingProviderEnd = useCallback(async (
     reason: string,
-    options: { hardDeadline?: boolean; providerTerminal?: boolean } = {},
+    options: { hardDeadline?: boolean } = {},
   ) => {
     cancelInactivityRuntime("provider_end", true);
     const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
@@ -2389,32 +2477,65 @@ export default function InterviewCviPage() {
           turn_index: nextState.turnIndex,
         });
       }
-      if (action === "send_closing_control") {
-        if (!sendHiddenBoundaryControl("CLOSING_ONLY")) {
+      if (action === "send_wind_down_control") {
+        if (!sendHiddenBoundaryControl("WIND_DOWN_ONLY")) {
           nextState = {
             ...nextState,
             closingControlSent: previousState.closingControlSent,
           };
           continue;
         }
-        sendLifecycleTelemetry("closing_only_entered", {
-          closing_state: "CLOSING_ONLY",
+        sendLifecycleTelemetry("wind_down_entered", {
+          closing_state: "WIND_DOWN_ONLY",
           remaining_time_bucket: remainingTimeBucket(remaining),
           turn_index: nextState.turnIndex,
+        });
+      }
+      if (action === "send_forced_wind_down_control") {
+        if (!sendHiddenBoundaryControl("FORCED_WIND_DOWN")) {
+          nextState = {
+            ...nextState,
+            forcedWindDownEntered: previousState.forcedWindDownEntered,
+          };
+          continue;
+        }
+        sendLifecycleTelemetry("wind_down_forced_interrupt", {
+          closing_state: "FORCED_WIND_DOWN",
+          remaining_time_bucket: remainingTimeBucket(remaining),
+          turn_index: nextState.turnIndex,
+          speech_interrupted: nextState.postClosingInterruptRequested,
         });
       }
       if (action === "send_candidate_question_invitation") {
         if (
           nextState.candidateQuestionInvitationSent &&
-          !previousState.candidateQuestionInvitationSent &&
-          sendCandidateQuestionInvitation(nextState.invitationInferenceId)
+          !previousState.candidateQuestionInvitationSent
         ) {
-          sendLifecycleTelemetry("candidate_question_invitation_sent", {
-            closing_state: "CLOSING_ONLY",
-            remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
-            turn_index: nextState.turnIndex,
-          });
+          if (sendCandidateQuestionInvitation(nextState.invitationInferenceId)) {
+            sendLifecycleTelemetry("candidate_question_invitation_sent", {
+              closing_state: nextState.phase,
+              remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+              turn_index: nextState.turnIndex,
+            });
+          } else {
+            nextState = markCandidateQuestionInvitationDispatchFailed(
+              nextState,
+              previousState.candidateQuestionInvitationSent,
+            );
+            sendLifecycleTelemetry("candidate_question_invitation_skipped", {
+              closing_state: nextState.phase,
+              remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+              turn_index: nextState.turnIndex,
+            });
+          }
         }
+      }
+      if (action === "record_candidate_question_invitation_skipped") {
+        sendLifecycleTelemetry("candidate_question_invitation_skipped", {
+          closing_state: nextState.phase,
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+          turn_index: nextState.turnIndex,
+        });
       }
       if (
         action === "start_candidate_question_silence_timer" &&
@@ -2425,6 +2546,7 @@ export default function InterviewCviPage() {
           candidateQuestionSilenceTimerRef.current = null;
           const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
           const silent = recordCandidateQuestionSilence(current);
+          if (silent.state !== current) persistBoundaryState(silent.state);
           if (!silent.actions.length) return;
           applyClosingActions(
             silent.actions,
@@ -2448,16 +2570,23 @@ export default function InterviewCviPage() {
           turn_index: nextState.turnIndex,
         });
       }
+      if (action === "record_final_farewell_eligible") {
+        sendLifecycleTelemetry("final_farewell_eligible", {
+          closing_state: "FINAL_FAREWELL_ELIGIBLE",
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+          turn_index: nextState.turnIndex,
+        });
+      }
+      if (action === "record_closing_farewell_reserved") {
+        sendLifecycleTelemetry("closing_farewell_reserved", {
+          closing_state: nextState.phase,
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+          turn_index: nextState.turnIndex,
+        });
+      }
       if (action === "send_closing_farewell") {
         if (nextState.closingFarewellPhase !== "RESERVED") {
           continue;
-        }
-        if (previousState.closingFarewellPhase === "IDLE") {
-          sendLifecycleTelemetry("closing_farewell_reserved", {
-            closing_state: nextState.phase,
-            remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
-            turn_index: nextState.turnIndex,
-          });
         }
         if (!sendFinalClosingAnnouncement(nextState.farewellInferenceId)) {
           nextState = markClosingFarewellDispatchFailed(nextState);
@@ -2529,6 +2658,7 @@ export default function InterviewCviPage() {
       candidateSpeaking: candidateSpeakingStateRef.current.active,
       replicaSpeaking: replicaSpeakingRef.current,
       replicaSpeechIsApplicationControlled:
+        Boolean(directClosingSpeechRef.current) ||
         previousState.closingFarewellPhase === "DISPATCHED" ||
         previousState.closingFarewellPhase === "SPEAKING",
       closingAnnouncementObserved: false,
@@ -3190,11 +3320,11 @@ export default function InterviewCviPage() {
             deriveCandidateSpeakingTransition(eventType, utteranceRole);
           const isCandidateSpeaking = candidateSpeakingTransition === "started";
           const isCandidateStoppedSpeaking = candidateSpeakingTransition === "ended";
-          const inferenceKey = String(
-            data?.properties?.inference_id ??
-            data?.inference_id ??
-            `replica-turn-${timerRuntimeRef.current?.boundaryState.turnIndex || 0}`,
-          );
+          const explicitInferenceId = String(
+            data?.properties?.inference_id ?? data?.inference_id ?? "",
+          ).trim();
+          const inferenceKey = explicitInferenceId ||
+            `replica-turn-${timerRuntimeRef.current?.boundaryState.turnIndex || 0}`;
           const activeConversationId = String(session.conversation_id || "").trim();
           const currentInferenceState = timerRuntimeRef.current?.boundaryState;
           const directSpeechKind = inferenceKey === currentInferenceState?.farewellInferenceId
@@ -3203,6 +3333,10 @@ export default function InterviewCviPage() {
               ? "invitation"
               : directClosingSpeechRef.current?.inferenceId === inferenceKey
                 ? directClosingSpeechRef.current.kind
+                : !explicitInferenceId &&
+                    normalizedPalSpeaking?.conversationId === activeConversationId &&
+                    directClosingSpeechRef.current
+                  ? directClosingSpeechRef.current.kind
                 : null;
 
           if (isCandidateSpeaking && candidateQuestionSilenceTimerRef.current) {
@@ -3240,7 +3374,8 @@ export default function InterviewCviPage() {
             const currentClosing = timerRuntimeRef.current?.boundaryState
               || createInterviewTimeBoundaryState();
             const mayAnswerCandidateQuestion =
-              currentClosing.phase === "CLOSING_ONLY" &&
+              (currentClosing.phase === "WIND_DOWN_ONLY" ||
+                currentClosing.phase === "FORCED_WIND_DOWN") &&
               currentClosing.candidateQuestionReceived &&
               !currentClosing.candidateQuestionDeclined &&
               !currentClosing.candidateQuestionResponseCompleted;
@@ -3316,6 +3451,9 @@ export default function InterviewCviPage() {
                 currentClosing,
                 normalizedPalSpeaking,
                 activeConversationId,
+                directClosingSpeechRef.current?.kind === "farewell"
+                  ? currentClosing.farewellInferenceId
+                  : "",
               );
               if (farewell.transition === "speaking") {
                 persistBoundaryState(farewell.state);
@@ -3335,6 +3473,9 @@ export default function InterviewCviPage() {
                 currentClosing,
                 normalizedPalSpeaking,
                 activeConversationId,
+                directClosingSpeechRef.current?.kind === "farewell"
+                  ? currentClosing.farewellInferenceId
+                  : "",
               );
               if (farewell.transition === "completed" || farewell.transition === "interrupted") {
                 if (farewellCompletionTimerRef.current) {
@@ -3356,6 +3497,15 @@ export default function InterviewCviPage() {
                       : {}),
                   },
                 );
+                if (
+                  farewell.transition === "completed" &&
+                  closingProviderEndAllowed(
+                    farewell.state,
+                    currentClosingRemainingSeconds(),
+                  )
+                ) {
+                  void requestClosingProviderEnd("farewell_completed", { hardDeadline: false });
+                }
               }
             }
             if (stoppedDirectSpeech && directClosingSpeechRef.current) {
@@ -3420,7 +3570,8 @@ export default function InterviewCviPage() {
               const currentClosing = timerRuntimeRef.current?.boundaryState
                 || createInterviewTimeBoundaryState();
               if (
-                currentClosing.phase === "CLOSING_ONLY" &&
+                (currentClosing.phase === "WIND_DOWN_ONLY" ||
+                  currentClosing.phase === "FORCED_WIND_DOWN") &&
                 currentClosing.candidateQuestionInvitationSent &&
                 !currentClosing.candidateQuestionReceived
               ) {
@@ -3474,7 +3625,10 @@ export default function InterviewCviPage() {
             if (toolName === "end_interview") {
               const closingState = timerRuntimeRef.current?.boundaryState;
               if (closingState && closingState.phase !== "INTERVIEWING") {
-                void requestClosingProviderEnd("tool_call");
+                const remaining = currentClosingRemainingSeconds();
+                if (remaining <= 0) {
+                  void requestClosingProviderEnd("time_limit_hard_deadline", { hardDeadline: true });
+                }
               } else {
                 void endInterview("tool_call");
               }
@@ -3485,7 +3639,12 @@ export default function InterviewCviPage() {
           if (/call_ended|call-ended|meeting-ended|meeting_ended|room_left|room-left|session_ended|session-ended|conversation_ended|conversation-ended|interview_ended|interview-ended/.test(payloadText)) {
             const closingState = timerRuntimeRef.current?.boundaryState;
             if (closingState && closingState.phase !== "INTERVIEWING") {
-              void requestClosingProviderEnd("vendor_end_event", { providerTerminal: true });
+              if (!endTriggeredRef.current) {
+                endTriggeredRef.current = true;
+                clearAutoEndTimers();
+                cancelInactivityRuntime("provider_end", true);
+                void leaveLiveRoute();
+              }
             } else {
               void endInterview("vendor_end_event");
             }
@@ -3535,6 +3694,7 @@ export default function InterviewCviPage() {
     armInactivityRuntime,
     applyClosingActions,
     cancelInactivityRuntime,
+    clearAutoEndTimers,
     clearStartupTimer,
     currentClosingRemainingSeconds,
     endInterview,

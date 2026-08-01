@@ -91,7 +91,7 @@ test("normal state progression is monotonic through ENDED", () => {
 
   assert.equal(interviewing.phase, "INTERVIEWING");
   assert.equal(locked.state.phase, "QUESTION_LOCKED");
-  assert.equal(closing.state.phase, "CLOSING_ONLY");
+  assert.equal(closing.state.phase, "WIND_DOWN_ONLY");
   assert.equal(terminating.state.phase, "TERMINATION_ONLY");
   assert.equal(ended.state.phase, "ENDED");
   assert.equal(ended.requested, true);
@@ -103,7 +103,7 @@ test("closing phases cannot regress", () => {
     "INTERVIEWING",
   );
   assert.equal(ended.phase, "ENDED");
-  assert.strictEqual(advanceInterviewClosingPhase(ended, "CLOSING_ONLY"), ended);
+  assert.strictEqual(advanceInterviewClosingPhase(ended, "WIND_DOWN_ONLY"), ended);
 });
 
 test("more than 45 seconds preserves ordinary rubric flow", () => {
@@ -116,7 +116,7 @@ test("45-second question lock supersedes coverage and fires once", () => {
   const first = evaluate(createInterviewTimeBoundaryState(), 45);
   const repeated = evaluate(first.state, 44);
 
-  assert.deepEqual(first.actions, ["send_question_lock_control", "interrupt_replica"]);
+  assert.deepEqual(first.actions, ["send_question_lock_control"]);
   assert.deepEqual(repeated.actions, []);
   assert.equal(repeated.state.questionLockControlSent, true);
 
@@ -131,18 +131,18 @@ test("45-second question lock supersedes coverage and fires once", () => {
 
 test("active candidate answer may finish after question lock", () => {
   const locked = evaluate(createInterviewTimeBoundaryState(), 45, true);
-  assert.deepEqual(locked.actions, ["send_question_lock_control", "interrupt_replica"]);
+  assert.deepEqual(locked.actions, ["send_question_lock_control"]);
   assert.equal(locked.state.candidateQuestionInvitationSent, false);
 });
 
-test("closing-only begins once and waits for a natural candidate boundary", () => {
+test("wind-down begins once and waits for a natural candidate boundary", () => {
   const locked = questionLockedState();
   const active = evaluate(locked, 30, true, false);
   const natural = evaluate(active.state, 29, false, false);
   const duplicate = evaluate(natural.state, 28, false, false);
 
-  assert.deepEqual(active.actions, ["send_closing_control"]);
-  assert.equal(active.state.phase, "CLOSING_ONLY");
+  assert.deepEqual(active.actions, ["send_wind_down_control"]);
+  assert.equal(active.state.phase, "WIND_DOWN_ONLY");
   assert.deepEqual(natural.actions, [
     "send_candidate_question_invitation",
     "start_candidate_question_silence_timer",
@@ -152,7 +152,7 @@ test("closing-only begins once and waits for a natural candidate boundary", () =
 
 test("replica speech also defers the deterministic closing invitation", () => {
   const active = evaluate(questionLockedState(), 30, false, true);
-  assert.deepEqual(active.actions, ["send_closing_control"]);
+  assert.deepEqual(active.actions, ["send_wind_down_control"]);
   assert.equal(active.state.candidateQuestionInvitationSent, false);
 });
 
@@ -160,34 +160,43 @@ test("candidate-question invitation is deterministic, spoken once, and contains 
   const message = buildCandidateQuestionInvitationMessage("synthetic-conversation");
   assert.equal(message.event_type, "conversation.echo");
   assert.equal(message.properties.done, true);
-  assert.equal(message.properties.text, "Before we finish, do you have one question for me?");
+  assert.equal(
+    message.properties.text,
+    "Time is winding down. Thank you. Any final question?",
+  );
   assert.doesNotMatch(message.properties.text, /\b(?:seconds?|minutes?|timer|remaining)\b/i);
 });
 
-test("insufficient invitation time goes directly to farewell and end", () => {
+test("insufficient invitation time skips the invitation without an early farewell", () => {
   const closing = closingOnlyState();
   const result = evaluate(closing, 17);
-  assert.deepEqual(result.actions, ["send_closing_farewell", "ensure_provider_shutdown"]);
+  assert.deepEqual(result.actions, ["record_candidate_question_invitation_skipped"]);
   assert.equal(result.state.candidateQuestionInvitationSent, false);
+  assert.equal(result.state.candidateQuestionInvitationSkipped, true);
+  assert.equal(result.state.closingFarewellPhase, "IDLE");
 });
 
-test("candidate decline or non-question answer triggers farewell and provider end", () => {
+test("candidate decline records wind-down completion but waits for final-farewell eligibility", () => {
   const invited = evaluate(closingOnlyState(), 29).state;
   const result = recordCandidateClosingTurn(invited, "decline");
-  assert.deepEqual(result.actions, ["send_closing_farewell", "ensure_provider_shutdown"]);
+  const eligible = evaluate(result.state, 15);
+  assert.deepEqual(result.actions, []);
   assert.equal(result.state.candidateQuestionDeclined, true);
-  assert.equal(result.state.closingFarewellSent, true);
+  assert.equal(result.state.closingFarewellSent, false);
+  assert.equal(eligible.actions.includes("send_closing_farewell"), true);
 });
 
-test("candidate silence triggers farewell and provider end without restarting", () => {
+test("candidate silence records a decline without beginning farewell early", () => {
   const invited = evaluate(closingOnlyState(), 29).state;
   const result = recordCandidateQuestionSilence(invited);
   const duplicate = recordCandidateQuestionSilence(result.state);
-  assert.deepEqual(result.actions, ["send_closing_farewell", "ensure_provider_shutdown"]);
+  assert.deepEqual(result.actions, []);
+  assert.equal(result.state.candidateQuestionDeclined, true);
+  assert.equal(result.state.closingFarewellPhase, "IDLE");
   assert.deepEqual(duplicate.actions, []);
 });
 
-test("one candidate question permits one response, then farewell and end", () => {
+test("one candidate question permits one response and still waits until 15 seconds", () => {
   const invited = evaluate(closingOnlyState(), 29).state;
   const question = recordCandidateClosingTurn(invited, "question");
   const started = recordCandidateQuestionResponseStarted(question.state);
@@ -196,8 +205,10 @@ test("one candidate question permits one response, then farewell and end", () =>
 
   assert.equal(question.state.candidateQuestionReceived, true);
   assert.equal(started.candidateQuestionResponseStarted, true);
-  assert.deepEqual(completed.actions, ["send_closing_farewell", "ensure_provider_shutdown"]);
+  const eligible = evaluate(completed.state, 15);
+  assert.deepEqual(completed.actions, []);
   assert.equal(completed.state.candidateQuestionResponseCompleted, true);
+  assert.equal(eligible.actions.includes("send_closing_farewell"), true);
   assert.deepEqual(duplicate.actions, []);
 });
 
@@ -216,22 +227,18 @@ test("bounded local closing-turn classifier distinguishes direct questions from 
 });
 
 test("10-second termination is absolute and application-controlled farewell is not interrupted", () => {
-  const closing = closingOnlyState();
+  const closing = evaluate(closingOnlyState(), 29).state;
   const normal = evaluate(closing, 10, false, true, false, false);
   const echo = evaluate(closing, 10, false, true, false, true);
 
   assert.equal(normal.state.phase, "TERMINATION_ONLY");
-  assert.deepEqual(normal.actions, [
-    "send_termination_control",
-    "interrupt_replica",
-    "send_closing_farewell",
-    "ensure_provider_shutdown",
-  ]);
-  assert.deepEqual(echo.actions, [
-    "send_termination_control",
-    "send_closing_farewell",
-    "ensure_provider_shutdown",
-  ]);
+  assert.equal(normal.actions.filter((action) => action === "interrupt_replica").length, 1);
+  assert.equal(normal.actions.filter((action) => action === "send_closing_farewell").length, 1);
+  assert.equal(normal.actions.includes("send_termination_control"), true);
+  assert.equal(normal.actions.includes("request_provider_end"), false);
+  assert.equal(echo.actions.includes("interrupt_replica"), false);
+  assert.equal(echo.actions.includes("send_closing_farewell"), false);
+  assert.equal(echo.actions.includes("send_termination_control"), true);
 });
 
 test("provider end request and confirmation are idempotent", () => {
@@ -247,22 +254,22 @@ test("provider end request and confirmation are idempotent", () => {
   assert.strictEqual(confirmedAgain, confirmed);
 });
 
-test("post-closing replica violations share one bounded interrupt path", () => {
+test("post-closing replica violations remain diagnostic until the clock-owned interrupt path", () => {
   const state = closingOnlyState();
   const first = recordPostClosingInterruption(state, "synthetic-inference");
   const duplicate = recordPostClosingInterruption(first.state, "synthetic-inference");
   const second = recordPostClosingInterruption(first.state, "synthetic-inference-two");
 
-  assert.equal(first.shouldInterrupt, true);
+  assert.equal(first.shouldInterrupt, false);
   assert.equal(duplicate.shouldInterrupt, false);
   assert.equal(second.shouldInterrupt, false);
   assert.equal(second.newViolation, true);
 });
 
-test("question-locked replica generation is interruptible without entering closing early", () => {
+test("question-locked replica generation is diagnosed without entering closing early", () => {
   const locked = questionLockedState();
   const violation = recordPostClosingInterruption(locked, "synthetic-inference");
-  assert.equal(violation.shouldInterrupt, true);
+  assert.equal(violation.shouldInterrupt, false);
   assert.equal(violation.state.phase, "QUESTION_LOCKED");
 });
 
@@ -296,13 +303,19 @@ test("reconnect preserves state while a genuinely new conversation resets it", (
 
   const reconnect = initializeInterviewTimerRuntime(null, "conversation-a:3", 2_000);
   const next = initializeInterviewTimerRuntime(null, "conversation-b:3", 3_000);
-  assert.equal(reconnect.boundaryState.phase, "CLOSING_ONLY");
+  assert.equal(reconnect.boundaryState.phase, "WIND_DOWN_ONLY");
   assert.equal(next.boundaryState.phase, "INTERVIEWING");
   assert.equal(next.startedAt, 3_000);
 });
 
 test("hidden control messages are silent, bounded, and reveal no time thresholds", () => {
-  for (const phase of ["QUESTION_LOCKED", "CLOSING_ONLY", "TERMINATION_ONLY"]) {
+  for (const phase of [
+    "QUESTION_LOCKED",
+    "WIND_DOWN_ONLY",
+    "FORCED_WIND_DOWN",
+    "FINAL_FAREWELL_ELIGIBLE",
+    "TERMINATION_ONLY",
+  ]) {
     const message = buildHiddenInterviewBoundaryMessage("synthetic-conversation", phase);
     assert.equal(message.message_type, "conversation");
     assert.equal(message.event_type, "conversation.append_llm_context");
@@ -329,7 +342,9 @@ test("the bounded farewell contains no timer or implementation language", () => 
 test("source statically proves hard boundaries, no legacy warning echo, and private violation handling", async () => {
   const source = await readFile(sourcePath, "utf8");
   assert.match(source, /QUESTION_LOCK_THRESHOLD_SECONDS = 45/);
-  assert.match(source, /CLOSING_ONLY_THRESHOLD_SECONDS = 30/);
+  assert.match(source, /WIND_DOWN_THRESHOLD_SECONDS = 30/);
+  assert.match(source, /FORCED_WIND_DOWN_THRESHOLD_SECONDS = 20/);
+  assert.match(source, /FINAL_FAREWELL_THRESHOLD_SECONDS = 15/);
   assert.match(source, /TERMINATION_CONTROL_THRESHOLD_SECONDS = 10/);
   assert.match(source, /conversation\.interrupt/);
   assert.match(source, /post_closing_question_violation/);
