@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, beforeEach, test } from "node:test";
+import { after, test } from "node:test";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,270 +25,190 @@ const closing = await server.ssrLoadModule("/src/pages/InterviewCviPage.tsx");
 after(async () => server.close());
 
 const {
-  buildFinalClosingAnnouncementMessage,
-  closingProviderEndAllowed,
-  createInterviewTimeBoundaryState,
-  evaluateInterviewTimeBoundary,
-  initializeInterviewTimerRuntime,
-  markClosingFarewellDispatched,
-  markProviderEndRequested,
-  normalizePalSpeakingEvent,
-  preserveInterviewTimerRuntime,
-  recordClosingFarewellSpeechEvent,
-  remainingSecondsAtDeadline,
-  reserveClosingFarewell,
-  resetInterviewTimerRuntimeForTests,
+  advanceSharedFinalClosingRuntime,
+  attachRemotePalAudioTrack,
+  claimSharedFinalClosingRuntime,
+  finalClosingSharedStorageKey,
+  readSharedFinalClosingRuntime,
+  requestCandidateAudioUnpublish,
+  sharedFinalClosingRecoveryPlan,
+  sharedProviderEndAttemptAllowed,
+  suppressRemotePalAudio,
 } = closing;
 
-beforeEach(() => resetInterviewTimerRuntimeForTests());
-
-function farewellEvent(state, kind, overrides = {}) {
+function memoryStorage() {
+  const values = new Map();
   return {
-    kind,
-    conversationId: "active-conversation",
-    turnKey: "opaque-turn",
-    providerSequence: 1,
-    interrupted: false,
-    applicationControl: true,
-    inferenceId: state.farewellInferenceId,
-    ...overrides,
+    getItem: (key) => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
   };
 }
 
-test("no closing behavior runs above the single 20-second boundary", () => {
-  for (const remainingSeconds of [180, 46, 45, 30, 21, 20.001]) {
-    const result = evaluateInterviewTimeBoundary({
-      state: createInterviewTimeBoundaryState(),
-      remainingSeconds,
-      candidateSpeaking: true,
-      replicaSpeaking: true,
-    });
-    assert.equal(result.state.phase, "INTERVIEWING");
-    assert.deepEqual(result.actions, []);
-  }
-});
-
-test("the exact 20-second boundary interrupts once and reserves one lock-gated closing utterance", () => {
-  const result = evaluateInterviewTimeBoundary({
-    state: createInterviewTimeBoundaryState(),
-    remainingSeconds: 20,
-    candidateSpeaking: true,
-    replicaSpeaking: true,
-  });
-  assert.equal(result.state.phase, "FINAL_FAREWELL_ELIGIBLE");
-  assert.equal(result.state.closingFarewellPhase, "RESERVED");
-  assert.deepEqual(result.actions, [
-    "interrupt_replica",
-    "record_closing_farewell_reserved",
-    "request_candidate_audio_lock",
-  ]);
-});
-
-test("the single boundary does not depend on who is speaking", () => {
-  for (const [candidateSpeaking, replicaSpeaking] of [
-    [false, false],
-    [true, false],
-    [false, true],
-    [true, true],
-  ]) {
-    const result = evaluateInterviewTimeBoundary({
-      state: createInterviewTimeBoundaryState(),
-      remainingSeconds: 20,
-      candidateSpeaking,
-      replicaSpeaking,
-    });
-    assert.equal(result.actions.filter((action) => action === "interrupt_replica").length, 1);
-    assert.equal(result.actions.filter((action) => action === "request_candidate_audio_lock").length, 1);
-  }
-});
-
-test("repeated evaluations below 20 seconds cannot replay interruption or speech", () => {
-  const first = evaluateInterviewTimeBoundary({
-    state: createInterviewTimeBoundaryState(),
-    remainingSeconds: 20,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
-  });
-  const second = evaluateInterviewTimeBoundary({
-    state: markClosingFarewellDispatched(first.state),
-    remainingSeconds: 19,
-    candidateSpeaking: true,
-    replicaSpeaking: true,
-  });
-  const third = evaluateInterviewTimeBoundary({
-    state: second.state,
-    remainingSeconds: 15,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
-  });
-  assert.deepEqual(second.actions, []);
-  assert.deepEqual(third.actions, []);
-});
-
-test("the only spoken closing text contains the complete operator-approved ending", () => {
-  const message = buildFinalClosingAnnouncementMessage(
-    "synthetic-conversation",
-    "alphascreen-closing-farewell-stable",
-  );
-  assert.equal(message.event_type, "conversation.echo");
-  assert.equal(message.properties.inference_id, "alphascreen-closing-farewell-stable");
-  assert.equal(
-    message.properties.text,
-    "Time is winding down. Thank you for your time. I am ending the session now.",
-  );
-});
-
-test("matching closing speech completion permits immediate provider end", () => {
-  const reserved = reserveClosingFarewell(createInterviewTimeBoundaryState()).state;
-  const dispatched = markClosingFarewellDispatched(reserved);
-  const speaking = recordClosingFarewellSpeechEvent(
-    dispatched,
-    farewellEvent(dispatched, "started"),
-    "active-conversation",
-  ).state;
-  assert.equal(closingProviderEndAllowed(speaking, 12), false);
-  const completed = recordClosingFarewellSpeechEvent(
-    speaking,
-    farewellEvent(speaking, "stopped"),
-    "active-conversation",
-  ).state;
-  assert.equal(closingProviderEndAllowed(completed, 11), true);
-});
-
-test("unrelated and duplicate speech events cannot complete or replay the closing", () => {
-  const dispatched = markClosingFarewellDispatched(
-    reserveClosingFarewell(createInterviewTimeBoundaryState()).state,
-  );
-  const wrong = recordClosingFarewellSpeechEvent(
-    dispatched,
-    farewellEvent(dispatched, "started", { inferenceId: "wrong" }),
-    "active-conversation",
-  );
-  const started = recordClosingFarewellSpeechEvent(
-    dispatched,
-    farewellEvent(dispatched, "started"),
-    "active-conversation",
-  );
-  const completed = recordClosingFarewellSpeechEvent(
-    started.state,
-    farewellEvent(started.state, "stopped"),
-    "active-conversation",
-  );
-  const duplicate = recordClosingFarewellSpeechEvent(
-    completed.state,
-    farewellEvent(completed.state, "stopped"),
-    "active-conversation",
-  );
-  assert.equal(wrong.matched, false);
-  assert.equal(started.transition, "speaking");
-  assert.equal(completed.transition, "completed");
-  assert.equal(duplicate.transition, "none");
-});
-
-test("a missing speech-stop remains single-flight and uses only the hard deadline fallback", () => {
-  const initial = evaluateInterviewTimeBoundary({
-    state: createInterviewTimeBoundaryState(),
-    remainingSeconds: 20,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
-  });
-  const dispatched = markClosingFarewellDispatched(initial.state);
-  const repeated = evaluateInterviewTimeBoundary({
-    state: dispatched,
-    remainingSeconds: 5,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
-  });
-  assert.deepEqual(repeated.actions, []);
-  assert.equal(reserveClosingFarewell(repeated.state).reserved, false);
-  assert.equal(closingProviderEndAllowed(repeated.state, 5), false);
-  assert.equal(closingProviderEndAllowed(repeated.state, 0, { hardDeadline: true }), true);
-});
-
-test("provider-end requests remain exactly once under completion/deadline races", () => {
-  const completed = {
-    ...createInterviewTimeBoundaryState(),
-    closingFarewellSent: true,
-    closingFarewellPhase: "COMPLETED",
+function mediaElement() {
+  return {
+    muted: false,
+    volume: 1,
+    srcObject: { existing: true },
+    paused: false,
+    pause() { this.paused = true; },
+    play() { return Promise.resolve(); },
   };
-  const first = markProviderEndRequested(completed);
-  const duplicate = markProviderEndRequested(first.state);
-  assert.equal(first.requested, true);
-  assert.equal(duplicate.requested, false);
-  assert.equal(closingProviderEndAllowed(first.state, 0, { hardDeadline: true }), false);
+}
+
+test("one tab exclusively claims a conversation-bound closing", () => {
+  const storage = memoryStorage();
+  const first = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
+  const duplicate = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
+  const competing = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b");
+  const otherConversation = claimSharedFinalClosingRuntime(storage, "conversation-b", "tab-b");
+  assert.equal(first.owned, true);
+  assert.equal(duplicate.owned, true);
+  assert.equal(competing.owned, false);
+  assert.equal(otherConversation.owned, true);
+  assert.notEqual(
+    finalClosingSharedStorageKey("conversation-a"),
+    finalClosingSharedStorageKey("conversation-b"),
+  );
 });
 
-test("provider speaking aliases correlate to the one application closing turn", () => {
-  const dispatched = markClosingFarewellDispatched(
-    reserveClosingFarewell(createInterviewTimeBoundaryState()).state,
+test("only the owner can monotonically advance and request provider end once", () => {
+  const storage = memoryStorage();
+  claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
+  assert.equal(
+    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", "REMOTE_AUDIO_MUTED").advanced,
+    false,
   );
-  const start = normalizePalSpeakingEvent({
-    event_type: "conversation.replica.started_speaking",
-    properties: { role: "replica", conversation_id: "active-conversation", sequence: 71 },
-  }, "active-conversation");
-  const stop = normalizePalSpeakingEvent({
-    event_type: "conversation.replica.stopped_speaking",
-    properties: { role: "replica", conversation_id: "active-conversation", sequence: 71 },
-  }, "active-conversation");
-  assert.ok(start);
-  assert.ok(stop);
-  const speaking = recordClosingFarewellSpeechEvent(
-    dispatched,
-    start,
-    "active-conversation",
-    dispatched.farewellInferenceId,
+  for (const phase of ["REMOTE_AUDIO_MUTED", "LOCAL_AUDIO_PLAY_REQUESTED"]) {
+    assert.equal(
+      advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", phase).advanced,
+      true,
+    );
+  }
+  const provider = advanceSharedFinalClosingRuntime(
+    storage,
+    "conversation-a",
+    "tab-a",
+    "PROVIDER_END_REQUESTED",
   );
-  const completed = recordClosingFarewellSpeechEvent(
-    speaking.state,
-    stop,
-    "active-conversation",
-    speaking.state.farewellInferenceId,
+  const duplicate = advanceSharedFinalClosingRuntime(
+    storage,
+    "conversation-a",
+    "tab-a",
+    "PROVIDER_END_REQUESTED",
   );
-  assert.equal(speaking.transition, "speaking");
-  assert.equal(completed.transition, "completed");
+  assert.equal(sharedProviderEndAttemptAllowed(provider), true);
+  assert.equal(sharedProviderEndAttemptAllowed(duplicate), false);
+  assert.equal(readSharedFinalClosingRuntime(storage, "conversation-a").phase, "PROVIDER_END_REQUESTED");
+  assert.equal(
+    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", "RESERVED").advanced,
+    false,
+  );
 });
 
-test("reconnect, rerender, and remount preserve the single reservation and absolute clock", () => {
-  const runtime = initializeInterviewTimerRuntime(null, "active-conversation:single", 1_000, 180_000);
-  const evaluated = evaluateInterviewTimeBoundary({
-    state: runtime.boundaryState,
-    remainingSeconds: 20,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
+test("owner remount re-arms completion without replaying a reserved provider end", () => {
+  const reserved = { version: 1, ownerTabId: "tab-a", phase: "RESERVED" };
+  const requested = { ...reserved, phase: "PROVIDER_END_REQUESTED" };
+  const complete = { ...reserved, phase: "COMPLETE" };
+
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(reserved, "tab-a"), {
+    owned: true,
+    navigateImmediately: false,
+    rearmNavigationFallback: true,
+    requestProviderEnd: true,
   });
-  const preserved = { ...runtime, boundaryState: evaluated.state };
-  preserveInterviewTimerRuntime(preserved);
-  const reconnect = initializeInterviewTimerRuntime(preserved, "active-conversation:single", 12_000, 180_000);
-  const remount = initializeInterviewTimerRuntime(null, "active-conversation:single", 22_000, 180_000);
-  assert.strictEqual(reconnect, preserved);
-  assert.strictEqual(remount, preserved);
-  assert.equal(remount.deadlineAt, 181_000);
-  assert.equal(reserveClosingFarewell(remount.boundaryState).reserved, false);
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-a"), {
+    owned: true,
+    navigateImmediately: false,
+    rearmNavigationFallback: true,
+    requestProviderEnd: false,
+  });
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-b"), {
+    owned: false,
+    navigateImmediately: false,
+    rearmNavigationFallback: true,
+    requestProviderEnd: false,
+  });
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(complete, "tab-a"), {
+    owned: true,
+    navigateImmediately: true,
+    rearmNavigationFallback: false,
+    requestProviderEnd: false,
+  });
 });
 
-test("the absolute clock is deterministic at the only closing boundary and deadline", () => {
-  const deadline = 100_000;
-  assert.equal(remainingSecondsAtDeadline(deadline, 79_999), 21);
-  assert.equal(remainingSecondsAtDeadline(deadline, 80_000), 20);
-  assert.equal(remainingSecondsAtDeadline(deadline, 100_000), 0);
+test("ambiguous shared state fails closed and never grants ownership", () => {
+  const storage = memoryStorage();
+  storage.setItem(finalClosingSharedStorageKey("conversation-a"), "{malformed");
+  assert.equal(readSharedFinalClosingRuntime(storage, "conversation-a"), null);
+  const claim = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
+  assert.equal(claim.owned, false);
+  assert.equal(claim.reason, "ambiguous_shared_state");
 });
 
-test("source contains no staged question lock, wind-down invitation, or 15-second farewell flow", async () => {
+test("remote PAL audio is synchronously muted, paused, and detached", () => {
+  const element = mediaElement();
+  assert.equal(suppressRemotePalAudio(element), "muted_detached");
+  assert.equal(element.muted, true);
+  assert.equal(element.volume, 0);
+  assert.equal(element.paused, true);
+  assert.equal(element.srcObject, null);
+  assert.equal(suppressRemotePalAudio(element), "already_muted");
+});
+
+test("participant updates cannot restore remote audio after local closing", () => {
+  const element = mediaElement();
+  const result = attachRemotePalAudioTrack(element, { kind: "audio" }, true);
+  assert.equal(result, "muted_detached");
+  assert.equal(element.muted, true);
+  assert.equal(element.volume, 0);
+  assert.equal(element.srcObject, null);
+});
+
+test("candidate audio unpublish uses the supported Daily call without waiting", () => {
+  const calls = [];
+  const result = requestCandidateAudioUnpublish({
+    setLocalAudio(enabled, options) {
+      calls.push([enabled, options]);
+      return this;
+    },
+  });
+  assert.equal(result, "requested");
+  assert.deepEqual(calls, [[false, { forceDiscardTrack: false }]]);
+  assert.equal(requestCandidateAudioUnpublish({}), "unsupported");
+  assert.equal(requestCandidateAudioUnpublish({
+    setLocalAudio() { throw new Error("synthetic"); },
+  }), "failed");
+});
+
+test("runtime ordering mutes remote audio before requesting local playback", async () => {
   const source = await readFile(sourcePath, "utf8");
-  assert.doesNotMatch(source, /QUESTION_LOCK_THRESHOLD_SECONDS/);
-  assert.doesNotMatch(source, /WIND_DOWN_THRESHOLD_SECONDS/);
-  assert.doesNotMatch(source, /FINAL_FAREWELL_THRESHOLD_SECONDS/);
-  assert.doesNotMatch(source, /CANDIDATE_QUESTION_INVITATION/);
-  assert.doesNotMatch(source, /send_candidate_question_invitation/);
-  assert.doesNotMatch(source, /candidate_question_invitation_sent/);
-});
-
-test("source retains no fixed post-closing shutdown delay", async () => {
-  const source = await readFile(sourcePath, "utf8");
-  assert.doesNotMatch(source, /CLOSING_UTTERANCE_END_DELAY_MS/);
-  assert.doesNotMatch(source, /FAREWELL_COMPLETION_TIMEOUT_MS/);
-  assert.doesNotMatch(
+  const begin = source.slice(source.indexOf("const beginLocalClosing"));
+  const mute = begin.indexOf("suppressRemotePalAudio(remoteAudioRef.current)");
+  const overlay = begin.indexOf("flushSync(() => setLocalClosingVisible(true))");
+  const play = begin.indexOf("playLocalClosingAudioOnce");
+  const provider = begin.indexOf("requestClosingProviderEnd()");
+  assert.ok(overlay >= 0);
+  assert.ok(mute > overlay);
+  assert.ok(play > mute);
+  assert.ok(provider > play);
+  assert.equal(source.match(/playLocalClosingAudioOnce\(/g)?.length, 1);
+  assert.equal(source.match(/requestCandidateAudioUnpublish\(callRef\.current\)/g)?.length, 1);
+  assert.match(source, /end-conversation[\s\S]{0,700}keepalive:\s*true/);
+  assert.match(
     source,
-    /closing_farewell_started[\s\S]{0,1800}setTimeout[\s\S]{0,800}requestClosingProviderEnd/,
+    /rearmNavigationFallback[\s\S]{0,300}localClosingNavigationTimerRef\.current\s*=\s*window\.setTimeout/,
+  );
+});
+
+test("post-zero provider and candidate messages are ignored before parsing", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  assert.match(
+    source,
+    /register\("app-message"[\s\S]{0,500}if \(localClosingActiveRef\.current\) return;/,
+  );
+  assert.match(
+    source,
+    /attachRemotePalAudioTrack\([\s\S]{0,180}localClosingActiveRef\.current/,
   );
 });

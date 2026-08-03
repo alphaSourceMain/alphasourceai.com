@@ -13,6 +13,10 @@ import {
 } from "../lib/candidatePhone";
 import { getCandidateFlowError } from "../lib/candidateFlowErrors";
 import { clearCandidateSubmissionKey, getOrCreateCandidateSubmissionKey } from "../lib/candidateSubmission";
+import {
+  preloadLocalClosingAudio,
+  primeLocalClosingAudio,
+} from "../lib/interviewLocalClosingAudio";
 import { alphaSourceLogo } from "@/assets/branding";
 
 /* ── Checklist copy (verbatim) ───────────────────────────────────── */
@@ -163,6 +167,10 @@ function readRoleToken(): string {
 
 export default function InterviewPage() {
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    preloadLocalClosingAudio();
+  }, []);
 
   /* ── Terms modal ─────────────────────────────────────────────── */
   const [termsOpen, setTermsOpen]     = useState(true);
@@ -662,6 +670,11 @@ export default function InterviewPage() {
     setStartLoading(true);
     setStartError("");
 
+    // This is the existing trusted candidate gesture. Prime the same
+    // module-lifetime element that will play at the hard deadline, at zero
+    // volume, before any network await can lose user activation.
+    const localClosingAudioPrimeResult = await primeLocalClosingAudio();
+
     try {
       const resp = await fetch(joinUrl(backendBase, "/create-tavus-interview"), {
         method: "POST",
@@ -729,6 +742,7 @@ export default function InterviewPage() {
             max_interview_minutes: maxInterviewMinutes,
             silence_engagement_owner: silenceEngagementOwner,
             application_inactivity_control_enabled: applicationInactivityControlEnabled,
+            local_closing_audio_prime_result: localClosingAudioPrimeResult,
             email: candidateEmail,
             candidate_id: candidateId,
             role_id: roleId,
