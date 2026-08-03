@@ -68,7 +68,7 @@ test("no closing behavior runs above the single 20-second boundary", () => {
   }
 });
 
-test("the exact 20-second boundary interrupts once and dispatches one closing utterance", () => {
+test("the exact 20-second boundary interrupts once and reserves one lock-gated closing utterance", () => {
   const result = evaluateInterviewTimeBoundary({
     state: createInterviewTimeBoundaryState(),
     remainingSeconds: 20,
@@ -80,7 +80,7 @@ test("the exact 20-second boundary interrupts once and dispatches one closing ut
   assert.deepEqual(result.actions, [
     "interrupt_replica",
     "record_closing_farewell_reserved",
-    "send_closing_farewell",
+    "request_candidate_audio_lock",
   ]);
 });
 
@@ -98,7 +98,7 @@ test("the single boundary does not depend on who is speaking", () => {
       replicaSpeaking,
     });
     assert.equal(result.actions.filter((action) => action === "interrupt_replica").length, 1);
-    assert.equal(result.actions.filter((action) => action === "send_closing_farewell").length, 1);
+    assert.equal(result.actions.filter((action) => action === "request_candidate_audio_lock").length, 1);
   }
 });
 

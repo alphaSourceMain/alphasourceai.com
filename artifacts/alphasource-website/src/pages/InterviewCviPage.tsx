@@ -214,10 +214,30 @@ export type ClosingFarewellPhase =
   | "COMPLETED"
   | "INTERRUPTED";
 
+export type CandidateAudioLockPhase =
+  | "IDLE"
+  | "REQUESTED"
+  | "LOCKED"
+  | "FAILED"
+  | "AMBIGUOUS";
+
+export type CandidateAudioLockResult = {
+  category:
+    | "confirmed_disabled"
+    | "already_disabled"
+    | "definite_failure"
+    | "ambiguous"
+    | "unsupported";
+  attempts: number;
+  publicationEnabled: boolean | null;
+};
+
 export type InterviewTimeBoundaryState = {
   phase: InterviewClosingPhase;
   closingFarewellSent: boolean;
   closingFarewellPhase: ClosingFarewellPhase;
+  candidateAudioLockPhase: CandidateAudioLockPhase;
+  candidateAudioLockAttempts: number;
   farewellInferenceId: string;
   farewellProviderTurnKey: string | null;
   closingInterruptRequested: boolean;
@@ -228,7 +248,7 @@ export type InterviewTimeBoundaryState = {
 
 export type InterviewTimeBoundaryAction =
   | "record_closing_farewell_reserved"
-  | "send_closing_farewell"
+  | "request_candidate_audio_lock"
   | "request_provider_end"
   | "interrupt_replica";
 
@@ -263,6 +283,8 @@ type DailyCallObject = {
   participants?: () => Record<string, DailyParticipant>;
   sendAppMessage?: (message: unknown, recipients?: string | string[]) => void;
   startRecording?: () => Promise<unknown>;
+  localAudio?: () => boolean;
+  setLocalAudio?: (enabled: boolean, options?: { forceDiscardTrack?: boolean }) => DailyCallObject;
   setInputDevicesAsync?: (devices: { videoDeviceId?: string; audioDeviceId?: string }) => Promise<unknown>;
   setInputDevices?: (devices: { videoDeviceId?: string; audioDeviceId?: string }) => Promise<unknown> | unknown;
 };
@@ -283,7 +305,8 @@ declare global {
 }
 
 const DAILY_SCRIPT_ID = "alphasource-daily-sdk";
-const DAILY_SCRIPT_SRC = "https://unpkg.com/@daily-co/daily-js";
+// Pin the audited Daily contract used by the final-closing publication lock.
+const DAILY_SCRIPT_SRC = "https://unpkg.com/@daily-co/daily-js@0.91.0/dist/daily.js";
 const LIVE_STATE_KEY = "alphasource_interview_live_state";
 const STARTUP_REMOTE_TIMEOUT_MS = 12000;
 // The Tavus prompt checks silence after 4-5 seconds; 45 seconds with no utterance is well beyond normal prompt progression.
@@ -314,6 +337,35 @@ const FINAL_CLOSING_UTTERANCE =
   "Time is winding down. Thank you for your time. I am ending the session now.";
 const MAX_PENDING_TELEMETRY_REQUESTS = 8;
 const closingRuntimeBySession = new Map<string, InterviewTimerRuntimeState>();
+const FINAL_CLOSING_STORAGE_PREFIX = "alphascreen-final-closing";
+const FINAL_CLOSING_TAB_RUNTIME_ID = boundedOpaqueHash(
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`,
+);
+
+export type SharedFinalClosingPhase =
+  | "RESERVED"
+  | "AUDIO_LOCKED"
+  | "FAREWELL_DISPATCHED"
+  | "PROVIDER_END_REQUESTED"
+  | "ENDED";
+
+type SharedFinalClosingState = {
+  version: 1;
+  ownerTabId: string;
+  phase: SharedFinalClosingPhase;
+};
+
+type FinalClosingStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+const SHARED_FINAL_CLOSING_PHASE_ORDER: Record<SharedFinalClosingPhase, number> = {
+  RESERVED: 0,
+  AUDIO_LOCKED: 1,
+  FAREWELL_DISPATCHED: 2,
+  PROVIDER_END_REQUESTED: 3,
+  ENDED: 4,
+};
 
 const CLOSING_PHASE_ORDER: Record<InterviewClosingPhase, number> = {
   INTERVIEWING: 0,
@@ -332,6 +384,8 @@ export function createInterviewTimeBoundaryState(sessionKey = "unbound"): Interv
     phase: "INTERVIEWING",
     closingFarewellSent: false,
     closingFarewellPhase: "IDLE",
+    candidateAudioLockPhase: "IDLE",
+    candidateAudioLockAttempts: 0,
     farewellInferenceId: closingApplicationInferenceId(sessionKey),
     farewellProviderTurnKey: null,
     closingInterruptRequested: false,
@@ -394,6 +448,204 @@ export function preserveInterviewTimerRuntime(runtime: InterviewTimerRuntimeStat
 
 export function resetInterviewTimerRuntimeForTests(): void {
   closingRuntimeBySession.clear();
+}
+
+export function finalClosingSharedStorageKey(conversationId: string): string {
+  return `${FINAL_CLOSING_STORAGE_PREFIX}:${boundedOpaqueHash(conversationId)}`;
+}
+
+function parseSharedFinalClosingState(value: string | null): SharedFinalClosingState | null | "ambiguous" {
+  if (value === null) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<SharedFinalClosingState>;
+    if (
+      parsed?.version !== 1 ||
+      typeof parsed.ownerTabId !== "string" ||
+      !parsed.ownerTabId ||
+      !(parsed.phase && parsed.phase in SHARED_FINAL_CLOSING_PHASE_ORDER)
+    ) return "ambiguous";
+    return parsed as SharedFinalClosingState;
+  } catch {
+    return "ambiguous";
+  }
+}
+
+export function readSharedFinalClosingRuntime(
+  storage: FinalClosingStorage,
+  conversationId: string,
+): SharedFinalClosingState | null {
+  const parsed = parseSharedFinalClosingState(
+    storage.getItem(finalClosingSharedStorageKey(conversationId)),
+  );
+  return parsed === "ambiguous" ? null : parsed;
+}
+
+export function claimSharedFinalClosingRuntime(
+  storage: FinalClosingStorage,
+  conversationId: string,
+  tabId: string,
+): { state: SharedFinalClosingState | null; owned: boolean; reason: string } {
+  const key = finalClosingSharedStorageKey(conversationId);
+  let parsed: ReturnType<typeof parseSharedFinalClosingState>;
+  try {
+    parsed = parseSharedFinalClosingState(storage.getItem(key));
+  } catch {
+    return { state: null, owned: false, reason: "shared_storage_unavailable" };
+  }
+  if (parsed === "ambiguous") {
+    return { state: null, owned: false, reason: "ambiguous_shared_state" };
+  }
+  if (parsed) {
+    return {
+      state: parsed,
+      owned: parsed.ownerTabId === tabId,
+      reason: parsed.ownerTabId === tabId ? "already_owned" : "owned_by_other_tab",
+    };
+  }
+  const created: SharedFinalClosingState = { version: 1, ownerTabId: tabId, phase: "RESERVED" };
+  try {
+    storage.setItem(key, JSON.stringify(created));
+    const confirmed = parseSharedFinalClosingState(storage.getItem(key));
+    if (confirmed === "ambiguous" || !confirmed) {
+      return { state: null, owned: false, reason: "ambiguous_shared_state" };
+    }
+    return {
+      state: confirmed,
+      owned: confirmed.ownerTabId === tabId,
+      reason: confirmed.ownerTabId === tabId ? "claimed" : "owned_by_other_tab",
+    };
+  } catch {
+    return { state: null, owned: false, reason: "shared_storage_unavailable" };
+  }
+}
+
+export function advanceSharedFinalClosingRuntime(
+  storage: FinalClosingStorage,
+  conversationId: string,
+  tabId: string,
+  target: SharedFinalClosingPhase,
+): { state: SharedFinalClosingState | null; advanced: boolean; reason: string } {
+  const key = finalClosingSharedStorageKey(conversationId);
+  try {
+    const parsed = parseSharedFinalClosingState(storage.getItem(key));
+    if (parsed === "ambiguous" || !parsed) {
+      return { state: null, advanced: false, reason: "ambiguous_shared_state" };
+    }
+    const terminalTransition =
+      target === "PROVIDER_END_REQUESTED" || target === "ENDED";
+    if (parsed.ownerTabId !== tabId && !terminalTransition) {
+      return { state: parsed, advanced: false, reason: "owned_by_other_tab" };
+    }
+    if (SHARED_FINAL_CLOSING_PHASE_ORDER[target] <= SHARED_FINAL_CLOSING_PHASE_ORDER[parsed.phase]) {
+      return { state: parsed, advanced: false, reason: "already_advanced" };
+    }
+    const next = { ...parsed, phase: target };
+    storage.setItem(key, JSON.stringify(next));
+    const confirmed = parseSharedFinalClosingState(storage.getItem(key));
+    if (confirmed === "ambiguous" || !confirmed || confirmed.phase !== target) {
+      return { state: null, advanced: false, reason: "ambiguous_shared_state" };
+    }
+    return { state: confirmed, advanced: true, reason: "advanced" };
+  } catch {
+    return { state: null, advanced: false, reason: "shared_storage_unavailable" };
+  }
+}
+
+export function sharedProviderEndAttemptAllowed(
+  transition: { state: SharedFinalClosingState | null; advanced: boolean },
+): boolean {
+  // PROVIDER_END_REQUESTED is an in-flight/idempotent claim, not proof that
+  // the provider confirmed termination. A surviving observer may retry the
+  // backend-idempotent request; only ENDED is terminal proof.
+  return transition.advanced || transition.state?.phase === "PROVIDER_END_REQUESTED";
+}
+
+export function lockCandidateAudioPublication(call: Partial<DailyCallObject>): CandidateAudioLockResult {
+  if (typeof call?.localAudio !== "function" || typeof call?.setLocalAudio !== "function") {
+    return { category: "unsupported", attempts: 0, publicationEnabled: null };
+  }
+  let enabled: boolean;
+  try {
+    enabled = call.localAudio();
+  } catch {
+    return { category: "ambiguous", attempts: 0, publicationEnabled: null };
+  }
+  if (enabled === false) {
+    return { category: "already_disabled", attempts: 0, publicationEnabled: false };
+  }
+  if (enabled !== true) {
+    return { category: "ambiguous", attempts: 0, publicationEnabled: null };
+  }
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      call.setLocalAudio(false, { forceDiscardTrack: false });
+    } catch {
+      // A readable `true` state proves the synchronous setter did not apply and
+      // permits the one bounded retry. An unreadable state is ambiguous.
+    }
+    try {
+      enabled = call.localAudio();
+    } catch {
+      return { category: "ambiguous", attempts: attempt, publicationEnabled: null };
+    }
+    if (enabled === false) {
+      return { category: "confirmed_disabled", attempts: attempt, publicationEnabled: false };
+    }
+    if (enabled !== true) {
+      return { category: "ambiguous", attempts: attempt, publicationEnabled: null };
+    }
+  }
+  return { category: "definite_failure", attempts: 2, publicationEnabled: true };
+}
+
+export function markCandidateAudioLockResolved(
+  state: InterviewTimeBoundaryState,
+  result: CandidateAudioLockResult,
+): { state: InterviewTimeBoundaryState; dispatchFarewell: boolean } {
+  if (state.candidateAudioLockPhase !== "REQUESTED") {
+    return { state, dispatchFarewell: false };
+  }
+  if (result.category === "confirmed_disabled" || result.category === "already_disabled") {
+    return {
+      state: {
+        ...state,
+        candidateAudioLockPhase: "LOCKED",
+        candidateAudioLockAttempts: result.attempts,
+      },
+      dispatchFarewell: state.closingFarewellPhase === "RESERVED",
+    };
+  }
+  return {
+    state: {
+      ...state,
+      candidateAudioLockPhase:
+        result.category === "definite_failure" ? "FAILED" : "AMBIGUOUS",
+      candidateAudioLockAttempts: result.attempts,
+    },
+    dispatchFarewell: false,
+  };
+}
+
+export function candidateTurnSuppressedDuringFinalClosing(state: InterviewTimeBoundaryState): boolean {
+  return state.phase !== "INTERVIEWING";
+}
+
+export function finalClosingRequiresAudioOff(
+  state: InterviewTimeBoundaryState,
+  sharedState?: SharedFinalClosingState | null,
+): boolean {
+  return state.phase !== "INTERVIEWING" || Boolean(sharedState);
+}
+
+export function finalClosingAudioRestoreAllowed(
+  state: InterviewTimeBoundaryState,
+  options: { explicitAbort: boolean },
+): boolean {
+  return options.explicitAbort === true &&
+    state.phase !== "ENDED" &&
+    state.closingFarewellPhase !== "DISPATCHED" &&
+    state.closingFarewellPhase !== "SPEAKING" &&
+    state.closingFarewellPhase !== "COMPLETED";
 }
 
 export function reserveClosingFarewell(
@@ -523,8 +775,9 @@ export function evaluateInterviewTimeBoundary(input: {
     if (reservation.reserved) {
       actions.push("record_closing_farewell_reserved");
     }
-    if (state.closingFarewellPhase === "RESERVED") {
-      actions.push("send_closing_farewell");
+    if (state.closingFarewellPhase === "RESERVED" && state.candidateAudioLockPhase === "IDLE") {
+      state = { ...state, candidateAudioLockPhase: "REQUESTED" };
+      actions.push("request_candidate_audio_lock");
     }
   }
 
@@ -1583,11 +1836,19 @@ export default function InterviewCviPage() {
   const inactivityCandidateMediaHealthyRef = useRef(false);
   const inactivityRemoteEvidenceRef = useRef<RemoteParticipantEvidence | null>(null);
   const inactivityTabIdRef = useRef("");
+  const finalClosingTabIdRef = useRef("");
+  const closingCandidateSuppressionRecordedRef = useRef(false);
   const telemetrySequenceRef = useRef(0);
   const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  if (!finalClosingTabIdRef.current) {
+    // Module lifetime is stable across React remounts but isolated per tab.
+    // A full reload becomes a non-owner observer: it cannot replay farewell,
+    // but it can still single-flight the terminal request at the deadline.
+    finalClosingTabIdRef.current = FINAL_CLOSING_TAB_RUNTIME_ID;
+  }
 
   const clearStartupTimer = useCallback(() => {
     if (startupTimerRef.current) {
@@ -1652,6 +1913,12 @@ export default function InterviewCviPage() {
       remoteParticipantCount: Math.min(16, remotes.length),
     };
     inactivityRemoteEvidenceRef.current = evidence;
+    const closingState = timerRuntimeRef.current?.boundaryState;
+    if (closingState && finalClosingRequiresAudioOff(closingState)) {
+      // Daily participant/device updates must not re-publish candidate audio
+      // after the irreversible final-closing boundary.
+      lockCandidateAudioPublication(callRef.current || {});
+    }
     return evidence;
   }, [clearStartupTimer]);
 
@@ -1930,42 +2197,91 @@ export default function InterviewCviPage() {
     return typeof secondsRemainingRef.current === "number" ? secondsRemainingRef.current : 0;
   }, []);
 
+  const sharedClosingState = useCallback((): SharedFinalClosingState | null => {
+    const conversationId = String(session?.conversation_id || "").trim();
+    if (!conversationId || typeof window === "undefined") return null;
+    try {
+      return readSharedFinalClosingRuntime(window.localStorage, conversationId);
+    } catch {
+      return null;
+    }
+  }, [session?.conversation_id]);
+
   const requestClosingProviderEnd = useCallback(async (
     reason: string,
     options: { hardDeadline?: boolean } = {},
   ) => {
     cancelInactivityRuntime("provider_end", true);
-    const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
-    const remaining = currentClosingRemainingSeconds();
-    if (!closingProviderEndAllowed(current, remaining, options)) return false;
-    const marked = markProviderEndRequested(current);
-    if (!marked.requested) return false;
-    persistBoundaryState(marked.state);
-    sendLifecycleTelemetry("provider_end_requested", {
-      closing_state: marked.state.phase,
-      remaining_time_bucket: remainingTimeBucket(remaining),
-      turn_index: marked.state.turnIndex,
-      hard_deadline: options.hardDeadline === true,
-    });
-    const confirmed = await endInterview(reason);
-    if (confirmed) {
-      const latest = timerRuntimeRef.current?.boundaryState || marked.state;
-      const confirmedState = markProviderEndConfirmed(latest);
-      persistBoundaryState(confirmedState);
-      sendLifecycleTelemetry("provider_end_confirmed", {
-        closing_state: confirmedState.phase,
-        remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
-        turn_index: confirmedState.turnIndex,
+    const conversationId = String(session?.conversation_id || "").trim();
+    const performTerminalRequest = async () => {
+      const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
+      const remaining = currentClosingRemainingSeconds();
+      if (!closingProviderEndAllowed(current, remaining, options)) return false;
+      const shared = sharedClosingState();
+      if (shared && conversationId && typeof window !== "undefined") {
+        const terminalClaim = advanceSharedFinalClosingRuntime(
+          window.localStorage,
+          conversationId,
+          finalClosingTabIdRef.current,
+          "PROVIDER_END_REQUESTED",
+        );
+        if (!sharedProviderEndAttemptAllowed(terminalClaim)) return false;
+      }
+      const marked = markProviderEndRequested(current);
+      if (!marked.requested) return false;
+      persistBoundaryState(marked.state);
+      sendLifecycleTelemetry("provider_end_requested", {
+        closing_state: marked.state.phase,
+        remaining_time_bucket: remainingTimeBucket(remaining),
+        turn_index: marked.state.turnIndex,
         hard_deadline: options.hardDeadline === true,
-      }, { terminal: true });
+      });
+      const confirmed = await endInterview(reason);
+      if (confirmed) {
+        const latest = timerRuntimeRef.current?.boundaryState || marked.state;
+        const confirmedState = markProviderEndConfirmed(latest);
+        persistBoundaryState(confirmedState);
+        if (conversationId && finalClosingTabIdRef.current && typeof window !== "undefined") {
+          advanceSharedFinalClosingRuntime(
+            window.localStorage,
+            conversationId,
+            finalClosingTabIdRef.current,
+            "ENDED",
+          );
+        }
+        sendLifecycleTelemetry("provider_end_confirmed", {
+          closing_state: confirmedState.phase,
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+          turn_index: confirmedState.turnIndex,
+          hard_deadline: options.hardDeadline === true,
+        }, { terminal: true });
+      }
+      return confirmed;
+    };
+
+    const lockManager = typeof navigator !== "undefined" ? navigator.locks : null;
+    if (lockManager && conversationId) {
+      const lockName = `${FINAL_CLOSING_STORAGE_PREFIX}-end:${boundedOpaqueHash(conversationId)}`;
+      try {
+        return await lockManager.request(
+          lockName,
+          { mode: "exclusive" },
+          performTerminalRequest,
+        );
+      } catch {
+        // A lock-manager availability failure falls back to the same shared
+        // monotonic state gate; provider mutation remains backend-idempotent.
+      }
     }
-    return confirmed;
+    return performTerminalRequest();
   }, [
     cancelInactivityRuntime,
     currentClosingRemainingSeconds,
     endInterview,
     persistBoundaryState,
     sendLifecycleTelemetry,
+    session?.conversation_id,
+    sharedClosingState,
   ]);
 
   const scheduleZeroDeadlineFallback = useCallback(() => {
@@ -2011,6 +2327,16 @@ export default function InterviewCviPage() {
     }
   }, [session?.conversation_id]);
 
+  const closingAudioOffRequired = useCallback((): boolean => {
+    const state = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
+    return finalClosingRequiresAudioOff(state, sharedClosingState());
+  }, [sharedClosingState]);
+
+  const enforceFinalClosingAudioOff = useCallback((): CandidateAudioLockResult | null => {
+    if (!closingAudioOffRequired()) return null;
+    return lockCandidateAudioPublication(callRef.current || {});
+  }, [closingAudioOffRequired]);
+
   const applyClosingActions = useCallback((
     actions: InterviewTimeBoundaryAction[],
     _previousState: InterviewTimeBoundaryState,
@@ -2034,10 +2360,48 @@ export default function InterviewCviPage() {
           turn_index: nextState.turnIndex,
         });
       }
-      if (action === "send_closing_farewell") {
-        if (nextState.closingFarewellPhase !== "RESERVED") {
+      if (action === "request_candidate_audio_lock") {
+        cancelInactivityRuntime("closing", true);
+        const conversationId = String(session?.conversation_id || "").trim();
+        const tabId = finalClosingTabIdRef.current;
+        const sharedClaim =
+          conversationId && tabId && typeof window !== "undefined"
+            ? claimSharedFinalClosingRuntime(window.localStorage, conversationId, tabId)
+            : { state: null, owned: false, reason: "shared_storage_unavailable" };
+        sendLifecycleTelemetry("closing_candidate_audio_lock_requested", {
+          closing_state: nextState.phase,
+          lock_result_category: "requested",
+          attempt_count: 0,
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+        });
+        const result = lockCandidateAudioPublication(callRef.current || {});
+        const resolution = markCandidateAudioLockResolved(nextState, result);
+        nextState = resolution.state;
+        if (nextState.candidateAudioLockPhase !== "LOCKED") {
+          sendLifecycleTelemetry("closing_candidate_audio_lock_failed", {
+            closing_state: nextState.phase,
+            lock_result_category: result.category,
+            audio_publication_enabled: result.publicationEnabled === true,
+            attempt_count: result.attempts,
+            remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+          });
           continue;
         }
+        sendLifecycleTelemetry("closing_candidate_audio_locked", {
+          closing_state: nextState.phase,
+          lock_result_category: result.category,
+          audio_publication_enabled: false,
+          attempt_count: result.attempts,
+          remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+        });
+        if (!sharedClaim.owned || !resolution.dispatchFarewell) continue;
+        const sharedLocked = advanceSharedFinalClosingRuntime(
+          window.localStorage,
+          conversationId,
+          tabId,
+          "AUDIO_LOCKED",
+        );
+        if (!sharedLocked.advanced) continue;
         if (!sendFinalClosingAnnouncement(nextState.farewellInferenceId)) {
           nextState = markClosingFarewellDispatchFailed(nextState);
           sendLifecycleTelemetry("closing_farewell_interrupted", {
@@ -2049,6 +2413,12 @@ export default function InterviewCviPage() {
           continue;
         }
         nextState = markClosingFarewellDispatched(nextState);
+        advanceSharedFinalClosingRuntime(
+          window.localStorage,
+          conversationId,
+          tabId,
+          "FAREWELL_DISPATCHED",
+        );
         sendLifecycleTelemetry("closing_farewell_started", {
           closing_state: nextState.phase,
           remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
@@ -2066,11 +2436,13 @@ export default function InterviewCviPage() {
     persistBoundaryState(nextState);
   }, [
     interruptReplica,
+    cancelInactivityRuntime,
     currentClosingRemainingSeconds,
     persistBoundaryState,
     requestClosingProviderEnd,
     sendFinalClosingAnnouncement,
     sendLifecycleTelemetry,
+    session?.conversation_id,
   ]);
 
   const processTimeBoundary = useCallback((remaining: number) => {
@@ -2097,6 +2469,21 @@ export default function InterviewCviPage() {
   }, [applyClosingActions, cancelInactivityRuntime]);
 
   useEffect(() => () => clearAutoEndTimers(), [clearAutoEndTimers]);
+
+  useEffect(() => {
+    const conversationId = String(session?.conversation_id || "").trim();
+    if (!conversationId || typeof window === "undefined") return;
+    const key = finalClosingSharedStorageKey(conversationId);
+    const enforceFromSharedState = (event?: StorageEvent) => {
+      if (event && event.key !== key) return;
+      const state = readSharedFinalClosingRuntime(window.localStorage, conversationId);
+      if (!state) return;
+      enforceFinalClosingAudioOff();
+    };
+    window.addEventListener("storage", enforceFromSharedState);
+    enforceFromSharedState();
+    return () => window.removeEventListener("storage", enforceFromSharedState);
+  }, [enforceFinalClosingAudioOff, session?.conversation_id]);
 
   useEffect(() => {
     const onPageHide = () => {
@@ -2296,10 +2683,11 @@ export default function InterviewCviPage() {
             await call.join({
               url: session.conversation_url,
               userName: "Candidate",
-              startAudioOff: false,
+              startAudioOff: closingAudioOffRequired(),
               startVideoOff: false,
             });
             if (!alive || endTriggeredRef.current) return;
+            enforceFinalClosingAudioOff();
             beginStartupWatchdog();
             return;
           } catch {
@@ -2612,10 +3000,11 @@ export default function InterviewCviPage() {
           await recoveryCall.join({
             url: session.conversation_url,
             userName: "Candidate",
-            startAudioOff: false,
+            startAudioOff: closingAudioOffRequired(),
             startVideoOff: false,
           });
           if (!alive || endTriggeredRef.current) return;
+          enforceFinalClosingAudioOff();
           recordReconnectLocalJoin(Date.now());
           syncParticipantsWithDiagnostics();
         } catch {
@@ -2754,8 +3143,23 @@ export default function InterviewCviPage() {
                   directClosingSpeechRef.current
                 ? directClosingSpeechRef.current.kind
                 : null;
+          const suppressCandidateTurn =
+            (candidateTurnSuppressedDuringFinalClosing(
+              currentInferenceState || createInterviewTimeBoundaryState(),
+            ) || Boolean(sharedClosingState())) &&
+            (isCandidateSpeaking || isCandidateStoppedSpeaking || isCandidateUtterance);
 
-          if (isCandidateSpeaking) recordInactivityCandidateActivity("candidate_speaking");
+          if (suppressCandidateTurn && !closingCandidateSuppressionRecordedRef.current) {
+            closingCandidateSuppressionRecordedRef.current = true;
+            sendLifecycleTelemetry("closing_candidate_activity_suppressed", {
+              closing_state: currentInferenceState?.phase || "FINAL_FAREWELL_ELIGIBLE",
+              suppression_reason: "final_closing_audio_lock",
+              remaining_time_bucket: remainingTimeBucket(currentClosingRemainingSeconds()),
+            });
+          }
+          if (isCandidateSpeaking && !suppressCandidateTurn) {
+            recordInactivityCandidateActivity("candidate_speaking");
+          }
           if (normalizedPalSpeaking?.kind === "started") {
             cancelInactivityRuntime("pal_speaking");
           }
@@ -2769,17 +3173,17 @@ export default function InterviewCviPage() {
             ? "replica_started_speaking"
             : isReplicaUtterance
               ? "replica_utterance"
-              : isCandidateUtterance
+              : isCandidateUtterance && !suppressCandidateTurn
                 ? "candidate_utterance"
-                : isCandidateSpeaking
+                : isCandidateSpeaking && !suppressCandidateTurn
                   ? "candidate_speaking_started"
-                  : isCandidateStoppedSpeaking
+                  : isCandidateStoppedSpeaking && !suppressCandidateTurn
                     ? "candidate_speaking_ended"
                     : null;
           if (
             eventType === "conversation.started_speaking" ||
             eventType === "conversation.stopped_speaking" ||
-            eventType === "conversation.utterance" ||
+            (eventType === "conversation.utterance" && !suppressCandidateTurn) ||
             eventType === "conversation.tool_call" ||
             eventType === "conversation.toolcall"
           ) {
@@ -2869,7 +3273,7 @@ export default function InterviewCviPage() {
               });
             }
           }
-          if (isCandidateSpeaking) {
+          if (isCandidateSpeaking && !suppressCandidateTurn) {
             const started = beginCandidateSpeaking(candidateSpeakingStateRef.current, progressAt);
             candidateSpeakingStateRef.current = started.state;
             if (started.started) {
@@ -2878,7 +3282,7 @@ export default function InterviewCviPage() {
               if (!recoveryWasActive) setConnectionNotice("");
             }
           }
-          if (isCandidateStoppedSpeaking) {
+          if (isCandidateStoppedSpeaking && !suppressCandidateTurn) {
             const stopped = endCandidateSpeaking(candidateSpeakingStateRef.current);
             candidateSpeakingStateRef.current = stopped.state;
             if (stopped.ended) {
@@ -2888,12 +3292,12 @@ export default function InterviewCviPage() {
             }
           }
           if (eventType === "conversation.utterance") {
-            if (isCandidateUtterance) {
+            if (isCandidateUtterance && !suppressCandidateTurn) {
               recordInactivityCandidateActivity("candidate_utterance");
               candidateSpeakingStateRef.current =
                 endCandidateSpeaking(candidateSpeakingStateRef.current).state;
             }
-            if (isReplicaUtterance || (isCandidateUtterance && isCandidateAnswerProgress(speech))) {
+            if (isReplicaUtterance || (isCandidateUtterance && !suppressCandidateTurn && isCandidateAnswerProgress(speech))) {
               progressObservedRef.current = true;
               if (isReplicaUtterance && !recoveryCompleted) {
                 recoveryCompleted = completeProgressRecovery("replica_utterance", progressAt);
@@ -2907,7 +3311,9 @@ export default function InterviewCviPage() {
               if (!recoveryWasActive) setConnectionNotice("");
             }
           }
-          if (isCandidateStoppedSpeaking || isCandidateUtterance || isReplicaStoppedSpeaking) {
+          if ((isCandidateStoppedSpeaking && !suppressCandidateTurn) ||
+              (isCandidateUtterance && !suppressCandidateTurn) ||
+              isReplicaStoppedSpeaking) {
             const remaining = secondsRemainingRef.current;
             if (typeof remaining === "number") processTimeBoundary(remaining);
           }
@@ -2954,10 +3360,11 @@ export default function InterviewCviPage() {
         await call.join({
           url: session.conversation_url,
           userName: "Candidate",
-          startAudioOff: false,
+          startAudioOff: closingAudioOffRequired(),
           startVideoOff: false,
         });
         if (!alive) return;
+        enforceFinalClosingAudioOff();
         syncParticipantsWithDiagnostics();
         beginProgressWatchdog();
       } catch {
@@ -2992,10 +3399,12 @@ export default function InterviewCviPage() {
     armInactivityRuntime,
     applyClosingActions,
     cancelInactivityRuntime,
+    closingAudioOffRequired,
     clearAutoEndTimers,
     clearStartupTimer,
     currentClosingRemainingSeconds,
     endInterview,
+    enforceFinalClosingAudioOff,
     interruptReplica,
     leaveLiveRoute,
     persistBoundaryState,
@@ -3004,6 +3413,7 @@ export default function InterviewCviPage() {
     requestClosingProviderEnd,
     sendLifecycleTelemetry,
     session,
+    sharedClosingState,
     syncParticipants,
     teardownCall,
   ]);

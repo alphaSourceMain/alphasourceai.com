@@ -72,7 +72,7 @@ test("the only transition is the exact 20-second final closing", () => {
   assert.deepEqual(closing.actions, [
     "interrupt_replica",
     "record_closing_farewell_reserved",
-    "send_closing_farewell",
+    "request_candidate_audio_lock",
   ]);
 });
 
