@@ -28,12 +28,12 @@ const {
   advanceSharedFinalClosingRuntime,
   candidateTurnSuppressedDuringFinalClosing,
   claimSharedFinalClosingRuntime,
+  confirmCandidateAudioPublicationDisabled,
   createInterviewTimeBoundaryState,
   evaluateInterviewTimeBoundary,
   finalClosingAudioRestoreAllowed,
   finalClosingRequiresAudioOff,
   finalClosingSharedStorageKey,
-  lockCandidateAudioPublication,
   markCandidateAudioLockResolved,
   readSharedFinalClosingRuntime,
   resetInterviewTimerRuntimeForTests,
@@ -52,20 +52,318 @@ function memoryStorage() {
   };
 }
 
-function fakeCall({ initiallyEnabled = true, apply = true, throwOn = [] } = {}) {
-  let enabled = initiallyEnabled;
+function convergingDailyCall({
+  initialState = "sendable",
+  localAudioEnabled = true,
+  setterThrows = [],
+} = {}) {
+  let audioState = initialState;
+  let enabled = localAudioEnabled;
   let requests = 0;
+  const listeners = new Set();
+  const localParticipant = () => ({
+    local: true,
+    tracks: { audio: { state: audioState } },
+  });
   return {
     get requests() { return requests; },
+    get listenerCount() { return listeners.size; },
     localAudio() { return enabled; },
+    participants() { return { local: localParticipant() }; },
     setLocalAudio(next) {
       requests += 1;
-      if (throwOn.includes(requests)) throw new Error("synthetic Daily failure");
-      if (apply) enabled = Boolean(next);
+      if (setterThrows.includes(requests)) throw new Error("synthetic Daily setter failure");
+      enabled = Boolean(next) ? true : enabled;
       return this;
     },
+    on(event, handler) {
+      if (event === "participant-updated") listeners.add(handler);
+    },
+    off(event, handler) {
+      if (event === "participant-updated") listeners.delete(handler);
+    },
+    updateAudioState(nextState, { local = true, emit = true } = {}) {
+      if (local) {
+        audioState = nextState;
+        enabled = nextState !== "off" && nextState !== "blocked";
+      }
+      if (emit) {
+        for (const listener of [...listeners]) {
+          listener({
+            action: "participant-updated",
+            participant: local
+              ? localParticipant()
+              : { local: false, tracks: { audio: { state: nextState } } },
+          });
+        }
+      }
+    },
+    setLocalAudioEnabled(next) { enabled = Boolean(next); },
   };
 }
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function manualClock() {
+  let now = 0;
+  let sequence = 0;
+  const tasks = new Map();
+  const setTimer = (callback, delayMs) => {
+    const id = ++sequence;
+    tasks.set(id, { id, at: now + delayMs, callback });
+    return id;
+  };
+  const clearTimer = (id) => tasks.delete(id);
+  const advanceTo = async (target) => {
+    while (true) {
+      const next = [...tasks.values()]
+        .filter((task) => task.at <= target)
+        .sort((left, right) => left.at - right.at || left.id - right.id)[0];
+      if (!next) break;
+      tasks.delete(next.id);
+      now = next.at;
+      next.callback();
+      await Promise.resolve();
+    }
+    now = target;
+    await Promise.resolve();
+  };
+  return {
+    now: () => now,
+    setTimer,
+    clearTimer,
+    advanceTo,
+    get pending() { return tasks.size; },
+  };
+}
+
+test("asynchronous Daily convergence replaces same-stack failure", async () => {
+  const call = convergingDailyCall();
+  assert.equal(typeof confirmCandidateAudioPublicationDisabled, "function");
+
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 80,
+    pollIntervalMs: 5,
+    retryAfterMs: 40,
+  });
+  await wait(10);
+  call.updateAudioState("off");
+  const result = await pending;
+  assert.equal(result.category, "confirmed_disabled");
+  assert.equal(result.confirmationSource, "participant_updated");
+  assert.equal(result.publicationEnabled, false);
+  assert.equal(call.listenerCount, 0);
+});
+
+test("listener-before-request and participant snapshot close both event races", async () => {
+  const beforeListener = convergingDailyCall({ initialState: "off", localAudioEnabled: false });
+  const existing = await confirmCandidateAudioPublicationDisabled(beforeListener, {
+    timeoutMs: 50,
+    pollIntervalMs: 5,
+    retryAfterMs: 25,
+  });
+  assert.equal(existing.category, "confirmed_disabled");
+  assert.equal(existing.confirmationSource, "participant_snapshot");
+
+  const afterRequest = convergingDailyCall();
+  const pending = confirmCandidateAudioPublicationDisabled(afterRequest, {
+    timeoutMs: 80,
+    pollIntervalMs: 5,
+    retryAfterMs: 40,
+  });
+  afterRequest.updateAudioState("off");
+  assert.equal((await pending).confirmationSource, "participant_updated");
+});
+
+test("irrelevant updates do not confirm and polling is a bounded fallback", async () => {
+  const call = convergingDailyCall();
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 80,
+    pollIntervalMs: 5,
+    retryAfterMs: 40,
+  });
+  call.updateAudioState("off", { local: false });
+  await wait(10);
+  call.updateAudioState("off", { emit: false });
+  const result = await pending;
+  assert.equal(result.category, "confirmed_disabled");
+  assert.equal(result.confirmationSource, "participant_snapshot_poll");
+  assert.equal(call.listenerCount, 0);
+});
+
+test("timeout and cancellation remain fail closed and clean up", async () => {
+  const timedOutCall = convergingDailyCall();
+  const timedOut = await confirmCandidateAudioPublicationDisabled(timedOutCall, {
+    timeoutMs: 30,
+    pollIntervalMs: 5,
+    retryAfterMs: 15,
+  });
+  assert.equal(timedOut.category, "definite_failure");
+  assert.equal(timedOut.publicationEnabled, true);
+  assert.equal(timedOutCall.listenerCount, 0);
+
+  const controller = new AbortController();
+  const cancelledCall = convergingDailyCall();
+  const cancelledPending = confirmCandidateAudioPublicationDisabled(cancelledCall, {
+    timeoutMs: 80,
+    pollIntervalMs: 5,
+    retryAfterMs: 40,
+    signal: controller.signal,
+  });
+  controller.abort();
+  const cancelled = await cancelledPending;
+  assert.equal(cancelled.category, "cancelled_terminal");
+  assert.equal(cancelledCall.listenerCount, 0);
+});
+
+test("a definite setter exception retries once while ambiguity does not", async () => {
+  const retryCall = convergingDailyCall({ setterThrows: [1] });
+  const retryPending = confirmCandidateAudioPublicationDisabled(retryCall, {
+    timeoutMs: 80,
+    pollIntervalMs: 5,
+    retryAfterMs: 40,
+  });
+  await wait(10);
+  retryCall.updateAudioState("off");
+  const retried = await retryPending;
+  assert.equal(retried.category, "confirmed_disabled");
+  assert.equal(retried.attempts, 2);
+
+  const ambiguous = {
+    on() {},
+    off() {},
+    setLocalAudio() { return this; },
+    localAudio() { return undefined; },
+    participants() { return { local: { local: true, tracks: { audio: { state: "mystery" } } } }; },
+  };
+  const ambiguousResult = await confirmCandidateAudioPublicationDisabled(ambiguous, {
+    timeoutMs: 30,
+    pollIntervalMs: 5,
+    retryAfterMs: 15,
+  });
+  assert.equal(ambiguousResult.category, "ambiguous");
+  assert.equal(ambiguousResult.attempts, 1);
+});
+
+test("confirmation at the timeout boundary wins and later confirmation is ignored", async () => {
+  const boundaryClock = manualClock();
+  const boundaryCall = convergingDailyCall();
+  boundaryClock.setTimer(() => boundaryCall.updateAudioState("off"), 30);
+  const boundaryPending = confirmCandidateAudioPublicationDisabled(boundaryCall, {
+    timeoutMs: 30,
+    pollIntervalMs: 10,
+    retryAfterMs: 15,
+    now: boundaryClock.now,
+    setTimer: boundaryClock.setTimer,
+    clearTimer: boundaryClock.clearTimer,
+  });
+  await boundaryClock.advanceTo(30);
+  const boundary = await boundaryPending;
+  assert.equal(boundary.category, "confirmed_disabled");
+  assert.equal(boundary.elapsedMs, 30);
+  assert.equal(boundaryCall.listenerCount, 0);
+  assert.equal(boundaryClock.pending, 0);
+
+  const lateClock = manualClock();
+  const lateCall = convergingDailyCall({ initialState: "loading" });
+  const latePending = confirmCandidateAudioPublicationDisabled(lateCall, {
+    timeoutMs: 30,
+    pollIntervalMs: 10,
+    retryAfterMs: 15,
+    now: lateClock.now,
+    setTimer: lateClock.setTimer,
+    clearTimer: lateClock.clearTimer,
+  });
+  await lateClock.advanceTo(30);
+  const late = await latePending;
+  assert.equal(late.category, "timed_out");
+  lateCall.updateAudioState("off");
+  assert.equal(lateCall.listenerCount, 0);
+  assert.equal(late.category, "timed_out");
+});
+
+test("duplicate and remote participant updates resolve only the local transition", async () => {
+  const call = convergingDailyCall();
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 80,
+    pollIntervalMs: 10,
+    retryAfterMs: 40,
+  });
+  call.updateAudioState("off", { local: false });
+  call.updateAudioState("off");
+  call.updateAudioState("off");
+  const result = await pending;
+  assert.equal(result.category, "confirmed_disabled");
+  assert.equal(result.confirmationSource, "participant_updated");
+  assert.equal(call.requests, 1);
+  assert.equal(call.listenerCount, 0);
+});
+
+test("localAudio false alone cannot authorize farewell without participant proof", async () => {
+  const clock = manualClock();
+  const call = convergingDailyCall({ initialState: "loading" });
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 40,
+    pollIntervalMs: 10,
+    retryAfterMs: 20,
+    now: clock.now,
+    setTimer: clock.setTimer,
+    clearTimer: clock.clearTimer,
+  });
+  call.setLocalAudioEnabled(false);
+  let resolved = false;
+  void pending.then(() => { resolved = true; });
+  await Promise.resolve();
+  assert.equal(resolved, false);
+  await clock.advanceTo(10);
+  assert.equal(resolved, false);
+  call.updateAudioState("off", { emit: false });
+  await clock.advanceTo(20);
+  const result = await pending;
+  assert.equal(result.category, "confirmed_disabled");
+  assert.equal(result.confirmationSource, "participant_snapshot_poll");
+});
+
+test("a stable authoritative enabled state retries once and fails closed", async () => {
+  const clock = manualClock();
+  const call = convergingDailyCall();
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 40,
+    pollIntervalMs: 10,
+    retryAfterMs: 20,
+    now: clock.now,
+    setTimer: clock.setTimer,
+    clearTimer: clock.clearTimer,
+  });
+  await clock.advanceTo(40);
+  const result = await pending;
+  assert.equal(result.category, "definite_failure");
+  assert.equal(result.publicationEnabled, true);
+  assert.equal(result.attempts, 2);
+  assert.equal(call.requests, 2);
+  assert.equal(clock.pending, 0);
+});
+
+test("the separate reconnect reassertion is one request with no retry", async () => {
+  const clock = manualClock();
+  const call = convergingDailyCall();
+  const pending = confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 40,
+    pollIntervalMs: 10,
+    retryAfterMs: 20,
+    allowRetry: false,
+    now: clock.now,
+    setTimer: clock.setTimer,
+    clearTimer: clock.clearTimer,
+  });
+  await clock.advanceTo(40);
+  const result = await pending;
+  assert.equal(result.category, "definite_failure");
+  assert.equal(result.attempts, 1);
+  assert.equal(call.requests, 1);
+});
 
 test("the 20-second boundary reserves closing and requests audio lock before farewell", () => {
   const result = evaluateInterviewTimeBoundary({
@@ -104,65 +402,6 @@ test("confirmed Daily publication lock permits exactly one farewell dispatch", (
     publicationEnabled: false,
   });
   assert.equal(duplicate.dispatchFarewell, false);
-});
-
-test("setLocalAudio false is state-confirmed before success", () => {
-  const call = fakeCall();
-  const result = lockCandidateAudioPublication(call);
-  assert.deepEqual(result, {
-    category: "confirmed_disabled",
-    attempts: 1,
-    publicationEnabled: false,
-  });
-  assert.equal(call.requests, 1);
-  assert.equal(call.localAudio(), false);
-});
-
-test("an already disabled microphone is accepted without another mutation", () => {
-  const call = fakeCall({ initiallyEnabled: false });
-  const result = lockCandidateAudioPublication(call);
-  assert.equal(result.category, "already_disabled");
-  assert.equal(result.attempts, 0);
-  assert.equal(result.publicationEnabled, false);
-  assert.equal(call.requests, 0);
-});
-
-test("a definitively unapplied failure may retry once and then confirms", () => {
-  const call = fakeCall({ throwOn: [1] });
-  const result = lockCandidateAudioPublication(call);
-  assert.equal(result.category, "confirmed_disabled");
-  assert.equal(result.attempts, 2);
-  assert.equal(call.requests, 2);
-});
-
-test("a persistent definite failure is bounded and cannot dispatch farewell", () => {
-  const call = fakeCall({ apply: false });
-  const lock = lockCandidateAudioPublication(call);
-  assert.equal(lock.category, "definite_failure");
-  assert.equal(lock.attempts, 2);
-  const closing = evaluateInterviewTimeBoundary({
-    state: createInterviewTimeBoundaryState("synthetic-session"),
-    remainingSeconds: 20,
-    candidateSpeaking: false,
-    replicaSpeaking: false,
-  }).state;
-  const resolved = markCandidateAudioLockResolved(closing, lock);
-  assert.equal(resolved.dispatchFarewell, false);
-  assert.equal(resolved.state.candidateAudioLockPhase, "FAILED");
-});
-
-test("ambiguous and unsupported publication state fail closed without replay", () => {
-  const ambiguousCall = {
-    setLocalAudio() { return this; },
-    localAudio() { throw new Error("synthetic ambiguous state"); },
-  };
-  const ambiguous = lockCandidateAudioPublication(ambiguousCall);
-  assert.equal(ambiguous.category, "ambiguous");
-  assert.equal(ambiguous.attempts, 0);
-
-  const unsupported = lockCandidateAudioPublication({});
-  assert.equal(unsupported.category, "unsupported");
-  assert.equal(unsupported.attempts, 0);
 });
 
 test("candidate turns are suppressed irreversibly after final closing begins", () => {
@@ -262,6 +501,21 @@ test("runtime pins the audited Daily version and never restores candidate audio 
   assert.equal((source.match(/startAudioOff: closingAudioOffRequired\(\)/g) || []).length, 3);
   assert.match(source, /finalClosingTabIdRef\.current = FINAL_CLOSING_TAB_RUNTIME_ID/);
   assert.doesNotMatch(source, /FINAL_CLOSING_TAB_SESSION_KEY/);
+});
+
+test("late owner acquisition joins the same confirmation and cannot be downgraded", () => {
+  assert.match(source, /existing\.sharedOwned = existing\.sharedOwned \|\| sharedOwned/);
+  assert.match(source, /existing\.handleResult\(\)/);
+  assert.match(source, /!operation\.sharedOwned/);
+  assert.match(source, /operation\.farewellDispatchAttempted = true/);
+  assert.match(source, /startFinalClosingAudioLock\(nextState, sharedClaim\.owned\)/);
+});
+
+test("reconnect reassertion is separately bounded and cannot replay farewell", () => {
+  assert.match(source, /existing\.reassertAfterReconnect\(\)/);
+  assert.match(source, /operation\.reconnectReasserted = true/);
+  assert.match(source, /allowRetry: false/);
+  assert.doesNotMatch(source, /reassertAfterReconnect[\s\S]{0,2600}sendFinalClosingAnnouncement/);
 });
 
 test("runtime suppresses candidate turns and inactivity after the irreversible boundary", () => {
