@@ -166,7 +166,7 @@ test("remote PAL audio stays attached and audible during avatar closing", () => 
   assert.ok(element.srcObject);
 });
 
-test("candidate audio unpublish uses the supported Daily call without waiting", () => {
+test("candidate audio unpublish terminally discards the Daily track", () => {
   const calls = [];
   const result = requestCandidateAudioUnpublish({
     setLocalAudio(enabled, options) {
@@ -175,26 +175,34 @@ test("candidate audio unpublish uses the supported Daily call without waiting", 
     },
   });
   assert.equal(result, "requested");
-  assert.deepEqual(calls, [[false, { forceDiscardTrack: false }]]);
+  assert.deepEqual(calls, [[false, { forceDiscardTrack: true }]]);
   assert.equal(requestCandidateAudioUnpublish({}), "unsupported");
   assert.equal(requestCandidateAudioUnpublish({
     setLocalAudio() { throw new Error("synthetic"); },
   }), "failed");
 });
 
-test("runtime ordering blocks candidate audio before interrupt and avatar Echo", async () => {
+test("runtime awaits confirmed candidate audio-off before interrupt and avatar Echo", async () => {
   const source = await readFile(sourcePath, "utf8");
   const begin = source.slice(source.indexOf("const beginAvatarClosing"));
-  const block = begin.indexOf("requestCandidateAudioUnpublish(callRef.current)");
-  const interrupt = begin.indexOf("buildReplicaInterruptMessage");
-  const echo = begin.indexOf("buildFinalClosingAnnouncementMessage");
+  const block = begin.indexOf("await confirmCandidateAudioPublicationDisabled");
+  const confirmedGate = begin.indexOf('audioLockResult.category !== "confirmed_disabled"');
+  const sharedAudioBlocked = begin.indexOf('"CANDIDATE_AUDIO_BLOCKED"');
+  const successInterrupt = begin.indexOf("let interruptSent", sharedAudioBlocked);
+  const interrupt = begin.indexOf("buildReplicaInterruptMessage", successInterrupt);
+  const echo = begin.indexOf("buildFinalClosingAnnouncementMessage", interrupt);
   const provider = begin.indexOf("requestClosingProviderEnd");
   assert.ok(block >= 0);
+  assert.ok(confirmedGate > block);
+  assert.ok(sharedAudioBlocked > confirmedGate);
+  assert.ok(successInterrupt > sharedAudioBlocked);
   assert.ok(interrupt > block);
   assert.ok(echo > interrupt);
   assert.ok(provider > echo);
   assert.doesNotMatch(begin.slice(0, provider), /requestClosingProviderEnd\(/);
-  assert.equal(source.match(/requestCandidateAudioUnpublish\(callRef\.current\)/g)?.length, 1);
+  assert.doesNotMatch(begin, /requestCandidateAudioUnpublish\(callRef\.current\)/);
+  assert.match(begin.slice(block, sharedAudioBlocked), /confirmed_disabled/);
+  assert.match(begin.slice(block, sharedAudioBlocked), /audio_lock_failed/);
   assert.match(source, /end-conversation[\s\S]{0,700}keepalive:\s*true/);
   assert.match(
     source,

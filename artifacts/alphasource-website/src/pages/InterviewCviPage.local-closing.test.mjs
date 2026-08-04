@@ -63,7 +63,7 @@ test("zero sends one interrupt and one exact avatar Echo without a provider end"
   });
 });
 
-test("strong and weak avatar completion defer provider end until the closing line stops", () => {
+test("only the matching farewell inference can start or complete avatar closing", () => {
   const conversationId = "synthetic-conversation";
   const reserved = closing.evaluateInterviewTimeBoundary({
     state: closing.createInterviewTimeBoundaryState(conversationId),
@@ -97,27 +97,63 @@ test("strong and weak avatar completion defer provider end until the closing lin
   assert.equal(strong.transition, "completed");
   assert.equal(closing.closingProviderEndAllowed(strong.state), true);
 
-  const weakStart = closing.recordClosingEchoSpeechEvent(dispatched, {
+  const missingInferenceStart = closing.recordClosingEchoSpeechEvent(dispatched, {
     kind: "started",
     conversationId,
-    turnKey: "weak-start",
+    turnKey: "missing-inference-start",
     providerSequence: null,
     interrupted: false,
     applicationControl: false,
     correlation: "local",
   }, conversationId);
-  assert.equal(weakStart.transition, "speaking");
-  const weakStop = closing.recordClosingEchoSpeechEvent(weakStart.state, {
+  assert.equal(missingInferenceStart.transition, "none");
+  assert.strictEqual(missingInferenceStart.state, dispatched);
+  const missingInferenceStop = closing.recordClosingEchoSpeechEvent(dispatched, {
     kind: "stopped",
     conversationId,
-    turnKey: "weak-stop",
+    turnKey: "missing-inference-stop",
     providerSequence: null,
     interrupted: false,
     applicationControl: false,
     correlation: "local",
   }, conversationId);
-  assert.equal(weakStop.transition, "completed");
-  assert.equal(closing.closingProviderEndAllowed(weakStop.state), true);
+  assert.equal(missingInferenceStop.transition, "none");
+  assert.strictEqual(missingInferenceStop.state, dispatched);
+
+  const wrongInference = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "stopped",
+    conversationId,
+    turnKey: "wrong-inference",
+    providerSequence: 9,
+    interrupted: false,
+    applicationControl: false,
+    inferenceId: "another-turn",
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(wrongInference.transition, "none");
+
+  const interruptedFarewell = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "stopped",
+    conversationId,
+    turnKey: "interrupted-farewell",
+    providerSequence: 10,
+    interrupted: true,
+    applicationControl: true,
+    inferenceId,
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(interruptedFarewell.transition, "none");
+});
+
+test("an unconfirmed candidate audio lock fails closed without requiring an Echo", () => {
+  const reserved = closing.evaluateInterviewTimeBoundary({
+    state: closing.createInterviewTimeBoundaryState("synthetic-conversation"),
+    remainingSeconds: 0,
+  }).state;
+  const fallback = closing.markClosingEchoFallback(reserved, "audio_lock_failed");
+  assert.equal(fallback.closingEchoPhase, "FALLBACK");
+  assert.equal(fallback.closingEchoFallbackReason, "audio_lock_failed");
+  assert.equal(closing.closingProviderEndAllowed(fallback), true);
 });
 
 test("the runtime keeps normal video UI and contains no local closing asset or splash", async () => {

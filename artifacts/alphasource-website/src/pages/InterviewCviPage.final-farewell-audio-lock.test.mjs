@@ -28,7 +28,7 @@ const server = await createServer({
 const runtime = await server.ssrLoadModule("/src/pages/InterviewCviPage.tsx");
 after(async () => server.close());
 
-test("candidate publication is disabled synchronously before the avatar closing dispatch", () => {
+test("candidate publication terminally discards the track", () => {
   const calls = [];
   const result = runtime.requestCandidateAudioUnpublish({
     setLocalAudio(enabled, options) {
@@ -37,7 +37,68 @@ test("candidate publication is disabled synchronously before the avatar closing 
     },
   });
   assert.equal(result, "requested");
-  assert.deepEqual(calls, [[false, { forceDiscardTrack: false }]]);
+  assert.deepEqual(calls, [[false, { forceDiscardTrack: true }]]);
+});
+
+test("candidate publication confirmation waits for Daily to report audio off", async () => {
+  const calls = [];
+  const handlers = new Map();
+  const local = {
+    local: true,
+    tracks: { audio: { state: "sendable" } },
+  };
+  const call = {
+    setLocalAudio(enabled, options) {
+      calls.push([enabled, options]);
+      return this;
+    },
+    participants() { return { local }; },
+    on(event, handler) { handlers.set(event, handler); },
+    off(event, handler) {
+      if (handlers.get(event) === handler) handlers.delete(event);
+    },
+  };
+
+  const pending = runtime.confirmCandidateAudioPublicationDisabled(call, {
+    timeoutMs: 100,
+    pollIntervalMs: 50,
+    allowRetry: false,
+  });
+  assert.deepEqual(calls, [[false, { forceDiscardTrack: true }]]);
+  local.tracks.audio.state = "off";
+  handlers.get("participant-updated")?.({ participant: local });
+  const result = await pending;
+  assert.equal(result.category, "confirmed_disabled");
+  assert.equal(result.confirmationSource, "participant_updated");
+  assert.equal(handlers.size, 0);
+});
+
+test("candidate publication confirmation fails closed while audio remains enabled", async () => {
+  const calls = [];
+  const handlers = new Map();
+  const local = {
+    local: true,
+    tracks: { audio: { state: "sendable" } },
+  };
+  const result = await runtime.confirmCandidateAudioPublicationDisabled({
+    setLocalAudio(enabled, options) {
+      calls.push([enabled, options]);
+      return this;
+    },
+    participants() { return { local }; },
+    on(event, handler) { handlers.set(event, handler); },
+    off(event, handler) {
+      if (handlers.get(event) === handler) handlers.delete(event);
+    },
+  }, {
+    timeoutMs: 5,
+    pollIntervalMs: 2,
+    allowRetry: false,
+  });
+  assert.equal(result.category, "definite_failure");
+  assert.equal(result.publicationEnabled, true);
+  assert.deepEqual(calls, [[false, { forceDiscardTrack: true }]]);
+  assert.equal(handlers.size, 0);
 });
 
 test("Start Interview no longer primes or persists local farewell audio", async () => {
@@ -53,7 +114,7 @@ test("Start Interview no longer primes or persists local farewell audio", async 
 test("the live page keeps PAL audio audible while candidate input stays blocked", async () => {
   const source = await readFile(pageSourcePath, "utf8");
   assert.match(source, /remoteAudioRef/);
-  assert.match(source, /requestCandidateAudioUnpublish\(callRef\.current\)/);
+  assert.match(source, /await confirmCandidateAudioPublicationDisabled/);
   assert.doesNotMatch(source, /suppressRemotePalAudio\(remoteAudioRef\.current\)[\s\S]{0,800}buildFinalClosingAnnouncementMessage/);
   assert.doesNotMatch(source, /playLocalClosingAudioOnce/);
 });
