@@ -124,6 +124,43 @@ test("generic and role-specific PAL aliases normalize to one opaque turn identit
   assert.equal(generic.providerSequence, 4);
 });
 
+test("attributed PAL stops without provider correlation fail open with a local ordinal", () => {
+  const generic = normalizePalSpeakingEvent({
+    event_type: "conversation.stopped_speaking",
+    conversation_id: CONVERSATION,
+    properties: { role: "replica", interrupted: false },
+  }, CONVERSATION, 7);
+  const roleSpecific = normalizePalSpeakingEvent({
+    event_type: "conversation.replica.stopped_speaking",
+    conversation_id: CONVERSATION,
+    properties: { interrupted: false },
+  }, CONVERSATION, 8);
+  assert.ok(generic);
+  assert.ok(roleSpecific);
+  assert.equal(generic.kind, "stopped");
+  assert.equal(generic.correlation, "local");
+  assert.equal(generic.providerSequence, null);
+  assert.notEqual(generic.turnKey, roleSpecific.turnKey);
+
+  const armed = armCandidateInactivityNudge(
+    createCandidateInactivityNudgeState(true, INTERVIEW, CONVERSATION),
+    generic,
+    1_000,
+    eligibility(),
+  );
+  assert.equal(armed.action, "armed");
+  assert.equal(armed.state.deadlineAt, 11_000);
+  const duplicateSchemaEvent = armCandidateInactivityNudge(
+    armed.state,
+    roleSpecific,
+    1_500,
+    eligibility(),
+  );
+  assert.equal(duplicateSchemaEvent.action, "suppressed");
+  assert.equal(duplicateSchemaEvent.reason, "duplicate_turn");
+  assert.strictEqual(duplicateSchemaEvent.state, armed.state);
+});
+
 test("unattributed, malformed, and non-speaking provider events fail silent", () => {
   assert.equal(normalizePalSpeakingEvent({ event_type: "conversation.stopped_speaking" }, CONVERSATION), null);
   assert.equal(normalizePalSpeakingEvent({ event_type: "conversation.utterance", role: "replica" }, CONVERSATION), null);

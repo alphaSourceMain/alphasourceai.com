@@ -26,10 +26,15 @@ after(async () => server.close());
 
 const {
   advanceInterviewClosingPhase,
+  closingProviderEndAllowed,
   createInterviewTimeBoundaryState,
   evaluateInterviewTimeBoundary,
   initializeInterviewTimerRuntime,
-  markLocalClosingComplete,
+  markClosingEchoCompleted,
+  markClosingEchoDispatched,
+  markClosingEchoFallback,
+  markClosingComplete,
+  markProviderEndRequested,
   markProviderEndConfirmed,
   preserveInterviewTimerRuntime,
   remainingSecondsAtDeadline,
@@ -62,7 +67,7 @@ test("no application closing action occurs above the exact zero deadline", () =>
   }
 });
 
-test("zero reserves the complete local closing atomically regardless of speaker state", () => {
+test("zero reserves avatar closing without ending or local playback regardless of speaker state", () => {
   for (const [candidateSpeaking, replicaSpeaking] of [[false, false], [true, false], [false, true], [true, true]]) {
     const result = evaluateInterviewTimeBoundary({
       state: createInterviewTimeBoundaryState(),
@@ -70,18 +75,17 @@ test("zero reserves the complete local closing atomically regardless of speaker 
       candidateSpeaking,
       replicaSpeaking,
     });
-    assert.equal(result.state.phase, "LOCAL_CLOSING");
-    assert.equal(result.state.localClosingReserved, true);
-    assert.equal(result.state.remotePalAudioMuted, true);
+    assert.equal(result.state.phase, "AVATAR_CLOSING");
+    assert.equal(result.state.closingReserved, true);
     assert.equal(result.state.candidateAudioUnpublishRequested, true);
-    assert.equal(result.state.localAudioPlayRequested, true);
-    assert.equal(result.state.providerEndRequested, true);
+    assert.equal(result.state.replicaInterruptRequested, true);
+    assert.equal(result.state.closingEchoPhase, "RESERVED");
+    assert.equal(result.state.providerEndRequested, false);
     assert.deepEqual(result.actions, [
-      "reserve_local_closing",
-      "mute_remote_pal_audio",
+      "reserve_avatar_closing",
       "request_candidate_audio_unpublish",
-      "play_local_closing_audio",
-      "request_provider_end",
+      "interrupt_replica",
+      "send_closing_echo",
     ]);
   }
 });
@@ -95,20 +99,31 @@ test("terminal evaluation and completion cannot replay or regress", () => {
     state: first.state,
     remainingSeconds: 0,
   }).actions, []);
-  const complete = markLocalClosingComplete(first.state);
+  const complete = markClosingComplete(first.state);
   assert.equal(complete.phase, "COMPLETE");
   assert.equal(complete.navigationRequested, true);
-  assert.strictEqual(markLocalClosingComplete(complete), complete);
+  assert.strictEqual(markClosingComplete(complete), complete);
   assert.strictEqual(advanceInterviewClosingPhase(complete, "INTERVIEWING"), complete);
 });
 
-test("provider confirmation is idempotent and requires the reserved end request", () => {
+test("provider end is forbidden at zero until avatar completion or bounded fallback", () => {
   const initial = createInterviewTimeBoundaryState();
   assert.strictEqual(markProviderEndConfirmed(initial), initial);
   const closing = evaluateInterviewTimeBoundary({ state: initial, remainingSeconds: 0 }).state;
-  const confirmed = markProviderEndConfirmed(closing);
+  assert.equal(closingProviderEndAllowed(closing), false);
+  const dispatched = markClosingEchoDispatched(closing);
+  assert.equal(closingProviderEndAllowed(dispatched), false);
+  const completed = markClosingEchoCompleted(dispatched);
+  assert.equal(closingProviderEndAllowed(completed), true);
+  const requested = markProviderEndRequested(completed);
+  assert.equal(requested.requested, true);
+  assert.equal(closingProviderEndAllowed(requested.state), false);
+  const confirmed = markProviderEndConfirmed(requested.state);
   assert.equal(confirmed.providerEndConfirmed, true);
   assert.strictEqual(markProviderEndConfirmed(confirmed), confirmed);
+
+  const fallback = markClosingEchoFallback(dispatched, "completion_timeout");
+  assert.equal(closingProviderEndAllowed(fallback), true);
 });
 
 test("same-conversation remount preserves the absolute clock and terminal state", () => {
@@ -138,16 +153,14 @@ test("the monotonic deadline reaches zero exactly and never becomes negative", (
   assert.equal(remainingSecondsAtDeadline(deadline, 101_000), 0);
 });
 
-test("source has one zero-deadline local path and no PAL farewell dispatch", async () => {
+test("source has one zero-deadline avatar path and no local closing media or splash", async () => {
   const source = await readFile(sourcePath, "utf8");
   assert.match(source, /processTimeBoundary\(0\)/);
-  assert.match(source, /playLocalClosingAudioOnce/);
-  assert.match(source, /local_closing_reserved/);
-  assert.match(source, /role="status"/);
-  assert.match(source, /aria-live="assertive"/);
-  assert.doesNotMatch(source, /buildFinalClosingAnnouncementMessage/);
-  assert.doesNotMatch(source, /sendFinalClosingAnnouncement/);
+  assert.match(source, /buildFinalClosingAnnouncementMessage/);
+  assert.match(source, /buildReplicaInterruptMessage/);
+  assert.match(source, /closing_farewell_started/);
+  assert.doesNotMatch(source, /playLocalClosingAudioOnce/);
+  assert.doesNotMatch(source, /localClosingVisible/);
+  assert.doesNotMatch(source, /INTERVIEW_LOCAL_CLOSING_TEXT/);
   assert.doesNotMatch(source, /FINAL_CLOSING_THRESHOLD_SECONDS/);
-  assert.doesNotMatch(source, /closing_farewell_started/);
-  assert.doesNotMatch(source, /closing_candidate_audio_lock_requested/);
 });

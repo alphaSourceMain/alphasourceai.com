@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
 import { alphaSourceLogo } from "@/assets/branding";
-import {
-  INTERVIEW_LOCAL_CLOSING_FALLBACK_MS,
-  INTERVIEW_LOCAL_CLOSING_TEXT,
-  playLocalClosingAudioOnce,
-  type LocalClosingPrimeResult,
-} from "../lib/interviewLocalClosingAudio";
 
 type LiveSessionState = {
   conversation_url: string;
@@ -17,7 +10,6 @@ type LiveSessionState = {
   max_interview_minutes: number | null;
   silence_engagement_owner?: "prompt" | "tavus_patient" | "application_inactivity";
   application_inactivity_control_enabled?: boolean;
-  local_closing_audio_prime_result?: LocalClosingPrimeResult;
   email?: string;
   candidate_id?: string;
   role_id?: string;
@@ -201,6 +193,7 @@ export type NormalizedPalSpeakingEvent = {
   interrupted: boolean;
   applicationControl: boolean;
   inferenceId?: string;
+  correlation: "provider" | "local";
 };
 
 export type CandidateInactivityTransition = {
@@ -214,26 +207,37 @@ export type TimerTone = "normal" | "warning" | "urgent";
 
 export type InterviewClosingPhase =
   | "INTERVIEWING"
-  | "LOCAL_CLOSING"
+  | "AVATAR_CLOSING"
   | "COMPLETE";
+
+export type ClosingEchoPhase =
+  | "IDLE"
+  | "RESERVED"
+  | "DISPATCHED"
+  | "SPEAKING"
+  | "COMPLETED"
+  | "FALLBACK"
+  | "DISPATCH_FAILED";
 
 export type InterviewTimeBoundaryState = {
   phase: InterviewClosingPhase;
-  localClosingReserved: boolean;
-  remotePalAudioMuted: boolean;
+  closingReserved: boolean;
   candidateAudioUnpublishRequested: boolean;
-  localAudioPlayRequested: boolean;
+  replicaInterruptRequested: boolean;
+  closingEchoPhase: ClosingEchoPhase;
+  farewellInferenceId: string | null;
+  closingEchoStarted: boolean;
+  closingEchoFallbackReason: "completion_timeout" | "dispatch_failed" | null;
   providerEndRequested: boolean;
   providerEndConfirmed: boolean;
   navigationRequested: boolean;
 };
 
 export type InterviewTimeBoundaryAction =
-  | "reserve_local_closing"
-  | "mute_remote_pal_audio"
+  | "reserve_avatar_closing"
   | "request_candidate_audio_unpublish"
-  | "play_local_closing_audio"
-  | "request_provider_end";
+  | "interrupt_replica"
+  | "send_closing_echo";
 
 export type InterviewTimeBoundaryEvaluation = {
   state: InterviewTimeBoundaryState;
@@ -326,6 +330,9 @@ export const CANDIDATE_INACTIVITY_NUDGE_THRESHOLD_MS = 10000;
 export const CANDIDATE_INACTIVITY_NUDGE_MAX_LATENESS_MS = 2000;
 export const CANDIDATE_INACTIVITY_NUDGE_TEXT =
   "Take your time. When you’re ready, you can continue.";
+export const FINAL_CLOSING_ANNOUNCEMENT_TEXT =
+  "We are out of time. Thank you for your time. I am ending the session now.";
+export const FINAL_CLOSING_COMPLETION_FALLBACK_MS = 15000;
 const CANDIDATE_INACTIVITY_NUDGE_INFERENCE_PREFIX =
   "alphascreen-candidate-inactivity-nudge";
 // Recognize callbacks from historically deployed PAL-farewell turns so they
@@ -347,8 +354,10 @@ const FINAL_CLOSING_TAB_RUNTIME_ID = boundedOpaqueHash(
 
 export type SharedFinalClosingPhase =
   | "RESERVED"
-  | "REMOTE_AUDIO_MUTED"
-  | "LOCAL_AUDIO_PLAY_REQUESTED"
+  | "CANDIDATE_AUDIO_BLOCKED"
+  | "INTERRUPT_SENT"
+  | "ECHO_DISPATCHED"
+  | "ECHO_COMPLETED"
   | "PROVIDER_END_REQUESTED"
   | "COMPLETE";
 
@@ -362,25 +371,30 @@ type FinalClosingStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 const SHARED_FINAL_CLOSING_PHASE_ORDER: Record<SharedFinalClosingPhase, number> = {
   RESERVED: 0,
-  REMOTE_AUDIO_MUTED: 1,
-  LOCAL_AUDIO_PLAY_REQUESTED: 2,
-  PROVIDER_END_REQUESTED: 3,
-  COMPLETE: 4,
+  CANDIDATE_AUDIO_BLOCKED: 1,
+  INTERRUPT_SENT: 2,
+  ECHO_DISPATCHED: 3,
+  ECHO_COMPLETED: 4,
+  PROVIDER_END_REQUESTED: 5,
+  COMPLETE: 6,
 };
 
 const CLOSING_PHASE_ORDER: Record<InterviewClosingPhase, number> = {
   INTERVIEWING: 0,
-  LOCAL_CLOSING: 1,
+  AVATAR_CLOSING: 1,
   COMPLETE: 2,
 };
 
-export function createInterviewTimeBoundaryState(_sessionKey = "unbound"): InterviewTimeBoundaryState {
+export function createInterviewTimeBoundaryState(sessionKey = "unbound"): InterviewTimeBoundaryState {
   return {
     phase: "INTERVIEWING",
-    localClosingReserved: false,
-    remotePalAudioMuted: false,
+    closingReserved: false,
     candidateAudioUnpublishRequested: false,
-    localAudioPlayRequested: false,
+    replicaInterruptRequested: false,
+    closingEchoPhase: "IDLE",
+    farewellInferenceId: closingApplicationInferenceId(sessionKey),
+    closingEchoStarted: false,
+    closingEchoFallbackReason: null,
     providerEndRequested: false,
     providerEndConfirmed: false,
     navigationRequested: false,
@@ -553,19 +567,22 @@ export function sharedFinalClosingRecoveryPlan(
 ): {
   owned: boolean;
   navigateImmediately: boolean;
-  rearmNavigationFallback: boolean;
+  rearmCompletionFallback: boolean;
   requestProviderEnd: boolean;
 } {
   const owned = state.ownerTabId === tabId;
   const navigateImmediately = state.phase === "COMPLETE";
+  const echoCompleted =
+    SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+    SHARED_FINAL_CLOSING_PHASE_ORDER.ECHO_COMPLETED;
+  const providerEndReserved =
+    SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+    SHARED_FINAL_CLOSING_PHASE_ORDER.PROVIDER_END_REQUESTED;
   return {
     owned,
     navigateImmediately,
-    rearmNavigationFallback: !navigateImmediately,
-    requestProviderEnd:
-      owned &&
-      SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] <
-        SHARED_FINAL_CLOSING_PHASE_ORDER.PROVIDER_END_REQUESTED,
+    rearmCompletionFallback: owned && !echoCompleted,
+    requestProviderEnd: owned && echoCompleted && !providerEndReserved,
   };
 }
 
@@ -802,9 +819,8 @@ export function suppressRemotePalAudio(
 export function attachRemotePalAudioTrack(
   element: HTMLMediaElement | null,
   track: MediaStreamTrack | null,
-  localClosingActive: boolean,
+  _avatarClosingActive: boolean,
 ): RemotePalAudioMuteResult | "attached" {
-  if (localClosingActive) return suppressRemotePalAudio(element);
   if (!element) return "unavailable";
   element.muted = false;
   element.volume = 1;
@@ -839,19 +855,17 @@ export function evaluateInterviewTimeBoundary(input: {
   return {
     state: {
       ...input.state,
-      phase: "LOCAL_CLOSING",
-      localClosingReserved: true,
-      remotePalAudioMuted: true,
+      phase: "AVATAR_CLOSING",
+      closingReserved: true,
       candidateAudioUnpublishRequested: true,
-      localAudioPlayRequested: true,
-      providerEndRequested: true,
+      replicaInterruptRequested: true,
+      closingEchoPhase: "RESERVED",
     },
     actions: [
-      "reserve_local_closing",
-      "mute_remote_pal_audio",
+      "reserve_avatar_closing",
       "request_candidate_audio_unpublish",
-      "play_local_closing_audio",
-      "request_provider_end",
+      "interrupt_replica",
+      "send_closing_echo",
     ],
   };
 }
@@ -870,7 +884,57 @@ export function markProviderEndConfirmed(
   return { ...state, providerEndConfirmed: true };
 }
 
-export function markLocalClosingComplete(
+export function closingProviderEndAllowed(state: InterviewTimeBoundaryState): boolean {
+  return (
+    state.phase === "AVATAR_CLOSING" &&
+    (state.closingEchoPhase === "COMPLETED" || state.closingEchoPhase === "FALLBACK") &&
+    !state.providerEndRequested
+  );
+}
+
+export function markClosingEchoDispatched(
+  state: InterviewTimeBoundaryState,
+  farewellInferenceId = state.farewellInferenceId,
+): InterviewTimeBoundaryState {
+  if (state.phase !== "AVATAR_CLOSING" || state.closingEchoPhase !== "RESERVED") return state;
+  return {
+    ...state,
+    closingEchoPhase: "DISPATCHED",
+    farewellInferenceId,
+  };
+}
+
+export function markClosingEchoCompleted(
+  state: InterviewTimeBoundaryState,
+): InterviewTimeBoundaryState {
+  if (
+    state.phase !== "AVATAR_CLOSING" ||
+    state.closingEchoPhase === "COMPLETED" ||
+    state.closingEchoPhase === "FALLBACK"
+  ) return state;
+  return { ...state, closingEchoPhase: "COMPLETED" };
+}
+
+export function markClosingEchoFallback(
+  state: InterviewTimeBoundaryState,
+  reason: "completion_timeout" | "dispatch_failed",
+): InterviewTimeBoundaryState {
+  if (state.phase !== "AVATAR_CLOSING" || closingProviderEndAllowed(state)) return state;
+  return {
+    ...state,
+    closingEchoPhase: "FALLBACK",
+    closingEchoFallbackReason: reason,
+  };
+}
+
+export function markProviderEndRequested(
+  state: InterviewTimeBoundaryState,
+): { state: InterviewTimeBoundaryState; requested: boolean } {
+  if (!closingProviderEndAllowed(state)) return { state, requested: false };
+  return { state: { ...state, providerEndRequested: true }, requested: true };
+}
+
+export function markClosingComplete(
   state: InterviewTimeBoundaryState,
 ): InterviewTimeBoundaryState {
   if (state.phase === "COMPLETE" && state.navigationRequested) return state;
@@ -879,6 +943,9 @@ export function markLocalClosingComplete(
     navigationRequested: true,
   };
 }
+
+// Compatibility alias retained for the existing boundary regression suite.
+export const markLocalClosingComplete = markClosingComplete;
 
 function monotonicNow(): number {
   return typeof performance !== "undefined" && typeof performance.now === "function"
@@ -915,6 +982,7 @@ function boundedPrimitiveString(...values: unknown[]): string {
 export function normalizePalSpeakingEvent(
   payload: unknown,
   activeConversationId: string,
+  localOrdinal = 1,
 ): NormalizedPalSpeakingEvent | null {
   const data = payload && typeof payload === "object" ? payload as Record<string, any> : {};
   const properties = data.properties && typeof data.properties === "object" && !Array.isArray(data.properties)
@@ -959,8 +1027,15 @@ export function normalizePalSpeakingEvent(
     data.turn_index,
     data.turn_idx,
   );
-  if (!inferenceId && providerSequence === null && turnIndex === null) return null;
-  const turnIdentity = inferenceId || `sequence:${providerSequence ?? turnIndex}`;
+  const providerCorrelation = Boolean(inferenceId) || providerSequence !== null || turnIndex !== null;
+  const safeLocalOrdinal =
+    typeof localOrdinal === "number" && Number.isInteger(localOrdinal) && localOrdinal >= 0
+      ? localOrdinal
+      : 0;
+  const turnIdentity = inferenceId ||
+    (providerCorrelation
+      ? `sequence:${providerSequence ?? turnIndex}`
+      : `local:${conversationId}:${kind}:${safeLocalOrdinal}`);
   const interruptedValue = properties.interrupted ?? data.interrupted;
   const interrupted = interruptedValue === true || String(interruptedValue || "").toLowerCase() === "true";
   const applicationControl =
@@ -975,6 +1050,7 @@ export function normalizePalSpeakingEvent(
     interrupted,
     applicationControl,
     inferenceId,
+    correlation: providerCorrelation ? "provider" : "local",
   };
 }
 
@@ -1003,7 +1079,10 @@ export function createCandidateInactivityNudgeState(
 function inactivityEligibilityFailure(
   eligibility: CandidateInactivityEligibility,
 ): CandidateInactivityNudgeReason | null {
-  if (eligibility.phase === "LOCAL_CLOSING") return "closing";
+  if (
+    eligibility.phase === "AVATAR_CLOSING" ||
+    String(eligibility.phase) === "LOCAL_CLOSING"
+  ) return "closing";
   if (eligibility.phase === "COMPLETE") return "termination";
   if (
     typeof eligibility.remainingSeconds === "number" &&
@@ -1084,6 +1163,12 @@ export function armCandidateInactivityNudge(
     event.providerSequence <= state.highestProviderSequence
   ) {
     return { state, action: "suppressed", reason: "stale_sequence" };
+  }
+  // Multiple provider schemas may describe the same stop. Once a quiet
+  // window is armed, another stop cannot extend it; a new PAL start cancels
+  // the window before a later genuine turn may arm a fresh one.
+  if (state.phase === "ARMED_AFTER_PAL_TURN") {
+    return { state, action: "suppressed", reason: "duplicate_turn" };
   }
 
   const highestProviderSequence = event.providerSequence === null
@@ -1286,6 +1371,76 @@ export function buildCandidateInactivityNudgeMessage(
       inference_id: `${CANDIDATE_INACTIVITY_NUDGE_INFERENCE_PREFIX}-${boundedOpaqueHash(turnKey)}`,
     },
   };
+}
+
+export function closingApplicationInferenceId(conversationId: string): string {
+  return `${CLOSING_FAREWELL_INFERENCE_PREFIX}-${boundedOpaqueHash(conversationId)}`;
+}
+
+export function buildReplicaInterruptMessage(conversationId: string) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.interrupt",
+    conversation_id: conversationId,
+  };
+}
+
+export function buildFinalClosingAnnouncementMessage(
+  conversationId: string,
+  inferenceId = closingApplicationInferenceId(conversationId),
+) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.echo",
+    conversation_id: conversationId,
+    properties: {
+      modality: "text",
+      text: FINAL_CLOSING_ANNOUNCEMENT_TEXT,
+      done: true,
+      inference_id: inferenceId,
+    },
+  };
+}
+
+export function recordClosingEchoSpeechEvent(
+  state: InterviewTimeBoundaryState,
+  event: NormalizedPalSpeakingEvent,
+  activeConversationId: string,
+): {
+  state: InterviewTimeBoundaryState;
+  transition: "none" | "speaking" | "completed";
+} {
+  if (
+    state.phase !== "AVATAR_CLOSING" ||
+    (state.closingEchoPhase !== "DISPATCHED" && state.closingEchoPhase !== "SPEAKING") ||
+    event.conversationId !== activeConversationId
+  ) return { state, transition: "none" };
+
+  const expectedInferenceId = state.farewellInferenceId ||
+    closingApplicationInferenceId(activeConversationId);
+  const hasInferenceId = Boolean(event.inferenceId);
+  if (hasInferenceId && event.inferenceId !== expectedInferenceId) {
+    return { state, transition: "none" };
+  }
+
+  if (event.kind === "started") {
+    if (event.interrupted) return { state, transition: "none" };
+    return {
+      state: {
+        ...state,
+        closingEchoPhase: "SPEAKING",
+        closingEchoStarted: true,
+      },
+      transition: "speaking",
+    };
+  }
+
+  const strongCompletion = hasInferenceId && event.inferenceId === expectedInferenceId;
+  const weakCompletion = !hasInferenceId && state.closingEchoStarted;
+  if (event.kind === "stopped" && !event.interrupted && (strongCompletion || weakCompletion)) {
+    return { state: markClosingEchoCompleted(state), transition: "completed" };
+  }
+  return { state, transition: "none" };
 }
 
 type CandidateInactivityLeaseStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -1844,7 +1999,6 @@ export default function InterviewCviPage() {
   const [progressStalled, setProgressStalled] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasLocalVideo, setHasLocalVideo] = useState(false);
-  const [localClosingVisible, setLocalClosingVisible] = useState(false);
 
   const callRef = useRef<DailyCallObject | null>(null);
   const leavingRef = useRef(false);
@@ -1852,16 +2006,13 @@ export default function InterviewCviPage() {
   const endTriggeredRef = useRef(false);
   const timerRuntimeRef = useRef<InterviewTimerRuntimeState | null>(null);
   const finalTerminationTimerRef = useRef<number | null>(null);
-  const localClosingNavigationTimerRef = useRef<number | null>(null);
-  const localClosingActiveRef = useRef(false);
-  const localClosingOwnedRef = useRef(false);
-  const localClosingNavigationRef = useRef(false);
-  const localClosingFallbackReasonRef = useRef<
-    "play_failed" | "playback_stalled" | "load_failed"
-  >("playback_stalled");
-  const remotePalAudioSuppressedRef = useRef(false);
+  const closingCompletionTimerRef = useRef<number | null>(null);
+  const avatarClosingActiveRef = useRef(false);
+  const avatarClosingOwnedRef = useRef(false);
+  const closingNavigationRef = useRef(false);
   const candidateAudioUnpublishRequestedRef = useRef(false);
-  const localClosingAudioPlayRequestedRef = useRef(false);
+  const replicaInterruptRequestedRef = useRef(false);
+  const closingEchoDispatchRequestedRef = useRef(false);
   const startupRemoteSeenRef = useRef(false);
   const startupRecoveryAttemptedRef = useRef(false);
   const startupTimerRef = useRef<number | null>(null);
@@ -1894,7 +2045,7 @@ export default function InterviewCviPage() {
   const inactivityRemoteEvidenceRef = useRef<RemoteParticipantEvidence | null>(null);
   const inactivityTabIdRef = useRef("");
   const finalClosingTabIdRef = useRef("");
-  const localClosingPrimeDiagnosticSentRef = useRef(false);
+  const palSpeechEventOrdinalRef = useRef(0);
   const telemetrySequenceRef = useRef(0);
   const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -1926,9 +2077,9 @@ export default function InterviewCviPage() {
       window.clearTimeout(finalTerminationTimerRef.current);
       finalTerminationTimerRef.current = null;
     }
-    if (localClosingNavigationTimerRef.current) {
-      window.clearTimeout(localClosingNavigationTimerRef.current);
-      localClosingNavigationTimerRef.current = null;
+    if (closingCompletionTimerRef.current) {
+      window.clearTimeout(closingCompletionTimerRef.current);
+      closingCompletionTimerRef.current = null;
     }
   }, []);
 
@@ -1953,14 +2104,11 @@ export default function InterviewCviPage() {
 
     setElementTrack(localVideoRef.current, localVideoTrack);
     setElementTrack(remoteVideoRef.current, remoteVideoTrack);
-    const remoteAudioResult = attachRemotePalAudioTrack(
+    attachRemotePalAudioTrack(
       remoteAudioRef.current,
       remoteAudioTrack,
-      localClosingActiveRef.current,
+      avatarClosingActiveRef.current,
     );
-    if (remoteAudioResult === "muted_detached" || remoteAudioResult === "already_muted") {
-      remotePalAudioSuppressedRef.current = true;
-    }
 
     const hasRemote = Boolean(remoteVideoTrack);
     setHasRemoteVideo(hasRemote);
@@ -2097,26 +2245,6 @@ export default function InterviewCviPage() {
       telemetryPendingRef.current.add(request);
     } catch {}
   }, [session]);
-
-  useEffect(() => {
-    if (localClosingPrimeDiagnosticSentRef.current) return;
-    const result = session?.local_closing_audio_prime_result;
-    if (!result) return;
-    localClosingPrimeDiagnosticSentRef.current = true;
-    if (result === "primed") {
-      sendLifecycleTelemetry("local_closing_audio_primed", {
-        closing_state: "INTERVIEWING",
-        playback_result_category: "primed",
-        audio_duration_bucket: "4_5_seconds",
-      });
-      return;
-    }
-    sendLifecycleTelemetry("local_closing_audio_prime_failed", {
-      closing_state: "INTERVIEWING",
-      playback_result_category: result,
-      audio_duration_bucket: "4_5_seconds",
-    });
-  }, [sendLifecycleTelemetry, session?.local_closing_audio_prime_result]);
 
   const currentInactivityEligibility = useCallback((): CandidateInactivityEligibility => {
     const remote = inactivityRemoteEvidenceRef.current;
@@ -2276,33 +2404,33 @@ export default function InterviewCviPage() {
   ]);
 
 
-  const completeLocalClosingNavigation = useCallback((
-    fallbackReason?: "play_failed" | "playback_stalled" | "load_failed" | "observer_reload",
+  const completeClosingNavigation = useCallback((
+    fallbackReason?: "completion_timeout" | "dispatch_failed" | "observer_reload",
   ) => {
-    if (localClosingNavigationRef.current) return;
-    localClosingNavigationRef.current = true;
-    if (localClosingNavigationTimerRef.current) {
-      window.clearTimeout(localClosingNavigationTimerRef.current);
-      localClosingNavigationTimerRef.current = null;
+    if (closingNavigationRef.current) return;
+    closingNavigationRef.current = true;
+    if (closingCompletionTimerRef.current) {
+      window.clearTimeout(closingCompletionTimerRef.current);
+      closingCompletionTimerRef.current = null;
     }
     const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
-    const completed = markLocalClosingComplete(current);
+    const completed = markClosingComplete(current);
     persistBoundaryState(completed);
     const conversationId = String(session?.conversation_id || "").trim();
-    if (localClosingOwnedRef.current && conversationId && typeof window !== "undefined") {
+    if (avatarClosingOwnedRef.current && conversationId && typeof window !== "undefined") {
       advanceSharedFinalClosingRuntime(
         window.localStorage,
         conversationId,
         finalClosingTabIdRef.current,
         "COMPLETE",
       );
-      if (fallbackReason) {
-        sendLifecycleTelemetry("local_closing_navigation_fallback", {
-          closing_state: "COMPLETE",
-          fallback_reason: fallbackReason,
-          remaining_time_bucket: "0_10",
-        }, { terminal: true });
-      }
+    }
+    if (fallbackReason) {
+      sendLifecycleTelemetry("closing_farewell_fallback", {
+        closing_state: "COMPLETE",
+        fallback_reason: fallbackReason,
+        remaining_time_bucket: "zero",
+      }, { terminal: true });
     }
     try {
       window.sessionStorage.removeItem(LIVE_STATE_KEY);
@@ -2310,10 +2438,15 @@ export default function InterviewCviPage() {
     setLocation("/interview/complete");
   }, [persistBoundaryState, sendLifecycleTelemetry, session?.conversation_id, setLocation]);
 
-  const requestClosingProviderEnd = useCallback(async () => {
-    if (!localClosingOwnedRef.current) return false;
+  const requestClosingProviderEnd = useCallback(async (
+    fallbackReason?: "completion_timeout" | "dispatch_failed" | "observer_reload",
+  ) => {
+    if (!avatarClosingOwnedRef.current) return false;
     const conversationId = String(session?.conversation_id || "").trim();
     if (!conversationId || typeof window === "undefined") return false;
+    const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
+    const requested = markProviderEndRequested(current);
+    if (!requested.requested) return false;
     const claim = advanceSharedFinalClosingRuntime(
       window.localStorage,
       conversationId,
@@ -2321,33 +2454,68 @@ export default function InterviewCviPage() {
       "PROVIDER_END_REQUESTED",
     );
     if (!sharedProviderEndAttemptAllowed(claim)) return false;
+    persistBoundaryState(requested.state);
     sendLifecycleTelemetry("provider_end_requested", {
-      closing_state: "LOCAL_CLOSING",
-      remaining_time_bucket: "0_10",
-      hard_deadline: true,
+      closing_state: "AVATAR_CLOSING",
+      remaining_time_bucket: "zero",
       provider_end_result_category: "requested",
     });
-    const confirmed = await endInterview("time_limit_hard_deadline", true);
+    const confirmed = await endInterview("time_limit_avatar_farewell_complete", true);
     if (confirmed) {
-      const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
-      persistBoundaryState(markProviderEndConfirmed(current));
-      sendLifecycleTelemetry("provider_end_confirmed", {
-        closing_state: "LOCAL_CLOSING",
-        remaining_time_bucket: "0_10",
-        hard_deadline: true,
-        provider_end_result_category: "confirmed",
-      }, { terminal: true });
+      const latest = timerRuntimeRef.current?.boundaryState || requested.state;
+      persistBoundaryState(markProviderEndConfirmed(latest));
     }
+    sendLifecycleTelemetry("provider_end_confirmed", {
+      closing_state: "AVATAR_CLOSING",
+      remaining_time_bucket: "zero",
+      provider_end_result_category: confirmed ? "confirmed" : "unconfirmed",
+    }, { terminal: true });
+    completeClosingNavigation(fallbackReason);
     return confirmed;
-  }, [endInterview, persistBoundaryState, sendLifecycleTelemetry, session?.conversation_id]);
+  }, [completeClosingNavigation, endInterview, persistBoundaryState, sendLifecycleTelemetry, session?.conversation_id]);
 
-  const beginLocalClosing = useCallback((nextState: InterviewTimeBoundaryState) => {
-    if (localClosingActiveRef.current) return;
-    localClosingActiveRef.current = true;
+  const finishAvatarClosingSpeech = useCallback((
+    state: InterviewTimeBoundaryState,
+    fallbackReason?: "completion_timeout" | "dispatch_failed" | "observer_reload",
+  ) => {
+    if (!avatarClosingOwnedRef.current) return;
+    if (closingCompletionTimerRef.current) {
+      window.clearTimeout(closingCompletionTimerRef.current);
+      closingCompletionTimerRef.current = null;
+    }
+    persistBoundaryState(state);
+    const conversationId = String(session?.conversation_id || "").trim();
+    if (conversationId && typeof window !== "undefined") {
+      advanceSharedFinalClosingRuntime(
+        window.localStorage,
+        conversationId,
+        finalClosingTabIdRef.current,
+        "ECHO_COMPLETED",
+      );
+    }
+    void requestClosingProviderEnd(fallbackReason);
+  }, [persistBoundaryState, requestClosingProviderEnd, session?.conversation_id]);
+
+  const armClosingCompletionFallback = useCallback(() => {
+    if (closingCompletionTimerRef.current || !avatarClosingOwnedRef.current) return;
+    closingCompletionTimerRef.current = window.setTimeout(() => {
+      closingCompletionTimerRef.current = null;
+      const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
+      if (current.phase !== "AVATAR_CLOSING" || closingProviderEndAllowed(current)) return;
+      const fallback = markClosingEchoFallback(current, "completion_timeout");
+      sendLifecycleTelemetry("closing_farewell_completion_timeout", {
+        closing_state: "AVATAR_CLOSING",
+        completion_result_category: "timeout",
+        remaining_time_bucket: "zero",
+      });
+      finishAvatarClosingSpeech(fallback, "completion_timeout");
+    }, FINAL_CLOSING_COMPLETION_FALLBACK_MS);
+  }, [finishAvatarClosingSpeech, sendLifecycleTelemetry]);
+
+  const beginAvatarClosing = useCallback((nextState: InterviewTimeBoundaryState) => {
+    if (avatarClosingActiveRef.current) return;
+    avatarClosingActiveRef.current = true;
     persistBoundaryState(nextState);
-    // Commit the accessible terminal overlay before any local playback can
-    // start or the provider end request can tear down the remote session.
-    flushSync(() => setLocalClosingVisible(true));
     setHelpOpen(false);
     setConnectionNotice("");
     cancelInactivityRuntime("closing", true);
@@ -2363,110 +2531,105 @@ export default function InterviewCviPage() {
             finalClosingTabIdRef.current,
           )
         : { state: null, owned: false, reason: "shared_storage_unavailable" };
-    localClosingOwnedRef.current = sharedClaim.owned;
+    avatarClosingOwnedRef.current = sharedClaim.owned;
+    if (!sharedClaim.owned) return;
 
-    const muteResult = suppressRemotePalAudio(remoteAudioRef.current);
-    remotePalAudioSuppressedRef.current =
-      muteResult === "muted_detached" || muteResult === "already_muted";
-
-    if (!sharedClaim.owned) {
-      localClosingNavigationTimerRef.current = window.setTimeout(
-        () => completeLocalClosingNavigation("observer_reload"),
-        INTERVIEW_LOCAL_CLOSING_FALLBACK_MS,
-      );
-      return;
-    }
-
-    sendLifecycleTelemetry("local_closing_reserved", {
-      closing_state: "LOCAL_CLOSING",
-      remaining_time_bucket: "0_10",
-    });
-    advanceSharedFinalClosingRuntime(
-      window.localStorage,
-      conversationId,
-      finalClosingTabIdRef.current,
-      "REMOTE_AUDIO_MUTED",
-    );
-    sendLifecycleTelemetry("remote_pal_audio_muted", {
-      closing_state: "LOCAL_CLOSING",
-      mute_result_category: muteResult,
-      remaining_time_bucket: "0_10",
+    sendLifecycleTelemetry("avatar_closing_reserved", {
+      closing_state: "AVATAR_CLOSING",
+      remaining_time_bucket: "zero",
     });
 
     if (!candidateAudioUnpublishRequestedRef.current) {
       candidateAudioUnpublishRequestedRef.current = true;
       const unpublishResult = requestCandidateAudioUnpublish(callRef.current);
-      sendLifecycleTelemetry("candidate_audio_unpublish_requested", {
-        closing_state: "LOCAL_CLOSING",
-        candidate_unpublish_result_category: unpublishResult,
-        remaining_time_bucket: "0_10",
-      });
-    }
-
-    localClosingNavigationTimerRef.current = window.setTimeout(
-      () => completeLocalClosingNavigation(localClosingFallbackReasonRef.current),
-      INTERVIEW_LOCAL_CLOSING_FALLBACK_MS,
-    );
-
-    if (!localClosingAudioPlayRequestedRef.current) {
-      localClosingAudioPlayRequestedRef.current = true;
       advanceSharedFinalClosingRuntime(
         window.localStorage,
         conversationId,
         finalClosingTabIdRef.current,
-        "LOCAL_AUDIO_PLAY_REQUESTED",
+        "CANDIDATE_AUDIO_BLOCKED",
       );
-      sendLifecycleTelemetry("local_closing_audio_play_requested", {
-        closing_state: "LOCAL_CLOSING",
-        playback_result_category: "requested",
-        audio_duration_bucket: "4_5_seconds",
-        remaining_time_bucket: "0_10",
-      });
-      void playLocalClosingAudioOnce({
-        onStarted: () => {
-          sendLifecycleTelemetry("local_closing_audio_started", {
-            closing_state: "LOCAL_CLOSING",
-            playback_result_category: "started",
-            audio_duration_bucket: "4_5_seconds",
-            remaining_time_bucket: "0_10",
-          });
-        },
-        onEnded: () => {
-          sendLifecycleTelemetry("local_closing_audio_completed", {
-            closing_state: "LOCAL_CLOSING",
-            playback_result_category: "completed",
-            audio_duration_bucket: "4_5_seconds",
-            remaining_time_bucket: "0_10",
-          }, { terminal: true });
-          completeLocalClosingNavigation();
-        },
-        onFailed: () => {
-          localClosingFallbackReasonRef.current = "play_failed";
-          sendLifecycleTelemetry("local_closing_audio_play_failed", {
-            closing_state: "LOCAL_CLOSING",
-            playback_result_category: "play_failed",
-            audio_duration_bucket: "4_5_seconds",
-            remaining_time_bucket: "0_10",
-          });
-        },
-      }).then((result) => {
-        if (result === "unavailable") localClosingFallbackReasonRef.current = "load_failed";
-        else if (result === "play_failed") localClosingFallbackReasonRef.current = "play_failed";
+      sendLifecycleTelemetry("candidate_audio_unpublish_requested", {
+        closing_state: "AVATAR_CLOSING",
+        candidate_unpublish_result_category: unpublishResult,
+        remaining_time_bucket: "zero",
       });
     }
 
-    void requestClosingProviderEnd();
+    const call = callRef.current;
+    if (!replicaInterruptRequestedRef.current && call?.sendAppMessage) {
+      replicaInterruptRequestedRef.current = true;
+      try {
+        call.sendAppMessage(buildReplicaInterruptMessage(conversationId), "*");
+        advanceSharedFinalClosingRuntime(
+          window.localStorage,
+          conversationId,
+          finalClosingTabIdRef.current,
+          "INTERRUPT_SENT",
+        );
+        sendLifecycleTelemetry("closing_replica_interrupt_sent", {
+          closing_state: "AVATAR_CLOSING",
+          dispatch_result_category: "sent",
+          remaining_time_bucket: "zero",
+        });
+      } catch {
+        sendLifecycleTelemetry("closing_replica_interrupt_failed", {
+          closing_state: "AVATAR_CLOSING",
+          dispatch_result_category: "failed",
+          remaining_time_bucket: "zero",
+        });
+      }
+    }
+
+    if (!closingEchoDispatchRequestedRef.current) {
+      closingEchoDispatchRequestedRef.current = true;
+      const inferenceId = closingApplicationInferenceId(conversationId);
+      try {
+        if (!call?.sendAppMessage) throw new Error("closing_echo_unavailable");
+        call.sendAppMessage(
+          buildFinalClosingAnnouncementMessage(conversationId, inferenceId),
+          "*",
+        );
+        const dispatched = markClosingEchoDispatched(
+          timerRuntimeRef.current?.boundaryState || nextState,
+          inferenceId,
+        );
+        persistBoundaryState(dispatched);
+        advanceSharedFinalClosingRuntime(
+          window.localStorage,
+          conversationId,
+          finalClosingTabIdRef.current,
+          "ECHO_DISPATCHED",
+        );
+        sendLifecycleTelemetry("closing_farewell_dispatched", {
+          closing_state: "AVATAR_CLOSING",
+          dispatch_result_category: "sent",
+          remaining_time_bucket: "zero",
+        });
+        armClosingCompletionFallback();
+      } catch {
+        const failed = markClosingEchoFallback(
+          timerRuntimeRef.current?.boundaryState || nextState,
+          "dispatch_failed",
+        );
+        sendLifecycleTelemetry("closing_farewell_dispatch_failed", {
+          closing_state: "AVATAR_CLOSING",
+          dispatch_result_category: "failed",
+          remaining_time_bucket: "zero",
+        });
+        finishAvatarClosingSpeech(failed, "dispatch_failed");
+      }
+    }
   }, [
+    armClosingCompletionFallback,
     cancelInactivityRuntime,
-    completeLocalClosingNavigation,
+    finishAvatarClosingSpeech,
     persistBoundaryState,
-    requestClosingProviderEnd,
     sendLifecycleTelemetry,
     session?.conversation_id,
   ]);
 
   const processTimeBoundary = useCallback((remaining: number) => {
-    if (localClosingActiveRef.current) return;
+    if (avatarClosingActiveRef.current) return;
     const runtime = timerRuntimeRef.current;
     const previousState = runtime?.boundaryState || createInterviewTimeBoundaryState();
     const evaluation = evaluateInterviewTimeBoundary({
@@ -2476,8 +2639,8 @@ export default function InterviewCviPage() {
       replicaSpeaking: replicaSpeakingRef.current,
     });
     if (!evaluation.actions.length) return;
-    beginLocalClosing(evaluation.state);
-  }, [beginLocalClosing]);
+    beginAvatarClosing(evaluation.state);
+  }, [beginAvatarClosing]);
 
   useEffect(() => () => clearAutoEndTimers(), [clearAutoEndTimers]);
 
@@ -2493,43 +2656,49 @@ export default function InterviewCviPage() {
         state,
         finalClosingTabIdRef.current,
       );
-      localClosingActiveRef.current = true;
-      localClosingOwnedRef.current = recoveryPlan.owned;
-      setLocalClosingVisible(true);
+      avatarClosingActiveRef.current = true;
+      avatarClosingOwnedRef.current = recoveryPlan.owned;
       setHelpOpen(false);
       setConnectionNotice("");
       cancelInactivityRuntime("closing", true);
-      suppressRemotePalAudio(remoteAudioRef.current);
       const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
       if (current.phase === "INTERVIEWING") {
         persistBoundaryState({
           ...current,
-          phase: "LOCAL_CLOSING",
-          localClosingReserved: true,
-          remotePalAudioMuted: true,
+          phase: "AVATAR_CLOSING",
+          closingReserved: true,
+          candidateAudioUnpublishRequested:
+            SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+            SHARED_FINAL_CLOSING_PHASE_ORDER.CANDIDATE_AUDIO_BLOCKED,
+          replicaInterruptRequested:
+            SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+            SHARED_FINAL_CLOSING_PHASE_ORDER.INTERRUPT_SENT,
+          closingEchoPhase:
+            SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+            SHARED_FINAL_CLOSING_PHASE_ORDER.ECHO_COMPLETED
+              ? "COMPLETED"
+              : SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
+                  SHARED_FINAL_CLOSING_PHASE_ORDER.ECHO_DISPATCHED
+                ? "DISPATCHED"
+                : "RESERVED",
         });
       }
       if (recoveryPlan.navigateImmediately) {
-        completeLocalClosingNavigation("observer_reload");
+        completeClosingNavigation("observer_reload");
         return;
       }
-      // Unmount cleanup clears component timers. Every remounted terminal
-      // observer, including the original owner, must re-arm navigation. The
-      // shared phase prevents replaying local audio or a second provider end.
-      if (recoveryPlan.rearmNavigationFallback && !localClosingNavigationTimerRef.current) {
-        localClosingNavigationTimerRef.current = window.setTimeout(
-          () => completeLocalClosingNavigation("observer_reload"),
-          INTERVIEW_LOCAL_CLOSING_FALLBACK_MS,
-        );
-      }
+      // A remount never replays the Echo. The owner restores only the
+      // completion fallback or the single provider-end transition.
+      if (recoveryPlan.rearmCompletionFallback) armClosingCompletionFallback();
       if (recoveryPlan.requestProviderEnd) void requestClosingProviderEnd();
     };
     window.addEventListener("storage", enforceFromSharedState);
     enforceFromSharedState();
     return () => window.removeEventListener("storage", enforceFromSharedState);
   }, [
+    armClosingCompletionFallback,
     cancelInactivityRuntime,
-    completeLocalClosingNavigation,
+    completeClosingNavigation,
     persistBoundaryState,
     requestClosingProviderEnd,
     session?.conversation_id,
@@ -2733,11 +2902,10 @@ export default function InterviewCviPage() {
             await call.join({
               url: session.conversation_url,
               userName: "Candidate",
-              startAudioOff: localClosingActiveRef.current,
+              startAudioOff: avatarClosingActiveRef.current,
               startVideoOff: false,
             });
             if (!alive || endTriggeredRef.current) return;
-            if (localClosingActiveRef.current) suppressRemotePalAudio(remoteAudioRef.current);
             beginStartupWatchdog();
             return;
           } catch {
@@ -2957,6 +3125,10 @@ export default function InterviewCviPage() {
           stopProgressWatchdog();
           return;
         }
+        if (avatarClosingActiveRef.current) {
+          stopProgressWatchdog();
+          return;
+        }
 
         const evaluationAt = Date.now();
         const evaluation = evaluateProgressWatchdog({
@@ -3044,17 +3216,20 @@ export default function InterviewCviPage() {
           progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
           ...recoveryMetadata(),
         }, { reason: "watchdog_timeout" });
+        if (avatarClosingActiveRef.current) {
+          stopProgressWatchdog();
+          return;
+        }
         try {
           await recoveryCall.leave().catch(() => {});
           if (!alive || endTriggeredRef.current) return;
           await recoveryCall.join({
             url: session.conversation_url,
             userName: "Candidate",
-            startAudioOff: localClosingActiveRef.current,
+            startAudioOff: avatarClosingActiveRef.current,
             startVideoOff: false,
           });
           if (!alive || endTriggeredRef.current) return;
-          if (localClosingActiveRef.current) suppressRemotePalAudio(remoteAudioRef.current);
           recordReconnectLocalJoin(Date.now());
           syncParticipantsWithDiagnostics();
         } catch {
@@ -3151,17 +3326,46 @@ export default function InterviewCviPage() {
         });
         register("app-message", (event) => {
           if (!alive || endTriggeredRef.current) return;
-          // Once the deterministic local closing owns the UI, provider app
-          // messages cannot re-enter interview turn-taking or navigate away
-          // before the bundled farewell completes.
-          if (localClosingActiveRef.current) return;
           const data = event?.data ?? event ?? {};
           const eventType = String(data?.event_type || data?.eventType || "").toLowerCase();
           const utteranceRole = String(data?.properties?.role || data?.role || "").toLowerCase();
+          const nextPalSpeechOrdinal = palSpeechEventOrdinalRef.current + 1;
           const normalizedPalSpeaking = normalizePalSpeakingEvent(
             data,
             String(session.conversation_id || "").trim(),
+            nextPalSpeechOrdinal,
           );
+          if (normalizedPalSpeaking) palSpeechEventOrdinalRef.current = nextPalSpeechOrdinal;
+
+          // Closing blocks ordinary turn-taking but must continue observing
+          // replica speaking events so the provider session ends only after
+          // the avatar has finished the exact farewell.
+          if (avatarClosingActiveRef.current) {
+            if (!normalizedPalSpeaking) return;
+            const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
+            const closingEvent = recordClosingEchoSpeechEvent(
+              current,
+              normalizedPalSpeaking,
+              String(session.conversation_id || "").trim(),
+            );
+            if (closingEvent.transition === "none") return;
+            persistBoundaryState(closingEvent.state);
+            if (closingEvent.transition === "speaking") {
+              sendLifecycleTelemetry("closing_farewell_started", {
+                closing_state: "AVATAR_CLOSING",
+                speech_result_category: "started",
+                remaining_time_bucket: "zero",
+              });
+              return;
+            }
+            sendLifecycleTelemetry("closing_farewell_completed", {
+              closing_state: "AVATAR_CLOSING",
+              speech_result_category: "completed",
+              remaining_time_bucket: "zero",
+            });
+            finishAvatarClosingSpeech(closingEvent.state);
+            return;
+          }
           const speech = String(data?.properties?.speech || data?.properties?.text || data?.speech || data?.text || "");
           const isReplicaUtterance =
             eventType === "conversation.utterance" &&
@@ -3305,11 +3509,10 @@ export default function InterviewCviPage() {
         await call.join({
           url: session.conversation_url,
           userName: "Candidate",
-          startAudioOff: localClosingActiveRef.current,
+          startAudioOff: avatarClosingActiveRef.current,
           startVideoOff: false,
         });
         if (!alive) return;
-        if (localClosingActiveRef.current) suppressRemotePalAudio(remoteAudioRef.current);
         syncParticipantsWithDiagnostics();
         beginProgressWatchdog();
       } catch {
@@ -3345,7 +3548,9 @@ export default function InterviewCviPage() {
     cancelInactivityRuntime,
     clearStartupTimer,
     endInterview,
+    finishAvatarClosingSpeech,
     leaveLiveRoute,
+    persistBoundaryState,
     processTimeBoundary,
     recordInactivityCandidateActivity,
     sendLifecycleTelemetry,
@@ -3426,7 +3631,7 @@ export default function InterviewCviPage() {
         if (!alive || !resp.ok) return;
         const status = String(data?.status || "");
         if (status === "ending_requested" || status === "Ended") {
-          if (localClosingActiveRef.current) return;
+          if (avatarClosingActiveRef.current) return;
           await leaveLiveRoute();
         }
       } catch {}
@@ -3475,31 +3680,6 @@ export default function InterviewCviPage() {
   }, [candidateAssistanceContact]);
 
   if (!session) return null;
-
-  if (localClosingVisible) {
-    return (
-      <div
-        className="min-h-screen bg-[#F8F9FD] flex items-center justify-center px-6"
-        style={{ fontFamily: "'Raleway', sans-serif" }}
-      >
-        <section
-          role="status"
-          aria-live="assertive"
-          aria-atomic="true"
-          className="w-full max-w-2xl rounded-2xl bg-white px-6 py-10 sm:px-10 text-center"
-          style={{
-            border: "1px solid rgba(10,21,71,0.10)",
-            boxShadow: "0 12px 40px rgba(10,21,71,0.12)",
-          }}
-        >
-          <img src={alphaSourceLogo} alt="alphaSource AI" className="h-10 w-auto mx-auto mb-7" />
-          <h1 className="text-xl sm:text-2xl font-black leading-relaxed text-[#0A1547]">
-            {INTERVIEW_LOCAL_CLOSING_TEXT}
-          </h1>
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] flex flex-col" style={{ fontFamily: "'Raleway', sans-serif" }}>

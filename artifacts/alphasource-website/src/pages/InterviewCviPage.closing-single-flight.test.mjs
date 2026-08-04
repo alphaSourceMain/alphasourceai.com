@@ -13,6 +13,11 @@ process.env.PORT ||= "4183";
 process.env.BASE_PATH ||= "/";
 process.env.NODE_ENV = "test";
 
+globalThis.MediaStream ||= class MediaStream {
+  constructor(tracks = []) { this.tracks = tracks; }
+  getTracks() { return this.tracks; }
+};
+
 const server = await createServer({
   appType: "custom",
   configFile: join(websiteRoot, "vite.config.ts"),
@@ -33,7 +38,6 @@ const {
   requestCandidateAudioUnpublish,
   sharedFinalClosingRecoveryPlan,
   sharedProviderEndAttemptAllowed,
-  suppressRemotePalAudio,
 } = closing;
 
 function memoryStorage() {
@@ -72,14 +76,14 @@ test("one tab exclusively claims a conversation-bound closing", () => {
   );
 });
 
-test("only the owner can monotonically advance and request provider end once", () => {
+test("only the owner can monotonically advance through avatar Echo and request provider end once", () => {
   const storage = memoryStorage();
   claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
   assert.equal(
-    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", "REMOTE_AUDIO_MUTED").advanced,
+    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", "CANDIDATE_AUDIO_BLOCKED").advanced,
     false,
   );
-  for (const phase of ["REMOTE_AUDIO_MUTED", "LOCAL_AUDIO_PLAY_REQUESTED"]) {
+  for (const phase of ["CANDIDATE_AUDIO_BLOCKED", "INTERRUPT_SENT", "ECHO_DISPATCHED", "ECHO_COMPLETED"]) {
     assert.equal(
       advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", phase).advanced,
       true,
@@ -106,7 +110,7 @@ test("only the owner can monotonically advance and request provider end once", (
   );
 });
 
-test("owner remount re-arms completion without replaying a reserved provider end", () => {
+test("owner remount never replays Echo and requests provider end only after completion", () => {
   const reserved = { version: 1, ownerTabId: "tab-a", phase: "RESERVED" };
   const requested = { ...reserved, phase: "PROVIDER_END_REQUESTED" };
   const complete = { ...reserved, phase: "COMPLETE" };
@@ -114,25 +118,32 @@ test("owner remount re-arms completion without replaying a reserved provider end
   assert.deepEqual(sharedFinalClosingRecoveryPlan(reserved, "tab-a"), {
     owned: true,
     navigateImmediately: false,
-    rearmNavigationFallback: true,
+    rearmCompletionFallback: true,
+    requestProviderEnd: false,
+  });
+  const echoCompleted = { ...reserved, phase: "ECHO_COMPLETED" };
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(echoCompleted, "tab-a"), {
+    owned: true,
+    navigateImmediately: false,
+    rearmCompletionFallback: false,
     requestProviderEnd: true,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-a"), {
     owned: true,
     navigateImmediately: false,
-    rearmNavigationFallback: true,
+    rearmCompletionFallback: false,
     requestProviderEnd: false,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-b"), {
     owned: false,
     navigateImmediately: false,
-    rearmNavigationFallback: true,
+    rearmCompletionFallback: false,
     requestProviderEnd: false,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(complete, "tab-a"), {
     owned: true,
     navigateImmediately: true,
-    rearmNavigationFallback: false,
+    rearmCompletionFallback: false,
     requestProviderEnd: false,
   });
 });
@@ -146,23 +157,13 @@ test("ambiguous shared state fails closed and never grants ownership", () => {
   assert.equal(claim.reason, "ambiguous_shared_state");
 });
 
-test("remote PAL audio is synchronously muted, paused, and detached", () => {
-  const element = mediaElement();
-  assert.equal(suppressRemotePalAudio(element), "muted_detached");
-  assert.equal(element.muted, true);
-  assert.equal(element.volume, 0);
-  assert.equal(element.paused, true);
-  assert.equal(element.srcObject, null);
-  assert.equal(suppressRemotePalAudio(element), "already_muted");
-});
-
-test("participant updates cannot restore remote audio after local closing", () => {
+test("remote PAL audio stays attached and audible during avatar closing", () => {
   const element = mediaElement();
   const result = attachRemotePalAudioTrack(element, { kind: "audio" }, true);
-  assert.equal(result, "muted_detached");
-  assert.equal(element.muted, true);
-  assert.equal(element.volume, 0);
-  assert.equal(element.srcObject, null);
+  assert.equal(result, "attached");
+  assert.equal(element.muted, false);
+  assert.equal(element.volume, 1);
+  assert.ok(element.srcObject);
 });
 
 test("candidate audio unpublish uses the supported Daily call without waiting", () => {
@@ -181,34 +182,32 @@ test("candidate audio unpublish uses the supported Daily call without waiting", 
   }), "failed");
 });
 
-test("runtime ordering mutes remote audio before requesting local playback", async () => {
+test("runtime ordering blocks candidate audio before interrupt and avatar Echo", async () => {
   const source = await readFile(sourcePath, "utf8");
-  const begin = source.slice(source.indexOf("const beginLocalClosing"));
-  const mute = begin.indexOf("suppressRemotePalAudio(remoteAudioRef.current)");
-  const overlay = begin.indexOf("flushSync(() => setLocalClosingVisible(true))");
-  const play = begin.indexOf("playLocalClosingAudioOnce");
-  const provider = begin.indexOf("requestClosingProviderEnd()");
-  assert.ok(overlay >= 0);
-  assert.ok(mute > overlay);
-  assert.ok(play > mute);
-  assert.ok(provider > play);
-  assert.equal(source.match(/playLocalClosingAudioOnce\(/g)?.length, 1);
+  const begin = source.slice(source.indexOf("const beginAvatarClosing"));
+  const block = begin.indexOf("requestCandidateAudioUnpublish(callRef.current)");
+  const interrupt = begin.indexOf("buildReplicaInterruptMessage");
+  const echo = begin.indexOf("buildFinalClosingAnnouncementMessage");
+  const provider = begin.indexOf("requestClosingProviderEnd");
+  assert.ok(block >= 0);
+  assert.ok(interrupt > block);
+  assert.ok(echo > interrupt);
+  assert.ok(provider > echo);
+  assert.doesNotMatch(begin.slice(0, provider), /requestClosingProviderEnd\(/);
   assert.equal(source.match(/requestCandidateAudioUnpublish\(callRef\.current\)/g)?.length, 1);
   assert.match(source, /end-conversation[\s\S]{0,700}keepalive:\s*true/);
   assert.match(
     source,
-    /rearmNavigationFallback[\s\S]{0,300}localClosingNavigationTimerRef\.current\s*=\s*window\.setTimeout/,
+    /rearmCompletionFallback[\s\S]{0,500}armClosingCompletionFallback/,
   );
 });
 
-test("post-zero provider and candidate messages are ignored before parsing", async () => {
+test("post-zero provider speech is parsed for closing completion while ordinary turns are blocked", async () => {
   const source = await readFile(sourcePath, "utf8");
+  assert.match(source, /if \(avatarClosingActiveRef\.current\)[\s\S]{0,900}recordClosingEchoSpeechEvent/);
+  assert.doesNotMatch(source, /register\("app-message"[\s\S]{0,500}if \(avatarClosingActiveRef\.current\) return;/);
   assert.match(
     source,
-    /register\("app-message"[\s\S]{0,500}if \(localClosingActiveRef\.current\) return;/,
-  );
-  assert.match(
-    source,
-    /attachRemotePalAudioTrack\([\s\S]{0,180}localClosingActiveRef\.current/,
+    /progressWatchdogTimer = window\.setInterval[\s\S]{0,450}avatarClosingActiveRef\.current[\s\S]{0,120}stopProgressWatchdog\(\)/,
   );
 });
