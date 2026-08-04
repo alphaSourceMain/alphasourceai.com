@@ -27,6 +27,8 @@ const closing = await server.ssrLoadModule("/src/pages/InterviewCviPage.tsx");
 after(async () => server.close());
 
 test("zero sends one interrupt and one exact avatar Echo without a provider end", () => {
+  assert.equal(closing.FINAL_CLOSING_START_TIMEOUT_MS, 3000);
+  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 7500);
   const state = closing.createInterviewTimeBoundaryState("synthetic");
   for (const remainingSeconds of [180, 60, 20, 1, 0.001]) {
     const result = closing.evaluateInterviewTimeBoundary({ state, remainingSeconds });
@@ -63,6 +65,53 @@ test("zero sends one interrupt and one exact avatar Echo without a provider end"
   });
 });
 
+test("completion requires a correlated start and ignores stale, foreign-conversation, duplicate, and late events", () => {
+  const conversationId = "synthetic-conversation";
+  const dispatched = closing.markClosingEchoDispatched(closing.evaluateInterviewTimeBoundary({
+    state: closing.createInterviewTimeBoundaryState(conversationId),
+    remainingSeconds: 0,
+  }).state);
+  const inferenceId = dispatched.farewellInferenceId;
+  const stopBeforeStart = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "stopped", conversationId, turnKey: "early-stop", providerSequence: 20,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(stopBeforeStart.transition, "none");
+
+  const wrongConversation = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started", conversationId: "another-conversation", turnKey: "wrong-conversation",
+    providerSequence: 21, interrupted: false, applicationControl: true,
+    inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(wrongConversation.transition, "none");
+
+  const started = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started", conversationId, turnKey: "farewell", providerSequence: 22,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  const staleStop = closing.recordClosingEchoSpeechEvent(started.state, {
+    kind: "stopped", conversationId, turnKey: "farewell", providerSequence: 21,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(staleStop.transition, "none");
+  const completed = closing.recordClosingEchoSpeechEvent(started.state, {
+    kind: "stopped", conversationId, turnKey: "farewell", providerSequence: 23,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(completed.transition, "completed");
+  const duplicate = closing.recordClosingEchoSpeechEvent(completed.state, {
+    kind: "stopped", conversationId, turnKey: "farewell", providerSequence: 23,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(duplicate.transition, "none");
+  const ended = closing.markProviderEndRequested(completed.state).state;
+  const late = closing.recordClosingEchoSpeechEvent(ended, {
+    kind: "started", conversationId, turnKey: "late", providerSequence: 24,
+    interrupted: false, applicationControl: true, inferenceId, correlation: "provider",
+  }, conversationId);
+  assert.equal(late.transition, "none");
+});
+
 test("only the matching farewell inference can start or complete avatar closing", () => {
   const conversationId = "synthetic-conversation";
   const reserved = closing.evaluateInterviewTimeBoundary({
@@ -84,7 +133,30 @@ test("only the matching farewell inference can start or complete avatar closing"
   assert.equal(uncorrelatedStopBeforeStart.transition, "none");
   assert.strictEqual(uncorrelatedStopBeforeStart.state, dispatched);
 
-  const strong = closing.recordClosingEchoSpeechEvent(dispatched, {
+  const strongStart = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started",
+    conversationId,
+    turnKey: "strong-turn",
+    providerSequence: 8,
+    interrupted: false,
+    applicationControl: true,
+    inferenceId,
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(strongStart.transition, "speaking");
+  const duplicateStart = closing.recordClosingEchoSpeechEvent(strongStart.state, {
+    kind: "started",
+    conversationId,
+    turnKey: "strong-turn-duplicate",
+    providerSequence: 9,
+    interrupted: false,
+    applicationControl: true,
+    inferenceId,
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(duplicateStart.transition, "none");
+  assert.strictEqual(duplicateStart.state, strongStart.state);
+  const strong = closing.recordClosingEchoSpeechEvent(strongStart.state, {
     kind: "stopped",
     conversationId,
     turnKey: "strong-turn",
@@ -106,7 +178,7 @@ test("only the matching farewell inference can start or complete avatar closing"
     applicationControl: false,
     correlation: "local",
   }, conversationId);
-  assert.equal(missingInferenceStart.transition, "none");
+  assert.equal(missingInferenceStart.transition, "foreign_suppressed");
   assert.strictEqual(missingInferenceStart.state, dispatched);
   const missingInferenceStop = closing.recordClosingEchoSpeechEvent(dispatched, {
     kind: "stopped",
@@ -132,7 +204,17 @@ test("only the matching farewell inference can start or complete avatar closing"
   }, conversationId);
   assert.equal(wrongInference.transition, "none");
 
-  const interruptedFarewell = closing.recordClosingEchoSpeechEvent(dispatched, {
+  const interruptedStart = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started",
+    conversationId,
+    turnKey: "interrupted-farewell",
+    providerSequence: 10,
+    interrupted: false,
+    applicationControl: true,
+    inferenceId,
+    correlation: "provider",
+  }, conversationId);
+  const interruptedFarewell = closing.recordClosingEchoSpeechEvent(interruptedStart.state, {
     kind: "stopped",
     conversationId,
     turnKey: "interrupted-farewell",
@@ -142,18 +224,60 @@ test("only the matching farewell inference can start or complete avatar closing"
     inferenceId,
     correlation: "provider",
   }, conversationId);
-  assert.equal(interruptedFarewell.transition, "none");
+  assert.equal(interruptedFarewell.transition, "farewell_interrupted");
+  assert.equal(interruptedFarewell.state.closingEchoPhase, "FALLBACK");
 });
 
-test("an unconfirmed candidate audio lock fails closed without requiring an Echo", () => {
+test("foreign PAL speech is explicitly suppressed and cannot complete closing", () => {
+  const conversationId = "synthetic-conversation";
   const reserved = closing.evaluateInterviewTimeBoundary({
-    state: closing.createInterviewTimeBoundaryState("synthetic-conversation"),
+    state: closing.createInterviewTimeBoundaryState(conversationId),
     remainingSeconds: 0,
   }).state;
-  const fallback = closing.markClosingEchoFallback(reserved, "audio_lock_failed");
-  assert.equal(fallback.closingEchoPhase, "FALLBACK");
-  assert.equal(fallback.closingEchoFallbackReason, "audio_lock_failed");
-  assert.equal(closing.closingProviderEndAllowed(fallback), true);
+  const dispatched = closing.markClosingEchoDispatched(reserved);
+  const foreignStart = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started",
+    conversationId,
+    turnKey: "foreign-turn",
+    providerSequence: 11,
+    interrupted: false,
+    applicationControl: false,
+    inferenceId: "foreign-inference",
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(foreignStart.transition, "foreign_suppressed");
+  assert.strictEqual(foreignStart.state, dispatched);
+
+  const farewellStarted = closing.recordClosingEchoSpeechEvent(dispatched, {
+    kind: "started",
+    conversationId,
+    turnKey: "farewell-turn",
+    providerSequence: 12,
+    interrupted: false,
+    applicationControl: true,
+    inferenceId: dispatched.farewellInferenceId,
+    correlation: "provider",
+  }, conversationId);
+  const overlap = closing.recordClosingEchoSpeechEvent(farewellStarted.state, {
+    kind: "started",
+    conversationId,
+    turnKey: "foreign-overlap",
+    providerSequence: 13,
+    interrupted: false,
+    applicationControl: false,
+    inferenceId: "foreign-inference-2",
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(overlap.transition, "foreign_conflict");
+  assert.equal(overlap.state.closingEchoPhase, "FALLBACK");
+});
+
+test("candidate audio publication failure does not become a farewell fallback", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  const begin = source.slice(source.indexOf("const beginAvatarClosing"));
+  assert.match(begin, /requestCandidateAudioUnpublish\(call\)/);
+  assert.doesNotMatch(begin, /confirmCandidateAudioPublicationDisabled/);
+  assert.doesNotMatch(begin, /audio_lock_failed/);
 });
 
 test("the runtime keeps normal video UI and contains no local closing asset or splash", async () => {

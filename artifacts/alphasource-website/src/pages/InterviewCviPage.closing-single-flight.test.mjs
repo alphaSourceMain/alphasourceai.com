@@ -37,7 +37,9 @@ const {
   readSharedFinalClosingRuntime,
   requestCandidateAudioUnpublish,
   sharedFinalClosingRecoveryPlan,
+  sharedFinalClosingDispatchMayResume,
   sharedProviderEndAttemptAllowed,
+  withFinalClosingRuntimeLock,
 } = closing;
 
 function memoryStorage() {
@@ -80,10 +82,17 @@ test("only the owner can monotonically advance through avatar Echo and request p
   const storage = memoryStorage();
   claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a");
   assert.equal(
-    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", "CANDIDATE_AUDIO_BLOCKED").advanced,
+    advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", "CANDIDATE_AUDIO_REQUESTED").advanced,
     false,
   );
-  for (const phase of ["CANDIDATE_AUDIO_BLOCKED", "INTERRUPT_SENT", "ECHO_DISPATCHED", "ECHO_COMPLETED"]) {
+  for (const phase of [
+    "CANDIDATE_AUDIO_REQUESTED",
+    "DISPATCH_RESERVED",
+    "INTERRUPT_SENT",
+    "ECHO_DISPATCHED",
+    "FAREWELL_AUDIBLE",
+    "ECHO_COMPLETED",
+  ]) {
     assert.equal(
       advanceSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", phase).advanced,
       true,
@@ -110,16 +119,27 @@ test("only the owner can monotonically advance through avatar Echo and request p
   );
 });
 
-test("owner remount never replays Echo and requests provider end only after completion", () => {
-  const reserved = { version: 1, ownerTabId: "tab-a", phase: "RESERVED" };
+test("owner remount resumes only before dispatch and requests provider end only after completion", () => {
+  const reserved = {
+    version: 2,
+    ownerTabId: "tab-a",
+    phase: "RESERVED",
+    updatedAt: 1_000,
+    leaseExpiresAt: 10_000,
+    farewellStartDeadlineAt: null,
+    farewellCompletionDeadlineAt: null,
+  };
   const requested = { ...reserved, phase: "PROVIDER_END_REQUESTED" };
   const complete = { ...reserved, phase: "COMPLETE" };
 
   assert.deepEqual(sharedFinalClosingRecoveryPlan(reserved, "tab-a"), {
     owned: true,
     navigateImmediately: false,
-    rearmCompletionFallback: true,
+    rearmCompletionFallback: false,
     requestProviderEnd: false,
+    failClosedProviderEnd: false,
+    farewellAudible: false,
+    resumeDispatch: true,
   });
   const echoCompleted = { ...reserved, phase: "ECHO_COMPLETED" };
   assert.deepEqual(sharedFinalClosingRecoveryPlan(echoCompleted, "tab-a"), {
@@ -127,25 +147,171 @@ test("owner remount never replays Echo and requests provider end only after comp
     navigateImmediately: false,
     rearmCompletionFallback: false,
     requestProviderEnd: true,
+    failClosedProviderEnd: false,
+    farewellAudible: false,
+    resumeDispatch: false,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-a"), {
     owned: true,
     navigateImmediately: false,
     rearmCompletionFallback: false,
     requestProviderEnd: false,
+    failClosedProviderEnd: false,
+    farewellAudible: false,
+    resumeDispatch: false,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(requested, "tab-b"), {
     owned: false,
     navigateImmediately: false,
     rearmCompletionFallback: false,
     requestProviderEnd: false,
+    failClosedProviderEnd: false,
+    farewellAudible: false,
+    resumeDispatch: false,
   });
   assert.deepEqual(sharedFinalClosingRecoveryPlan(complete, "tab-a"), {
     owned: true,
     navigateImmediately: true,
     rearmCompletionFallback: false,
     requestProviderEnd: false,
+    failClosedProviderEnd: false,
+    farewellAudible: false,
+    resumeDispatch: false,
   });
+});
+
+test("a stale owner can be taken over once without reopening dispatch reservations", () => {
+  const storage = memoryStorage();
+  const first = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", 1_000);
+  assert.equal(first.owned, true);
+  assert.equal(
+    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", 9_999).owned,
+    false,
+  );
+  const takeover = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", 10_000);
+  assert.equal(takeover.owned, true);
+  assert.equal(takeover.reason, "stale_owner_takeover");
+  assert.equal(takeover.state.ownerTabId, "tab-b");
+  assert.equal(
+    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-c", 10_001).owned,
+    false,
+  );
+});
+
+test("stale takeover resumes only before any provider dispatch reservation", () => {
+  const storage = memoryStorage();
+  const initial = claimSharedFinalClosingRuntime(storage, "conversation-resume", "tab-a", 100);
+  assert.equal(initial.owned, true);
+  assert.equal(sharedFinalClosingDispatchMayResume(initial.state), true);
+
+  assert.equal(
+    advanceSharedFinalClosingRuntime(
+      storage,
+      "conversation-resume",
+      "tab-a",
+      "CANDIDATE_AUDIO_REQUESTED",
+      101,
+    ).advanced,
+    true,
+  );
+  const requested = readSharedFinalClosingRuntime(storage, "conversation-resume");
+  assert.equal(sharedFinalClosingDispatchMayResume(requested), true);
+
+  const takeover = claimSharedFinalClosingRuntime(
+    storage,
+    "conversation-resume",
+    "tab-b",
+    requested.leaseExpiresAt + 1,
+  );
+  assert.equal(takeover.owned, true);
+  assert.equal(takeover.reason, "stale_owner_takeover");
+  assert.equal(sharedFinalClosingRecoveryPlan(takeover.state, "tab-b").resumeDispatch, true);
+
+  assert.equal(
+    advanceSharedFinalClosingRuntime(
+      storage,
+      "conversation-resume",
+      "tab-b",
+      "DISPATCH_RESERVED",
+      takeover.state.updatedAt + 1,
+    ).advanced,
+    true,
+  );
+  const dispatchReserved = readSharedFinalClosingRuntime(storage, "conversation-resume");
+  assert.equal(sharedFinalClosingDispatchMayResume(dispatchReserved), false);
+  assert.equal(
+    sharedFinalClosingRecoveryPlan(dispatchReserved, "tab-b").failClosedProviderEnd,
+    true,
+  );
+});
+
+test("the browser closing lock serializes simultaneous tab reservations", async () => {
+  const storage = memoryStorage();
+  let queue = Promise.resolve();
+  let active = 0;
+  let maximumActive = 0;
+  const manager = {
+    request(_name, _options, callback) {
+      const result = queue.then(async () => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await Promise.resolve();
+        const value = await callback({ name: "synthetic-lock" });
+        active -= 1;
+        return value;
+      });
+      queue = result.then(() => undefined, () => undefined);
+      return result;
+    },
+  };
+  const results = await Promise.all([
+    withFinalClosingRuntimeLock(manager, "conversation-locked", () =>
+      claimSharedFinalClosingRuntime(storage, "conversation-locked", "tab-a", 100)),
+    withFinalClosingRuntimeLock(manager, "conversation-locked", () =>
+      claimSharedFinalClosingRuntime(storage, "conversation-locked", "tab-b", 100)),
+  ]);
+  assert.equal(maximumActive, 1);
+  assert.equal(results[0].acquired, true);
+  assert.equal(results[0].value.owned, true);
+  assert.equal(results[1].acquired, true);
+  assert.equal(results[1].value.owned, false);
+  assert.equal(results[1].value.reason, "owned_by_other_tab");
+  assert.deepEqual(
+    await withFinalClosingRuntimeLock(null, "conversation-locked", () => "unsafe"),
+    { acquired: false, value: null },
+  );
+});
+
+test("shared farewell deadlines survive later phases and cannot extend on remount", () => {
+  const storage = memoryStorage();
+  claimSharedFinalClosingRuntime(storage, "conversation-deadline", "tab-a", 100);
+  advanceSharedFinalClosingRuntime(
+    storage,
+    "conversation-deadline",
+    "tab-a",
+    "CANDIDATE_AUDIO_REQUESTED",
+    110,
+  );
+  advanceSharedFinalClosingRuntime(
+    storage,
+    "conversation-deadline",
+    "tab-a",
+    "ECHO_DISPATCHED",
+    200,
+  );
+  const dispatched = readSharedFinalClosingRuntime(storage, "conversation-deadline");
+  assert.equal(dispatched.farewellStartDeadlineAt, 3_200);
+  assert.equal(dispatched.farewellCompletionDeadlineAt, 7_700);
+  advanceSharedFinalClosingRuntime(
+    storage,
+    "conversation-deadline",
+    "tab-a",
+    "FAREWELL_AUDIBLE",
+    2_500,
+  );
+  const audible = readSharedFinalClosingRuntime(storage, "conversation-deadline");
+  assert.equal(audible.farewellStartDeadlineAt, 3_200);
+  assert.equal(audible.farewellCompletionDeadlineAt, 7_700);
 });
 
 test("ambiguous shared state fails closed and never grants ownership", () => {
@@ -157,13 +323,31 @@ test("ambiguous shared state fails closed and never grants ownership", () => {
   assert.equal(claim.reason, "ambiguous_shared_state");
 });
 
-test("remote PAL audio stays attached and audible during avatar closing", () => {
+test("remote PAL audio is inaudible during terminal closing until the exact farewell", () => {
   const element = mediaElement();
   const result = attachRemotePalAudioTrack(element, { kind: "audio" }, true);
-  assert.equal(result, "attached");
-  assert.equal(element.muted, false);
-  assert.equal(element.volume, 1);
-  assert.ok(element.srcObject);
+  assert.equal(result, "muted_detached");
+  assert.equal(element.muted, true);
+  assert.equal(element.volume, 0);
+  assert.equal(element.srcObject, null);
+  assert.equal(element.paused, true);
+});
+
+test("remote PAL audio is attached only before closing or while the correlated farewell is audible", () => {
+  const ordinary = mediaElement();
+  assert.equal(attachRemotePalAudioTrack(ordinary, { kind: "audio" }, false), "attached");
+  assert.equal(ordinary.muted, false);
+  assert.equal(ordinary.volume, 1);
+
+  const farewell = mediaElement();
+  assert.equal(attachRemotePalAudioTrack(farewell, { kind: "audio" }, true, true), "attached");
+  assert.equal(farewell.muted, false);
+  assert.equal(farewell.volume, 1);
+
+  const recreated = mediaElement();
+  assert.equal(attachRemotePalAudioTrack(recreated, { kind: "audio" }, true, false), "muted_detached");
+  assert.equal(recreated.muted, true);
+  assert.equal(recreated.srcObject, null);
 });
 
 test("candidate audio unpublish terminally discards the Daily track", () => {
@@ -182,31 +366,42 @@ test("candidate audio unpublish terminally discards the Daily track", () => {
   }), "failed");
 });
 
-test("runtime awaits confirmed candidate audio-off before interrupt and avatar Echo", async () => {
+test("runtime makes candidate unpublish best effort and gates PAL audio before interrupt and Echo", async () => {
   const source = await readFile(sourcePath, "utf8");
   const begin = source.slice(source.indexOf("const beginAvatarClosing"));
-  const block = begin.indexOf("await confirmCandidateAudioPublicationDisabled");
-  const confirmedGate = begin.indexOf('audioLockResult.category !== "confirmed_disabled"');
-  const sharedAudioBlocked = begin.indexOf('"CANDIDATE_AUDIO_BLOCKED"');
-  const successInterrupt = begin.indexOf("let interruptSent", sharedAudioBlocked);
-  const interrupt = begin.indexOf("buildReplicaInterruptMessage", successInterrupt);
-  const echo = begin.indexOf("buildFinalClosingAnnouncementMessage", interrupt);
-  const provider = begin.indexOf("requestClosingProviderEnd");
-  assert.ok(block >= 0);
-  assert.ok(confirmedGate > block);
-  assert.ok(sharedAudioBlocked > confirmedGate);
-  assert.ok(successInterrupt > sharedAudioBlocked);
-  assert.ok(interrupt > block);
+  const dispatch = source.slice(
+    source.indexOf("const dispatchTerminalClosing"),
+    source.indexOf("const beginAvatarClosing"),
+  );
+  const unpublish = begin.indexOf("requestCandidateAudioUnpublish(call)");
+  const mute = begin.indexOf("suppressRemotePalAudio(remoteAudioRef.current)");
+  const dispatchCall = begin.indexOf("dispatchTerminalClosingWhenReady(nextState, conversationId)");
+  const interrupt = dispatch.indexOf("buildReplicaInterruptMessage");
+  const echo = dispatch.indexOf("buildFinalClosingAnnouncementMessage", interrupt);
+  assert.ok(unpublish >= 0);
+  assert.ok(mute > unpublish);
+  assert.ok(dispatchCall > mute);
+  assert.ok(interrupt >= 0);
   assert.ok(echo > interrupt);
-  assert.ok(provider > echo);
-  assert.doesNotMatch(begin.slice(0, provider), /requestClosingProviderEnd\(/);
-  assert.doesNotMatch(begin, /requestCandidateAudioUnpublish\(callRef\.current\)/);
-  assert.match(begin.slice(block, sharedAudioBlocked), /confirmed_disabled/);
-  assert.match(begin.slice(block, sharedAudioBlocked), /audio_lock_failed/);
-  assert.match(source, /end-conversation[\s\S]{0,700}keepalive:\s*true/);
   assert.match(
     source,
-    /rearmCompletionFallback[\s\S]{0,500}armClosingCompletionFallback/,
+    /avatarClosingActiveRef\.current\s*&&\s*!candidateAudioUnpublishRequestedRef\.current[\s\S]{0,300}requestCandidateAudioUnpublish\(callRef\.current\)/,
+    "a reconstructed terminal Daily runtime must reassert audio discard once",
+  );
+  assert.doesNotMatch(begin, /await confirmCandidateAudioPublicationDisabled/);
+  assert.doesNotMatch(source, /FINAL_CLOSING_INTERRUPT_SETTLE_MS/);
+  assert.match(source, /end-conversation[\s\S]{0,700}keepalive:\s*true/);
+  assert.match(source, /rearmCompletionFallback\) armClosingFallbacks\(\)/);
+  const coordination = begin.indexOf("withFinalClosingRuntimeLock(");
+  const sharedClaim = begin.indexOf("claimSharedFinalClosingRuntime(", coordination);
+  const coordinatedDispatch = begin.indexOf("dispatchTerminalClosingWhenReady(nextState, conversationId)", sharedClaim);
+  assert.ok(coordination >= 0, "closing must enter the exclusive browser lock");
+  assert.ok(sharedClaim > coordination, "shared ownership must be claimed inside the browser lock");
+  assert.ok(coordinatedDispatch > sharedClaim, "provider dispatch must remain inside the browser lock");
+  assert.match(
+    source,
+    /if \(!avatarClosingOwnedRef\.current\) \{[\s\S]{0,180}suppressRemotePalAudio\(remoteAudioRef\.current\)/,
+    "a secondary tab must never expose the correlated farewell audio",
   );
 });
 

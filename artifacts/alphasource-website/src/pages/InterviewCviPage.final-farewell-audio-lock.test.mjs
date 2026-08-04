@@ -111,10 +111,13 @@ test("Start Interview no longer primes or persists local farewell audio", async 
   await assert.rejects(access(assetPath, constants.F_OK));
 });
 
-test("the live page keeps PAL audio audible while candidate input stays blocked", async () => {
+test("the live page makes candidate audio best effort and gates PAL audio until farewell correlation", async () => {
   const source = await readFile(pageSourcePath, "utf8");
   assert.match(source, /remoteAudioRef/);
-  assert.match(source, /await confirmCandidateAudioPublicationDisabled/);
-  assert.doesNotMatch(source, /suppressRemotePalAudio\(remoteAudioRef\.current\)[\s\S]{0,800}buildFinalClosingAnnouncementMessage/);
+  const begin = source.slice(source.indexOf("const beginAvatarClosing"));
+  assert.match(begin, /requestCandidateAudioUnpublish\(call\)/);
+  assert.match(begin, /suppressRemotePalAudio\(remoteAudioRef\.current\)/);
+  assert.doesNotMatch(begin, /await confirmCandidateAudioPublicationDisabled/);
+  assert.match(source, /farewellAudioAudibleRef\.current = true;[\s\S]{0,120}syncParticipantsWithDiagnostics/);
   assert.doesNotMatch(source, /playLocalClosingAudioOnce/);
 });
