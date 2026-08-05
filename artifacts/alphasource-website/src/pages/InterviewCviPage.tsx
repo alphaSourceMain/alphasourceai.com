@@ -1247,6 +1247,31 @@ export function normalizePalSpeakingEvent(
   };
 }
 
+export function normalizeCorrelatedRolelessPalStop(
+  payload: unknown,
+  activeConversationId: string,
+  localOrdinal: number,
+  replicaSpeechOpen: boolean,
+  candidateSpeaking: boolean,
+): NormalizedPalSpeakingEvent | null {
+  if (!replicaSpeechOpen || candidateSpeaking) return null;
+  const data = payload && typeof payload === "object" ? payload as Record<string, any> : {};
+  const properties = data.properties && typeof data.properties === "object" && !Array.isArray(data.properties)
+    ? data.properties as Record<string, unknown>
+    : {};
+  const eventType = String(data.event_type || data.eventType || "").trim().toLowerCase();
+  const explicitRole = String(properties.role || data.role || "").trim();
+  // Tavus occasionally omits the documented role on the generic stop event.
+  // Treat it as the end of the replica span only when a qualified replica
+  // start is already open and candidate speech is not active. An unattributed
+  // event can never open a replica span by itself.
+  if (eventType !== "conversation.stopped_speaking" || explicitRole) return null;
+  return normalizePalSpeakingEvent({
+    ...data,
+    properties: { ...properties, role: "replica" },
+  }, activeConversationId, localOrdinal);
+}
+
 export function createCandidateInactivityNudgeState(
   enabled: boolean,
   interviewId: string,
@@ -1605,8 +1630,6 @@ export function recordClosingEchoSpeechEvent(
     | "none"
     | "speaking"
     | "completed"
-    | "foreign_suppressed"
-    | "foreign_conflict"
     | "farewell_interrupted";
 } {
   if (
@@ -1615,28 +1638,11 @@ export function recordClosingEchoSpeechEvent(
     event.conversationId !== activeConversationId
   ) return { state, transition: "none" };
 
-  const expectedInferenceId = state.farewellInferenceId ||
-    closingApplicationInferenceId(activeConversationId);
-  const hasInferenceId = Boolean(event.inferenceId);
-  const hasMatchingInferenceId = hasInferenceId &&
-    event.inferenceId === expectedInferenceId;
-  // Tavus documents inference_id as optional across the interaction stream.
-  // A missing id on the first post-Echo PAL speaking span is therefore valid;
-  // a present-but-different id remains a fail-closed foreign turn.
-  if (hasInferenceId && !hasMatchingInferenceId) {
-    if (event.kind === "started" && state.closingEchoPhase === "SPEAKING") {
-      return {
-        state: markClosingEchoFallback(state, "foreign_inference_conflict"),
-        transition: "foreign_conflict",
-      };
-    }
-    return {
-      state,
-      transition: event.kind === "started" ? "foreign_suppressed" : "none",
-    };
-  }
-
   if (event.kind === "started") {
+    // The ordered interrupt + Echo owns the terminal turn. Tavus may emit a
+    // provider-generated inference id instead of echoing the caller-supplied
+    // id, so inference identity cannot be used to mute the only permitted
+    // post-Echo replica span.
     if (event.interrupted || state.closingEchoPhase === "SPEAKING") {
       return { state, transition: "none" };
     }
@@ -4465,11 +4471,19 @@ export default function InterviewCviPage() {
           const eventType = String(data?.event_type || data?.eventType || "").toLowerCase();
           const utteranceRole = String(data?.properties?.role || data?.role || "").toLowerCase();
           const nextPalSpeechOrdinal = palSpeechEventOrdinalRef.current + 1;
-          const normalizedPalSpeaking = normalizePalSpeakingEvent(
+          const normalizedExplicitPalSpeaking = normalizePalSpeakingEvent(
             data,
             String(session.conversation_id || "").trim(),
             nextPalSpeechOrdinal,
           );
+          const correlatedRolelessPalStop = normalizeCorrelatedRolelessPalStop(
+            data,
+            String(session.conversation_id || "").trim(),
+            nextPalSpeechOrdinal,
+            replicaSpeakingRef.current,
+            candidateSpeakingStateRef.current.active,
+          );
+          const normalizedPalSpeaking = normalizedExplicitPalSpeaking || correlatedRolelessPalStop;
           if (normalizedPalSpeaking) palSpeechEventOrdinalRef.current = nextPalSpeechOrdinal;
 
           // Closing blocks ordinary turn-taking but must continue observing
@@ -4485,30 +4499,6 @@ export default function InterviewCviPage() {
             );
             if (closingEvent.transition === "none") return;
             persistBoundaryState(closingEvent.state);
-            if (closingEvent.transition === "foreign_suppressed") {
-              farewellAudioAudibleRef.current = false;
-              suppressRemotePalAudio(remoteAudioRef.current);
-              sendLifecycleTelemetry("closing_foreign_inference_suppressed", {
-                closing_state: "FAREWELL_DISPATCHED",
-                inference_match: false,
-                remote_audio_state_category: "muted",
-                remaining_time_bucket: "0_10",
-              });
-              return;
-            }
-            if (closingEvent.transition === "foreign_conflict") {
-              farewellAudioAudibleRef.current = false;
-              suppressRemotePalAudio(remoteAudioRef.current);
-              sendLifecycleTelemetry("closing_foreign_inference_suppressed", {
-                closing_state: "FAREWELL_AUDIBLE",
-                inference_match: false,
-                remote_audio_state_category: "remuted",
-                provider_end_reason: "foreign_inference_conflict",
-                remaining_time_bucket: "0_10",
-              });
-              finishAvatarClosingSpeech(closingEvent.state, "foreign_inference_conflict");
-              return;
-            }
             if (closingEvent.transition === "speaking") {
               if (!avatarClosingOwnedRef.current) {
                 farewellAudioAudibleRef.current = false;

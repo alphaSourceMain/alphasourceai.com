@@ -228,7 +228,7 @@ test("matching or inference-less farewell events can complete closing while conf
   assert.equal(interruptedFarewell.state.closingEchoPhase, "FALLBACK");
 });
 
-test("foreign PAL speech is explicitly suppressed and cannot complete closing", () => {
+test("the first post-Echo PAL span stays audible even when Tavus assigns a different inference id", () => {
   const conversationId = "synthetic-conversation";
   const reserved = closing.evaluateInterviewTimeBoundary({
     state: closing.createInterviewTimeBoundaryState(conversationId),
@@ -245,20 +245,10 @@ test("foreign PAL speech is explicitly suppressed and cannot complete closing", 
     inferenceId: "foreign-inference",
     correlation: "provider",
   }, conversationId);
-  assert.equal(foreignStart.transition, "foreign_suppressed");
-  assert.strictEqual(foreignStart.state, dispatched);
+  assert.equal(foreignStart.transition, "speaking");
+  assert.equal(foreignStart.state.closingEchoPhase, "SPEAKING");
 
-  const farewellStarted = closing.recordClosingEchoSpeechEvent(dispatched, {
-    kind: "started",
-    conversationId,
-    turnKey: "farewell-turn",
-    providerSequence: 12,
-    interrupted: false,
-    applicationControl: true,
-    inferenceId: dispatched.farewellInferenceId,
-    correlation: "provider",
-  }, conversationId);
-  const overlap = closing.recordClosingEchoSpeechEvent(farewellStarted.state, {
+  const duplicateStart = closing.recordClosingEchoSpeechEvent(foreignStart.state, {
     kind: "started",
     conversationId,
     turnKey: "foreign-overlap",
@@ -268,8 +258,33 @@ test("foreign PAL speech is explicitly suppressed and cannot complete closing", 
     inferenceId: "foreign-inference-2",
     correlation: "provider",
   }, conversationId);
-  assert.equal(overlap.transition, "foreign_conflict");
-  assert.equal(overlap.state.closingEchoPhase, "FALLBACK");
+  assert.equal(duplicateStart.transition, "none");
+  assert.strictEqual(duplicateStart.state, foreignStart.state);
+
+  const completed = closing.recordClosingEchoSpeechEvent(foreignStart.state, {
+    kind: "stopped",
+    conversationId,
+    turnKey: "foreign-turn",
+    providerSequence: 13,
+    interrupted: false,
+    applicationControl: false,
+    inferenceId: "foreign-inference",
+    correlation: "provider",
+  }, conversationId);
+  assert.equal(completed.transition, "completed");
+  assert.equal(closing.closingProviderEndAllowed(completed.state), true);
+});
+
+test("terminal app-message handling never re-mutes an owned farewell for inference-id drift", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  const closingComment = source.indexOf("Closing blocks ordinary turn-taking");
+  const closingBranchStart = source.indexOf("if (avatarClosingActiveRef.current)", closingComment);
+  const ordinaryBranchStart = source.indexOf("const speech =", closingBranchStart);
+  const closingBranch = source.slice(closingBranchStart, ordinaryBranchStart);
+  assert.ok(closingBranchStart >= 0);
+  assert.ok(ordinaryBranchStart > closingBranchStart);
+  assert.doesNotMatch(closingBranch, /foreign_suppressed|foreign_conflict/);
+  assert.doesNotMatch(closingBranch, /closing_foreign_inference_suppressed/);
 });
 
 test("candidate audio publication failure does not become a farewell fallback", async () => {
