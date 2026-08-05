@@ -377,8 +377,8 @@ export const CANDIDATE_INACTIVITY_NUDGE_TEXT =
   "Take your time. When you’re ready, you can continue.";
 export const FINAL_CLOSING_ANNOUNCEMENT_TEXT =
   "We are out of time. Thank you for your time. I am ending the session now.";
-export const FINAL_CLOSING_START_TIMEOUT_MS = 3000;
-export const FINAL_CLOSING_COMPLETION_FALLBACK_MS = 7500;
+export const FINAL_CLOSING_START_TIMEOUT_MS = 5000;
+export const FINAL_CLOSING_COMPLETION_FALLBACK_MS = 12000;
 export const FINAL_CLOSING_OWNER_LEASE_MS = 9000;
 const CANDIDATE_INACTIVITY_NUDGE_INFERENCE_PREFIX =
   "alphascreen-candidate-inactivity-nudge";
@@ -753,7 +753,11 @@ export function sharedFinalClosingRecoveryPlan(
   const providerEndReserved =
     SHARED_FINAL_CLOSING_PHASE_ORDER[state.phase] >=
     SHARED_FINAL_CLOSING_PHASE_ORDER.PROVIDER_END_REQUESTED;
-  const farewellAudible = state.phase === "FAREWELL_AUDIBLE";
+  // Once the single owner has dispatched the direct Echo, its existing Tavus
+  // audio must stay open. Provider speaking events are useful completion
+  // evidence, but cannot be an audio gate because inference_id is optional.
+  const farewellAudible =
+    state.phase === "ECHO_DISPATCHED" || state.phase === "FAREWELL_AUDIBLE";
   const fallbackCanBeRearmed =
     state.phase === "ECHO_DISPATCHED" || farewellAudible;
   const resumeDispatch = owned && sharedFinalClosingDispatchMayResume(state);
@@ -1613,9 +1617,13 @@ export function recordClosingEchoSpeechEvent(
 
   const expectedInferenceId = state.farewellInferenceId ||
     closingApplicationInferenceId(activeConversationId);
-  const hasMatchingInferenceId = Boolean(event.inferenceId) &&
+  const hasInferenceId = Boolean(event.inferenceId);
+  const hasMatchingInferenceId = hasInferenceId &&
     event.inferenceId === expectedInferenceId;
-  if (!hasMatchingInferenceId) {
+  // Tavus documents inference_id as optional across the interaction stream.
+  // A missing id on the first post-Echo PAL speaking span is therefore valid;
+  // a present-but-different id remains a fail-closed foreign turn.
+  if (hasInferenceId && !hasMatchingInferenceId) {
     if (event.kind === "started" && state.closingEchoPhase === "SPEAKING") {
       return {
         state: markClosingEchoFallback(state, "foreign_inference_conflict"),
@@ -3135,15 +3143,14 @@ export default function InterviewCviPage() {
         closingStartTimerRef.current = null;
         const current = timerRuntimeRef.current?.boundaryState || createInterviewTimeBoundaryState();
         if (current.phase !== "AVATAR_CLOSING" || current.closingEchoPhase !== "DISPATCHED") return;
-        farewellAudioAudibleRef.current = false;
-        suppressRemotePalAudio(remoteAudioRef.current);
-        const fallback = markClosingEchoFallback(current, "start_timeout");
+        // Missing speaking-start metadata is diagnostic only. The Tavus Echo
+        // may already be rendering, so keep its audio open and let the single
+        // completion deadline provide the bounded provider-end fail-safe.
         sendLifecycleTelemetry("closing_farewell_start_timed_out", {
           closing_state: "FAREWELL_DISPATCHED",
           timeout_category: "farewell_start",
           remaining_time_bucket: "0_10",
         });
-        finishAvatarClosingSpeech(fallback, "start_timeout");
       }, startDelay);
     }
     if (closingCompletionTimerRef.current) return;
@@ -3247,6 +3254,11 @@ export default function InterviewCviPage() {
         finalClosingTabIdRef.current,
         "ECHO_DISPATCHED",
       );
+      // The direct Echo is the only PAL turn allowed after the ordered
+      // interrupt. Open the existing Tavus media immediately; never wait for
+      // an optional inference_id before allowing the farewell to be heard.
+      farewellAudioAudibleRef.current = true;
+      syncParticipants();
       sendLifecycleTelemetry("closing_farewell_dispatched", {
         closing_state: "FAREWELL_DISPATCHED",
         dispatch_result_category: "sent",
@@ -3265,7 +3277,13 @@ export default function InterviewCviPage() {
       });
       finishAvatarClosingSpeech(failed, "dispatch_failed");
     }
-  }, [armClosingFallbacks, finishAvatarClosingSpeech, persistBoundaryState, sendLifecycleTelemetry]);
+  }, [
+    armClosingFallbacks,
+    finishAvatarClosingSpeech,
+    persistBoundaryState,
+    sendLifecycleTelemetry,
+    syncParticipants,
+  ]);
 
   const dispatchTerminalClosingWhenReady = useCallback((
     nextState: InterviewTimeBoundaryState,
@@ -4512,7 +4530,8 @@ export default function InterviewCviPage() {
               sendLifecycleTelemetry("closing_farewell_started", {
                 closing_state: "FAREWELL_AUDIBLE",
                 speech_result_category: "started",
-                inference_match: true,
+                inference_match: Boolean(normalizedPalSpeaking.inferenceId) &&
+                  normalizedPalSpeaking.inferenceId === current.farewellInferenceId,
                 remote_audio_state_category: "audible",
                 remaining_time_bucket: "0_10",
               });
@@ -4534,7 +4553,8 @@ export default function InterviewCviPage() {
             sendLifecycleTelemetry("closing_farewell_completed", {
               closing_state: "FAREWELL_AUDIBLE",
               speech_result_category: "completed",
-              inference_match: true,
+              inference_match: Boolean(normalizedPalSpeaking.inferenceId) &&
+                normalizedPalSpeaking.inferenceId === current.farewellInferenceId,
               speech_interrupted: false,
               remaining_time_bucket: "0_10",
             });

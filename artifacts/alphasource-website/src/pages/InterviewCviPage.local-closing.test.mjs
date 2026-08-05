@@ -27,8 +27,8 @@ const closing = await server.ssrLoadModule("/src/pages/InterviewCviPage.tsx");
 after(async () => server.close());
 
 test("zero sends one interrupt and one exact avatar Echo without a provider end", () => {
-  assert.equal(closing.FINAL_CLOSING_START_TIMEOUT_MS, 3000);
-  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 7500);
+  assert.equal(closing.FINAL_CLOSING_START_TIMEOUT_MS, 5000);
+  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 12000);
   const state = closing.createInterviewTimeBoundaryState("synthetic");
   for (const remainingSeconds of [180, 60, 20, 1, 0.001]) {
     const result = closing.evaluateInterviewTimeBoundary({ state, remainingSeconds });
@@ -112,7 +112,7 @@ test("completion requires a correlated start and ignores stale, foreign-conversa
   assert.equal(late.transition, "none");
 });
 
-test("only the matching farewell inference can start or complete avatar closing", () => {
+test("matching or inference-less farewell events can complete closing while conflicting ids fail closed", () => {
   const conversationId = "synthetic-conversation";
   const reserved = closing.evaluateInterviewTimeBoundary({
     state: closing.createInterviewTimeBoundaryState(conversationId),
@@ -178,9 +178,9 @@ test("only the matching farewell inference can start or complete avatar closing"
     applicationControl: false,
     correlation: "local",
   }, conversationId);
-  assert.equal(missingInferenceStart.transition, "foreign_suppressed");
-  assert.strictEqual(missingInferenceStart.state, dispatched);
-  const missingInferenceStop = closing.recordClosingEchoSpeechEvent(dispatched, {
+  assert.equal(missingInferenceStart.transition, "speaking");
+  assert.equal(missingInferenceStart.state.closingEchoStarted, true);
+  const missingInferenceStop = closing.recordClosingEchoSpeechEvent(missingInferenceStart.state, {
     kind: "stopped",
     conversationId,
     turnKey: "missing-inference-stop",
@@ -189,8 +189,8 @@ test("only the matching farewell inference can start or complete avatar closing"
     applicationControl: false,
     correlation: "local",
   }, conversationId);
-  assert.equal(missingInferenceStop.transition, "none");
-  assert.strictEqual(missingInferenceStop.state, dispatched);
+  assert.equal(missingInferenceStop.transition, "completed");
+  assert.equal(closing.closingProviderEndAllowed(missingInferenceStop.state), true);
 
   const wrongInference = closing.recordClosingEchoSpeechEvent(dispatched, {
     kind: "stopped",
@@ -278,6 +278,30 @@ test("candidate audio publication failure does not become a farewell fallback", 
   assert.match(begin, /requestCandidateAudioUnpublish\(call\)/);
   assert.doesNotMatch(begin, /confirmCandidateAudioPublicationDisabled/);
   assert.doesNotMatch(begin, /audio_lock_failed/);
+});
+
+test("the owner opens Tavus audio after Echo dispatch and a missing start signal cannot end early", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  const dispatchBegin = source.indexOf("const dispatchTerminalClosing");
+  const dispatchEnd = source.indexOf("const dispatchTerminalClosingWhenReady", dispatchBegin);
+  const dispatch = source.slice(dispatchBegin, dispatchEnd);
+  const echoSend = dispatch.indexOf("buildFinalClosingAnnouncementMessage");
+  const audioOpen = dispatch.indexOf("farewellAudioAudibleRef.current = true", echoSend);
+  const participantSync = dispatch.indexOf("syncParticipants()", audioOpen);
+  assert.ok(echoSend >= 0);
+  assert.ok(audioOpen > echoSend);
+  assert.ok(participantSync > audioOpen);
+
+  const fallbackBegin = source.indexOf("const armClosingFallbacks");
+  const fallbackEnd = source.indexOf("const dispatchTerminalClosing", fallbackBegin);
+  const fallbacks = source.slice(fallbackBegin, fallbackEnd);
+  const startTimeoutBegin = fallbacks.indexOf("closing_farewell_start_timed_out");
+  const completionTimerBegin = fallbacks.indexOf("if (closingCompletionTimerRef.current)");
+  const startTimeout = fallbacks.slice(startTimeoutBegin, completionTimerBegin);
+  assert.ok(startTimeoutBegin >= 0);
+  assert.doesNotMatch(startTimeout, /finishAvatarClosingSpeech/);
+  assert.doesNotMatch(startTimeout, /markClosingEchoFallback/);
+  assert.doesNotMatch(startTimeout, /suppressRemotePalAudio/);
 });
 
 test("the runtime keeps normal video UI and contains no local closing asset or splash", async () => {

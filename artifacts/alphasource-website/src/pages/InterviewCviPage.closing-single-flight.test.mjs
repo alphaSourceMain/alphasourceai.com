@@ -141,6 +141,21 @@ test("owner remount resumes only before dispatch and requests provider end only 
     farewellAudible: false,
     resumeDispatch: true,
   });
+  const echoDispatched = {
+    ...reserved,
+    phase: "ECHO_DISPATCHED",
+    farewellStartDeadlineAt: 6_000,
+    farewellCompletionDeadlineAt: 13_000,
+  };
+  assert.deepEqual(sharedFinalClosingRecoveryPlan(echoDispatched, "tab-a"), {
+    owned: true,
+    navigateImmediately: false,
+    rearmCompletionFallback: true,
+    requestProviderEnd: false,
+    failClosedProviderEnd: false,
+    farewellAudible: true,
+    resumeDispatch: false,
+  });
   const echoCompleted = { ...reserved, phase: "ECHO_COMPLETED" };
   assert.deepEqual(sharedFinalClosingRecoveryPlan(echoCompleted, "tab-a"), {
     owned: true,
@@ -300,8 +315,8 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
     200,
   );
   const dispatched = readSharedFinalClosingRuntime(storage, "conversation-deadline");
-  assert.equal(dispatched.farewellStartDeadlineAt, 3_200);
-  assert.equal(dispatched.farewellCompletionDeadlineAt, 7_700);
+  assert.equal(dispatched.farewellStartDeadlineAt, 5_200);
+  assert.equal(dispatched.farewellCompletionDeadlineAt, 12_200);
   advanceSharedFinalClosingRuntime(
     storage,
     "conversation-deadline",
@@ -310,8 +325,8 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
     2_500,
   );
   const audible = readSharedFinalClosingRuntime(storage, "conversation-deadline");
-  assert.equal(audible.farewellStartDeadlineAt, 3_200);
-  assert.equal(audible.farewellCompletionDeadlineAt, 7_700);
+  assert.equal(audible.farewellStartDeadlineAt, 5_200);
+  assert.equal(audible.farewellCompletionDeadlineAt, 12_200);
 });
 
 test("ambiguous shared state fails closed and never grants ownership", () => {
@@ -323,7 +338,7 @@ test("ambiguous shared state fails closed and never grants ownership", () => {
   assert.equal(claim.reason, "ambiguous_shared_state");
 });
 
-test("remote PAL audio is inaudible during terminal closing until the exact farewell", () => {
+test("remote PAL audio is muted before the single owner dispatches the direct Echo", () => {
   const element = mediaElement();
   const result = attachRemotePalAudioTrack(element, { kind: "audio" }, true);
   assert.equal(result, "muted_detached");
@@ -333,7 +348,7 @@ test("remote PAL audio is inaudible during terminal closing until the exact fare
   assert.equal(element.paused, true);
 });
 
-test("remote PAL audio is attached only before closing or while the correlated farewell is audible", () => {
+test("remote PAL audio is attached before closing or after the owner has dispatched the direct Echo", () => {
   const ordinary = mediaElement();
   assert.equal(attachRemotePalAudioTrack(ordinary, { kind: "audio" }, false), "attached");
   assert.equal(ordinary.muted, false);
