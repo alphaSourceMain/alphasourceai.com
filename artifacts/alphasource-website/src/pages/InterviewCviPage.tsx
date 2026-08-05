@@ -20,6 +20,7 @@ type LiveSessionState = {
 
 type DailyTrackSlot = {
   state?: string;
+  subscribed?: boolean | "staged";
   off?: {
     byUser?: boolean;
   };
@@ -41,7 +42,40 @@ type RemoteParticipantEvidence = {
   remoteAudioReady: boolean;
   remoteVideoReady: boolean;
   remoteParticipantCount: number;
+  remoteParticipantCountBucket: "zero" | "one" | "multiple";
+  audioState: NormalizedRemoteTrackState;
+  videoState: NormalizedRemoteTrackState;
+  audioPersistentTrackPresent: boolean;
+  videoPersistentTrackPresent: boolean;
+  audioSubscriptionState: SubscriptionState;
+  videoSubscriptionState: SubscriptionState;
+  audioTrackPresent: boolean;
+  videoTrackPresent: boolean;
 };
+
+export type NormalizedRemoteTrackState =
+  | "absent"
+  | "blocked"
+  | "off"
+  | "sendable"
+  | "loading"
+  | "interrupted"
+  | "playable"
+  | "unavailable"
+  | "unknown";
+
+export type SubscriptionState = "subscribed" | "staged" | "unsubscribed" | "unknown";
+
+export type StartupReadinessState =
+  | "waiting_for_remote_participant"
+  | "remote_participant_present"
+  | "remote_participant_audio_only"
+  | "remote_video_loading"
+  | "remote_video_playable"
+  | "replica_progress_confirmed"
+  | "startup_ready"
+  | "startup_recovering"
+  | "startup_failed";
 
 type ReliabilityMetadata = Record<string, string | number | boolean>;
 
@@ -290,6 +324,7 @@ type DailyEvent = {
   participant?: DailyParticipant;
   participants?: Record<string, DailyParticipant>;
   meetingState?: string;
+  receiveSettings?: unknown;
 };
 
 type DailyCallObject = {
@@ -299,6 +334,8 @@ type DailyCallObject = {
   on: (event: string, handler: (event?: DailyEvent) => void) => void;
   off?: (event: string, handler: (event?: DailyEvent) => void) => void;
   participants?: () => Record<string, DailyParticipant>;
+  getReceiveSettings?: () => Promise<unknown>;
+  subscribeToTracksAutomatically?: () => boolean;
   sendAppMessage?: (message: unknown, recipients?: string | string[]) => void;
   startRecording?: () => Promise<unknown>;
   localAudio?: () => boolean;
@@ -1918,10 +1955,247 @@ function loadDailySdk(): Promise<DailySdk> {
   });
 }
 
+function remoteCountBucket(count: number): "zero" | "one" | "multiple" {
+  if (count <= 0) return "zero";
+  return count === 1 ? "one" : "multiple";
+}
+
+function normalizeSubscription(slot?: DailyTrackSlot): SubscriptionState {
+  if (!slot || !("subscribed" in slot)) return "unknown";
+  if (slot.subscribed === "staged") return "staged";
+  if (slot.subscribed === true) return "subscribed";
+  if (slot.subscribed === false) return "unsubscribed";
+  return "unknown";
+}
+
+function liveTrack(slot?: DailyTrackSlot): MediaStreamTrack | null {
+  const track = slot?.track || slot?.persistentTrack || null;
+  return track && track.readyState !== "ended" ? track : null;
+}
+
+export function normalizeRemoteTrackState(slot?: DailyTrackSlot): NormalizedRemoteTrackState {
+  if (!slot) return "absent";
+  const raw = String(slot.state || "").toLowerCase();
+  if (["blocked", "off", "sendable", "loading", "interrupted"].includes(raw)) {
+    return raw as NormalizedRemoteTrackState;
+  }
+  if (raw === "playable") return liveTrack(slot) ? "playable" : "unavailable";
+  if (!raw) return liveTrack(slot) ? "unknown" : "unavailable";
+  return "unknown";
+}
+
+function preferredRemoteSlot(
+  participants: DailyParticipant[],
+  kind: "audio" | "video",
+): DailyTrackSlot | undefined {
+  const slots = participants.map((participant) => participant?.tracks?.[kind]).filter(Boolean) as DailyTrackSlot[];
+  return slots.find((slot) => normalizeRemoteTrackState(slot) === "playable")
+    || slots.find((slot) => normalizeRemoteTrackState(slot) === "loading")
+    || slots[0];
+}
+
+export function snapshotRemoteParticipants(participants: DailyParticipant[]): RemoteParticipantEvidence {
+  const remotes = participants.filter((participant) => participant?.local !== true);
+  const audio = preferredRemoteSlot(remotes, "audio");
+  const video = preferredRemoteSlot(remotes, "video");
+  const audioState = normalizeRemoteTrackState(audio);
+  const videoState = normalizeRemoteTrackState(video);
+  return {
+    remotePresent: remotes.length > 0,
+    remoteAudioReady: audioState === "playable",
+    remoteVideoReady: videoState === "playable",
+    remoteParticipantCount: Math.min(16, remotes.length),
+    remoteParticipantCountBucket: remoteCountBucket(remotes.length),
+    audioState,
+    videoState,
+    audioPersistentTrackPresent: Boolean(audio?.persistentTrack),
+    videoPersistentTrackPresent: Boolean(video?.persistentTrack),
+    audioSubscriptionState: normalizeSubscription(audio),
+    videoSubscriptionState: normalizeSubscription(video),
+    audioTrackPresent: Boolean(liveTrack(audio)),
+    videoTrackPresent: Boolean(liveTrack(video)),
+  };
+}
+
+function emptyRemoteEvidence(): RemoteParticipantEvidence {
+  return snapshotRemoteParticipants([]);
+}
+
+export function deriveStartupReadiness(
+  evidence: RemoteParticipantEvidence,
+  replicaProgressConfirmed: boolean,
+  recovering: boolean,
+): StartupReadinessState {
+  if (recovering) return "startup_recovering";
+  if (replicaProgressConfirmed) return "replica_progress_confirmed";
+  if (evidence.remoteVideoReady) return "remote_video_playable";
+  if (!evidence.remotePresent) return "waiting_for_remote_participant";
+  if (evidence.videoState === "loading") return "remote_video_loading";
+  if (evidence.remoteAudioReady && !evidence.remoteVideoReady) return "remote_participant_audio_only";
+  return "remote_participant_present";
+}
+
+export function transitionStartupReadiness(
+  current: StartupReadinessState,
+  next: StartupReadinessState,
+  newConversation: boolean,
+): StartupReadinessState {
+  if (newConversation) return next;
+  if (current === "startup_failed") return current;
+  if (next === "startup_failed" || next === "startup_recovering") return next;
+  if (
+    current === "remote_video_playable"
+    || current === "replica_progress_confirmed"
+    || current === "startup_ready"
+  ) {
+    return current;
+  }
+  return next;
+}
+
+export function deriveTrackStateTransition(
+  kind: "audio" | "video",
+  previous: NormalizedRemoteTrackState,
+  next: NormalizedRemoteTrackState,
+  evidence: RemoteParticipantEvidence,
+  source: "participant_joined" | "participant_updated" | "participant_left" | "track_started" | "track_stopped" | "reconnect_enumeration" | "watchdog_snapshot",
+  elapsedBucket: string,
+  startupState: StartupReadinessState,
+  reconnectPhase: ReconnectRecoveryPhase,
+): ReliabilityDiagnosticEvent | null {
+  if (previous === next) return null;
+  return {
+    event: "daily_remote_track_state_changed",
+    metadata: {
+      track_kind: kind,
+      previous_track_state: previous,
+      next_track_state: next,
+      track_present: kind === "audio" ? evidence.audioTrackPresent : evidence.videoTrackPresent,
+      persistent_track_present: kind === "audio"
+        ? evidence.audioPersistentTrackPresent
+        : evidence.videoPersistentTrackPresent,
+      subscription_state: kind === "audio"
+        ? evidence.audioSubscriptionState
+        : evidence.videoSubscriptionState,
+      startup_readiness_state: startupState,
+      reconnect_phase: reconnectPhase,
+      elapsed_since_join_bucket: elapsedBucket,
+      transition_source: source,
+    },
+  };
+}
+
+function normalizeReceiveValue(value: unknown, kind: "audio" | "video"): string {
+  if (value === false || value === "off") return "off";
+  if (value === true || value === "full") return "full";
+  if (value === "base") return "base";
+  if (kind === "video" && value === "thumbnail") return "thumbnail";
+  if (kind === "video" && value && typeof value === "object" && !Array.isArray(value)) {
+    const layer = (value as { layer?: unknown }).layer;
+    if (layer === 0) return "thumbnail";
+    if (layer === 1) return "base";
+    if (typeof layer === "number" && Number.isInteger(layer) && layer >= 2) return "full";
+  }
+  return "unknown";
+}
+
+export function normalizeDailyReceiveSettings(
+  settings: unknown,
+  reconnect: boolean,
+  explicit = false,
+): ReliabilityMetadata {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+    return {
+      audio_receive_state: "automatic",
+      video_receive_state: "automatic",
+      settings_source: "inherited_default",
+      reconnect_active: reconnect,
+    };
+  }
+  const source = settings as Record<string, unknown>;
+  const base = source.base && typeof source.base === "object" && !Array.isArray(source.base)
+    ? source.base as Record<string, unknown>
+    : source;
+  return {
+    audio_receive_state: base.audio === undefined ? "automatic" : normalizeReceiveValue(base.audio, "audio"),
+    video_receive_state: base.video === undefined ? "automatic" : normalizeReceiveValue(base.video, "video"),
+    settings_source: explicit ? "explicit" : "inherited_default",
+    reconnect_active: reconnect,
+  };
+}
+
+export async function readDailyReceiveSettingsSnapshot(
+  call: Pick<DailyCallObject, "getReceiveSettings"> | null,
+  reconnect: boolean,
+  explicitSettings?: unknown,
+  explicit = false,
+): Promise<ReliabilityMetadata> {
+  let settings = explicitSettings;
+  if (settings === undefined && call?.getReceiveSettings) {
+    try {
+      settings = await call.getReceiveSettings();
+    } catch {
+      return {
+        audio_receive_state: "unavailable",
+        video_receive_state: "unavailable",
+        settings_source: "unavailable",
+        reconnect_active: reconnect,
+      };
+    }
+  }
+  return normalizeDailyReceiveSettings(settings, reconnect, explicit);
+}
+
+export function classifyRemoteVideoAttachment(error: unknown):
+  | "play_rejected_policy"
+  | "play_rejected_media"
+  | "play_rejected_unknown" {
+  const name = error && typeof error === "object" && "name" in error
+    ? String((error as { name?: unknown }).name || "")
+    : "";
+  if (["NotAllowedError", "SecurityError", "AbortError"].includes(name)) return "play_rejected_policy";
+  if (["NotSupportedError", "EncodingError", "MediaError"].includes(name)) return "play_rejected_media";
+  return "play_rejected_unknown";
+}
+
+function elapsedSinceJoinBucket(joinedAt: number | null, now = Date.now()): string {
+  if (joinedAt === null) return "unavailable";
+  const elapsed = Math.max(0, now - joinedAt);
+  if (elapsed < 15000) return "under_15_seconds";
+  if (elapsed <= 45000) return "15_45_seconds";
+  if (elapsed <= 75000) return "46_75_seconds";
+  return "over_75_seconds";
+}
+
+function recoveryAgeBucket(startedAt: number | null, now = Date.now()): string {
+  if (startedAt === null) return "unavailable";
+  const elapsed = Math.max(0, now - startedAt);
+  if (elapsed < 5000) return "under_5_seconds";
+  if (elapsed <= 15000) return "5_15_seconds";
+  if (elapsed <= 30000) return "16_30_seconds";
+  return "over_30_seconds";
+}
+
+export function deriveMissingProgressReason(
+  evidence: RemoteParticipantEvidence,
+  attachmentResult: string,
+): string {
+  if (!evidence.remotePresent) return "no_remote_participant";
+  const missingAudio = !evidence.remoteAudioReady;
+  const loadingVideo = evidence.videoState === "loading";
+  const missingVideo = !evidence.remoteVideoReady;
+  if (missingAudio && missingVideo) return "multiple_conditions";
+  if (loadingVideo) return "video_loading";
+  if (evidence.remoteAudioReady && missingVideo && evidence.videoState === "absent") return "audio_only";
+  if (missingVideo) return "video_unavailable";
+  if (!["play_resolved", "src_object_attached"].includes(attachmentResult)) return "media_attachment_unconfirmed";
+  return "no_replica_speech";
+}
+
 function extractTrack(slot?: DailyTrackSlot): MediaStreamTrack | null {
   if (!slot) return null;
   const state = String(slot.state || "").toLowerCase();
-  if (state && state !== "playable" && state !== "sendable" && state !== "loading") return null;
+  if (state && state !== "playable" && state !== "sendable") return null;
   return slot.persistentTrack || slot.track || null;
 }
 
@@ -2055,12 +2329,7 @@ export function deriveRemoteDiagnosticEvents(
   current: RemoteParticipantEvidence,
   context: RemoteDiagnosticContext,
 ): ReliabilityDiagnosticEvent[] {
-  const prior = previous || {
-    remotePresent: false,
-    remoteAudioReady: false,
-    remoteVideoReady: false,
-    remoteParticipantCount: 0,
-  };
+  const prior = previous || emptyRemoteEvidence();
   const events: ReliabilityDiagnosticEvent[] = [];
   const recoveryMetadata: ReliabilityMetadata = context.recoveryActive
     ? {
@@ -2158,6 +2427,64 @@ function setElementTrack(element: HTMLMediaElement | null, track: MediaStreamTra
   void element.play().catch(() => {});
 }
 
+function mediaElementReadyStateBucket(element: HTMLMediaElement | null): string {
+  if (!element) return "unavailable";
+  if (element.readyState <= 0) return "empty";
+  if (element.readyState === 1) return "metadata";
+  if (element.readyState === 2) return "current_data";
+  if (element.readyState === 3) return "future_data";
+  return "enough_data";
+}
+
+function mediaElementSizeBucket(element: HTMLMediaElement | null): string {
+  if (!element) return "unavailable";
+  return element.clientWidth > 0 && element.clientHeight > 0 ? "nonzero" : "zero";
+}
+
+export async function attachRemoteVideoTrack(
+  element: HTMLVideoElement | null,
+  track: MediaStreamTrack | null,
+  trackState: NormalizedRemoteTrackState,
+  reconnect: boolean,
+): Promise<string[]> {
+  if (!element) return ["element_not_ready"];
+  if (!track) {
+    try {
+      if (element.srcObject) element.srcObject = null;
+    } catch {
+      return ["element_not_ready"];
+    }
+    return [trackState === "loading" ? "track_loading" : "no_track"];
+  }
+  if (track.readyState === "ended") {
+    try {
+      if (element.srcObject) element.srcObject = null;
+    } catch {
+      return ["element_not_ready"];
+    }
+    return ["track_ended"];
+  }
+  const outcomes: string[] = [];
+  let currentTrack: MediaStreamTrack | null = null;
+  try {
+    const current = element.srcObject instanceof MediaStream ? element.srcObject : null;
+    currentTrack = current?.getTracks?.()[0] || null;
+    if (currentTrack !== track) {
+      element.srcObject = new MediaStream([track]);
+      outcomes.push(reconnect && currentTrack ? "replaced_after_reconnect" : "src_object_attached");
+    }
+  } catch {
+    return ["element_not_ready"];
+  }
+  try {
+    await element.play();
+    outcomes.push("play_resolved");
+  } catch (error) {
+    outcomes.push(classifyRemoteVideoAttachment(error));
+  }
+  return outcomes;
+}
+
 function formatCountdown(seconds: number | null): string {
   if (seconds === null || seconds <= 0) return "";
   const mins = Math.floor(seconds / 60);
@@ -2203,9 +2530,20 @@ export default function InterviewCviPage() {
   const replicaInterruptRequestedRef = useRef(false);
   const closingEchoDispatchRequestedRef = useRef(false);
   const candidateAudioLockAbortRef = useRef<AbortController | null>(null);
-  const startupRemoteSeenRef = useRef(false);
+  const startupReadyRef = useRef(false);
+  const startupReadinessRef = useRef<StartupReadinessState>("waiting_for_remote_participant");
+  const replicaProgressConfirmedRef = useRef(false);
   const startupRecoveryAttemptedRef = useRef(false);
   const startupTimerRef = useRef<number | null>(null);
+  const roomJoinedAtRef = useRef<number | null>(null);
+  const remoteSnapshotSignatureRef = useRef("");
+  const reconnectBindingSignaturesRef = useRef<Record<string, string>>({});
+  const remoteVideoAttachmentSignatureRef = useRef("");
+  const remoteVideoAttachmentResultRef = useRef("no_track");
+  const previousRemoteParticipantRef = useRef<DailyParticipant | null>(null);
+  const previousRemoteAudioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const previousRemoteVideoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const telemetryEmitterRef = useRef<((event: string, metadata: ReliabilityMetadata) => void) | null>(null);
   const secondsRemainingRef = useRef<number | null>(null);
   const recordingStartRequestedRef = useRef(false);
   const progressObservedRef = useRef(false);
@@ -2298,6 +2636,7 @@ export default function InterviewCviPage() {
     const list = Object.values(map);
     const local = list.find((p) => Boolean(p?.local));
     const remotes = list.filter((p) => !p?.local);
+    const evidence = snapshotRemoteParticipants(remotes);
 
     // A terminal-state remount can construct a fresh Daily runtime. Reassert
     // the best-effort discard once for that runtime without waiting for or
@@ -2308,12 +2647,51 @@ export default function InterviewCviPage() {
     }
 
     const localVideoTrack = extractTrack(local?.tracks?.video);
-    const remoteVideoTrack = remotes.map((remote) => extractTrack(remote?.tracks?.video)).find(Boolean) || null;
-    const remoteAudioTrack = remotes.map((remote) => extractTrack(remote?.tracks?.audio)).find(Boolean) || null;
+    const remoteVideoSlot = preferredRemoteSlot(remotes, "video");
+    const remoteAudioSlot = preferredRemoteSlot(remotes, "audio");
+    const remoteVideoTrack = extractTrack(remoteVideoSlot);
+    const remoteAudioTrack = extractTrack(remoteAudioSlot);
     const localAudioTrack = extractTrack(local?.tracks?.audio);
 
     setElementTrack(localVideoRef.current, localVideoTrack);
-    setElementTrack(remoteVideoRef.current, remoteVideoTrack);
+    void attachRemoteVideoTrack(
+      remoteVideoRef.current,
+      remoteVideoTrack,
+      evidence.videoState,
+      reconnectingRef.current || isReconnectRecoveryActive(progressRecoveryStateRef.current),
+    ).then((outcomes) => {
+      if (endTriggeredRef.current) return;
+      for (const outcome of outcomes) {
+        remoteVideoAttachmentResultRef.current = outcome;
+        const metadata = {
+          video_attachment_result: outcome,
+          video_track_state: evidence.videoState,
+          element_ready_state_bucket: mediaElementReadyStateBucket(remoteVideoRef.current),
+          element_visible: Boolean(remoteVideoRef.current && !remoteVideoRef.current.hidden),
+          element_size_bucket: mediaElementSizeBucket(remoteVideoRef.current),
+          reconnect_active: reconnectingRef.current || isReconnectRecoveryActive(progressRecoveryStateRef.current),
+          elapsed_since_join_bucket: elapsedSinceJoinBucket(roomJoinedAtRef.current),
+          startup_readiness_state: startupReadinessRef.current,
+        };
+        const signature = JSON.stringify(metadata);
+        if (remoteVideoAttachmentSignatureRef.current === signature) continue;
+        remoteVideoAttachmentSignatureRef.current = signature;
+        telemetryEmitterRef.current?.("remote_video_attachment_result", metadata);
+      }
+    }).catch(() => {
+      if (endTriggeredRef.current) return;
+      remoteVideoAttachmentResultRef.current = "play_rejected_unknown";
+      telemetryEmitterRef.current?.("remote_video_attachment_result", {
+        video_attachment_result: "play_rejected_unknown",
+        video_track_state: evidence.videoState,
+        element_ready_state_bucket: mediaElementReadyStateBucket(remoteVideoRef.current),
+        element_visible: Boolean(remoteVideoRef.current && !remoteVideoRef.current.hidden),
+        element_size_bucket: mediaElementSizeBucket(remoteVideoRef.current),
+        reconnect_active: reconnectingRef.current || isReconnectRecoveryActive(progressRecoveryStateRef.current),
+        elapsed_since_join_bucket: elapsedSinceJoinBucket(roomJoinedAtRef.current),
+        startup_readiness_state: startupReadinessRef.current,
+      });
+    });
     attachRemotePalAudioTrack(
       remoteAudioRef.current,
       remoteAudioTrack,
@@ -2321,24 +2699,35 @@ export default function InterviewCviPage() {
       farewellAudioAudibleRef.current,
     );
 
-    const hasRemote = Boolean(remoteVideoTrack);
+    const hasRemote = evidence.remoteVideoReady;
     setHasRemoteVideo(hasRemote);
     setHasLocalVideo(Boolean(localVideoTrack));
     inactivityCandidateMediaHealthyRef.current = Boolean(
       localAudioTrack && localAudioTrack.readyState !== "ended" && localAudioTrack.enabled,
     );
-    if (hasRemote) {
-      startupRemoteSeenRef.current = true;
+    const proposedReadiness = deriveStartupReadiness(
+      evidence,
+      replicaProgressConfirmedRef.current,
+      reconnectingRef.current || isReconnectRecoveryActive(progressRecoveryStateRef.current),
+    );
+    const previousReadiness = startupReadinessRef.current;
+    const nextReadiness = transitionStartupReadiness(previousReadiness, proposedReadiness, false);
+    startupReadinessRef.current = nextReadiness;
+    if (nextReadiness !== previousReadiness) {
+      telemetryEmitterRef.current?.("startup_readiness_changed", {
+        startup_readiness_state: nextReadiness,
+        audio_track_state: evidence.audioState,
+        video_track_state: evidence.videoState,
+        remote_participant_count_bucket: evidence.remoteParticipantCountBucket,
+        reconnect_phase: progressRecoveryStateRef.current.phase,
+      });
+    }
+    if (["remote_video_playable", "replica_progress_confirmed", "startup_ready"].includes(nextReadiness)) {
+      startupReadyRef.current = true;
       clearStartupTimer();
       setLoading(false);
       setError("");
     }
-    const evidence = {
-      remotePresent: remotes.length > 0,
-      remoteAudioReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.audio)),
-      remoteVideoReady: remotes.some((remote) => isRemoteTrackReady(remote?.tracks?.video)),
-      remoteParticipantCount: Math.min(16, remotes.length),
-    };
     inactivityRemoteEvidenceRef.current = evidence;
     return evidence;
   }, [clearStartupTimer]);
@@ -2458,6 +2847,13 @@ export default function InterviewCviPage() {
       telemetryPendingRef.current.add(request);
     } catch {}
   }, [session]);
+
+  useEffect(() => {
+    telemetryEmitterRef.current = (event, metadata) => sendLifecycleTelemetry(event, metadata);
+    return () => {
+      telemetryEmitterRef.current = null;
+    };
+  }, [sendLifecycleTelemetry]);
 
   const currentInactivityEligibility = useCallback((): CandidateInactivityEligibility => {
     const remote = inactivityRemoteEvidenceRef.current;
@@ -3372,16 +3768,73 @@ export default function InterviewCviPage() {
       }
     };
 
+    type ReconnectBindingPhase = "initiation" | "post_leave" | "rejoin_success" | "participant_rediscovery" | "track_rebinding" | "recovery_deadline";
+    const emitReconnectBindingMetadata = (phase: ReconnectBindingPhase, metadata: ReliabilityMetadata) => {
+      const boundedMetadata = { reconnect_binding_phase: phase, ...metadata };
+      const signature = JSON.stringify(boundedMetadata);
+      if (reconnectBindingSignaturesRef.current[phase] === signature) return;
+      reconnectBindingSignaturesRef.current[phase] = signature;
+      sendLifecycleTelemetry("reconnect_media_binding_snapshot", boundedMetadata);
+    };
+    const emitReconnectBindingSnapshot = (
+      phase: ReconnectBindingPhase,
+      evidence = previousRemoteEvidence || emptyRemoteEvidence(),
+    ) => {
+      const metadata: ReliabilityMetadata = {
+        remote_participant_count_bucket: evidence.remoteParticipantCountBucket,
+        audio_track_state: evidence.audioState,
+        video_track_state: evidence.videoState,
+        audio_attached: Boolean(remoteAudioRef.current?.srcObject),
+        video_attached: Boolean(remoteVideoRef.current?.srcObject),
+        participant_continuity: evidence.remotePresent ? "unknown" : "absent",
+        audio_track_continuity: evidence.audioTrackPresent ? "unknown" : "absent",
+        video_track_continuity: evidence.videoTrackPresent ? "unknown" : "absent",
+        startup_readiness_state: startupReadinessRef.current,
+        recovery_age_bucket: recoveryAgeBucket(progressRecoveryStateRef.current.startedAt),
+      };
+      emitReconnectBindingMetadata(phase, metadata);
+    };
+    let syncParticipantsWithDiagnostics: (
+      participants?: Record<string, DailyParticipant>,
+      snapshotReason?: "initial_discovery" | "participant_joined" | "participant_updated" | "participant_left"
+        | "track_started" | "track_stopped" | "reconnect_rediscovery" | "recovery_deadline"
+        | "terminal_failure" | "watchdog_snapshot",
+      transitionSource?: "participant_joined" | "participant_updated" | "participant_left" | "track_started"
+        | "track_stopped" | "reconnect_enumeration" | "watchdog_snapshot",
+    ) => RemoteParticipantEvidence = (participants) => syncParticipants(participants);
+
     const beginStartupWatchdog = () => {
       clearStartupTimer();
       startupTimerRef.current = window.setTimeout(async () => {
-        if (!alive || startupRemoteSeenRef.current || !call) return;
+        if (!alive || startupReadyRef.current || !call) return;
         if (!startupRecoveryAttemptedRef.current) {
           startupRecoveryAttemptedRef.current = true;
           reconnectingRef.current = true;
+          const previousReadiness = startupReadinessRef.current;
+          startupReadinessRef.current = transitionStartupReadiness(previousReadiness, "startup_recovering", false);
+          if (startupReadinessRef.current !== previousReadiness) {
+            sendLifecycleTelemetry("startup_readiness_changed", {
+              startup_readiness_state: startupReadinessRef.current,
+              reconnect_phase: "reconnecting_transport",
+            });
+          }
+          emitReconnectBindingSnapshot("initiation");
           cancelInactivityRuntime("reconnect");
           try {
             await call.leave().catch(() => {});
+            if (remoteVideoRef.current?.srcObject) remoteVideoRef.current.srcObject = null;
+            remoteVideoAttachmentResultRef.current = "detached_for_reconnect";
+            sendLifecycleTelemetry("remote_video_attachment_result", {
+              video_attachment_result: "detached_for_reconnect",
+              video_track_state: previousRemoteEvidence?.videoState || "absent",
+              element_ready_state_bucket: mediaElementReadyStateBucket(remoteVideoRef.current),
+              element_visible: Boolean(remoteVideoRef.current && !remoteVideoRef.current.hidden),
+              element_size_bucket: mediaElementSizeBucket(remoteVideoRef.current),
+              reconnect_active: true,
+              elapsed_since_join_bucket: elapsedSinceJoinBucket(roomJoinedAtRef.current),
+              startup_readiness_state: startupReadinessRef.current,
+            });
+            emitReconnectBindingSnapshot("post_leave", emptyRemoteEvidence());
             if (!alive || endTriggeredRef.current) return;
             await call.join({
               url: session.conversation_url,
@@ -3390,6 +3843,13 @@ export default function InterviewCviPage() {
               startVideoOff: false,
             });
             if (!alive || endTriggeredRef.current) return;
+            emitReconnectBindingSnapshot("rejoin_success");
+            void emitReceiveSettingsSnapshot();
+            // The startup reconnect has completed. Clear its transport guard
+            // before rediscovery so playable media can satisfy readiness
+            // immediately instead of remaining stuck in startup_recovering.
+            reconnectingRef.current = false;
+            syncParticipantsWithDiagnostics(undefined, "reconnect_rediscovery", "reconnect_enumeration");
             beginStartupWatchdog();
             return;
           } catch {
@@ -3397,6 +3857,15 @@ export default function InterviewCviPage() {
             reconnectingRef.current = false;
           }
         }
+        const previousReadiness = startupReadinessRef.current;
+        startupReadinessRef.current = transitionStartupReadiness(previousReadiness, "startup_failed", false);
+        if (startupReadinessRef.current !== previousReadiness) {
+          sendLifecycleTelemetry("startup_readiness_changed", {
+            startup_readiness_state: startupReadinessRef.current,
+            reconnect_phase: "failed",
+          });
+        }
+        syncParticipantsWithDiagnostics(undefined, "terminal_failure", "watchdog_snapshot");
         setLoading(false);
         setError("Interview did not start correctly. Please relaunch and try again.");
       }, STARTUP_REMOTE_TIMEOUT_MS);
@@ -3436,18 +3905,41 @@ export default function InterviewCviPage() {
       is_recovery_active: isReconnectRecoveryActive(state),
     });
 
+    const emitReceiveSettingsSnapshot = async (explicitSettings?: unknown, explicit = false) => {
+      const metadata = await readDailyReceiveSettingsSnapshot(
+        call,
+        reconnectingRef.current || isReconnectRecoveryActive(progressRecoveryStateRef.current),
+        explicitSettings,
+        explicit,
+      );
+      if (!alive || endTriggeredRef.current) return;
+      sendLifecycleTelemetry("daily_receive_settings_snapshot", {
+        ...metadata,
+        startup_readiness_state: startupReadinessRef.current,
+      });
+    };
+
     const remoteStateMetadata = (): ReliabilityMetadata => {
-      const evidence = previousRemoteEvidence || {
-        remotePresent: false,
-        remoteAudioReady: false,
-        remoteVideoReady: false,
-        remoteParticipantCount: 0,
-      };
+      const evidence = previousRemoteEvidence || emptyRemoteEvidence();
       return {
         participant_count: evidence.remoteParticipantCount,
         remote_participant_present: evidence.remotePresent,
-        remote_audio_state: remoteMediaState(evidence.remoteAudioReady, evidence.remotePresent),
-        remote_video_state: remoteMediaState(evidence.remoteVideoReady, evidence.remotePresent),
+        remote_audio_state: evidence.audioState,
+        remote_video_state: evidence.videoState,
+        audio_track_present: evidence.audioTrackPresent,
+        video_track_present: evidence.videoTrackPresent,
+        audio_persistent_track_present: evidence.audioPersistentTrackPresent,
+        video_persistent_track_present: evidence.videoPersistentTrackPresent,
+        video_attachment_result: remoteVideoAttachmentResultRef.current,
+        missing_progress_reason: deriveMissingProgressReason(
+          evidence,
+          remoteVideoAttachmentResultRef.current,
+        ),
+        startup_readiness_state: startupReadinessRef.current,
+        video_unavailable_duration_bucket: evidence.remoteVideoReady
+          ? "under_15_seconds"
+          : elapsedSinceJoinBucket(roomJoinedAtRef.current),
+        reconnect_phase: progressRecoveryStateRef.current.phase,
       };
     };
 
@@ -3493,6 +3985,15 @@ export default function InterviewCviPage() {
       cancelInactivityRuntime("watchdog_recovery", true);
       setError("The interview stopped progressing and cannot continue. Please contact support before trying again.");
       const at = Date.now();
+      const previousReadiness = startupReadinessRef.current;
+      startupReadinessRef.current = transitionStartupReadiness(previousReadiness, "startup_failed", false);
+      if (startupReadinessRef.current !== previousReadiness) {
+        sendLifecycleTelemetry("startup_readiness_changed", {
+          startup_readiness_state: startupReadinessRef.current,
+          reconnect_phase: "failed",
+        });
+      }
+      syncParticipantsWithDiagnostics(undefined, "terminal_failure", "watchdog_snapshot");
       sendLifecycleTelemetry(
         "interview_terminal_requested",
         {
@@ -3536,6 +4037,8 @@ export default function InterviewCviPage() {
           ...remoteStateMetadata(),
           ...recoveryMetadata(),
         });
+        emitReconnectBindingSnapshot("recovery_deadline");
+        syncParticipantsWithDiagnostics(undefined, "recovery_deadline", "watchdog_snapshot");
         failProgressRecovery({ type: "deadline", at });
       }, RECOVERY_PROGRESS_TIMEOUT_MS);
     };
@@ -3549,7 +4052,22 @@ export default function InterviewCviPage() {
       });
     };
 
-    const syncParticipantsWithDiagnostics = (participants?: Record<string, DailyParticipant>) => {
+    syncParticipantsWithDiagnostics = (
+      participants?: Record<string, DailyParticipant>,
+      snapshotReason:
+        | "initial_discovery" | "participant_joined" | "participant_updated" | "participant_left"
+        | "track_started" | "track_stopped" | "reconnect_rediscovery" | "recovery_deadline"
+        | "terminal_failure" | "watchdog_snapshot" = "watchdog_snapshot",
+      transitionSource:
+        | "participant_joined" | "participant_updated" | "participant_left" | "track_started"
+        | "track_stopped" | "reconnect_enumeration" | "watchdog_snapshot" = "watchdog_snapshot",
+    ) => {
+      const map = participants || call?.participants?.() || {};
+      const remoteParticipants = Object.values(map).filter((participant) => participant?.local !== true);
+      const remoteParticipant = remoteParticipants[0] || null;
+      const currentAudioTrack = liveTrack(preferredRemoteSlot(remoteParticipants, "audio"));
+      const currentVideoTrack = liveTrack(preferredRemoteSlot(remoteParticipants, "video"));
+      const priorEvidence = previousRemoteEvidence || emptyRemoteEvidence();
       const evidence = syncParticipants(participants);
       observeRecoveryRemoteState(evidence);
       const state = progressRecoveryStateRef.current;
@@ -3562,6 +4080,71 @@ export default function InterviewCviPage() {
       for (const diagnostic of events) {
         sendLifecycleTelemetry(diagnostic.event, diagnostic.metadata);
       }
+      const snapshotMetadata: ReliabilityMetadata = {
+        remote_participant_count_bucket: evidence.remoteParticipantCountBucket,
+        local_remote_classification: evidence.remotePresent ? "all_non_local_as_replica" : "none",
+        audio_track_state: evidence.audioState,
+        video_track_state: evidence.videoState,
+        audio_persistent_track_present: evidence.audioPersistentTrackPresent,
+        video_persistent_track_present: evidence.videoPersistentTrackPresent,
+        audio_subscription_state: evidence.audioSubscriptionState,
+        video_subscription_state: evidence.videoSubscriptionState,
+        startup_readiness_state: startupReadinessRef.current,
+        reconnect_phase: state.phase,
+        snapshot_reason: snapshotReason,
+      };
+      const snapshotSignature = JSON.stringify(snapshotMetadata);
+      if (remoteSnapshotSignatureRef.current !== snapshotSignature) {
+        remoteSnapshotSignatureRef.current = snapshotSignature;
+        sendLifecycleTelemetry("daily_remote_participant_snapshot", snapshotMetadata);
+      }
+      for (const [kind, previousTrackState, nextTrackState] of [
+        ["audio", priorEvidence.audioState, evidence.audioState],
+        ["video", priorEvidence.videoState, evidence.videoState],
+      ] as const) {
+        const transition = deriveTrackStateTransition(
+          kind,
+          previousTrackState,
+          nextTrackState,
+          evidence,
+          transitionSource,
+          elapsedSinceJoinBucket(roomJoinedAtRef.current),
+          startupReadinessRef.current,
+          state.phase,
+        );
+        if (transition) sendLifecycleTelemetry(transition.event, transition.metadata);
+      }
+      if (isReconnectRecoveryActive(state)) {
+        const participantContinuity = !remoteParticipant
+          ? "absent"
+          : !previousRemoteParticipantRef.current
+            ? "unknown"
+            : previousRemoteParticipantRef.current === remoteParticipant
+              ? "same_runtime_reference"
+              : "replacement_reference";
+        const continuity = (previous: MediaStreamTrack | null, current: MediaStreamTrack | null) => (
+          !current ? "absent" : !previous ? "unknown" : previous === current ? "retained" : "replaced"
+        );
+        const reconnectBindingMetadata: ReliabilityMetadata = {
+          remote_participant_count_bucket: evidence.remoteParticipantCountBucket,
+          audio_track_state: evidence.audioState,
+          video_track_state: evidence.videoState,
+          audio_attached: Boolean(remoteAudioRef.current?.srcObject),
+          video_attached: Boolean(remoteVideoRef.current?.srcObject),
+          participant_continuity: participantContinuity,
+          audio_track_continuity: continuity(previousRemoteAudioTrackRef.current, currentAudioTrack),
+          video_track_continuity: continuity(previousRemoteVideoTrackRef.current, currentVideoTrack),
+          startup_readiness_state: startupReadinessRef.current,
+          recovery_age_bucket: recoveryAgeBucket(state.startedAt),
+        };
+        emitReconnectBindingMetadata("participant_rediscovery", reconnectBindingMetadata);
+        if (currentAudioTrack || currentVideoTrack) {
+          emitReconnectBindingMetadata("track_rebinding", reconnectBindingMetadata);
+        }
+      }
+      previousRemoteParticipantRef.current = remoteParticipant;
+      previousRemoteAudioTrackRef.current = currentAudioTrack;
+      previousRemoteVideoTrackRef.current = currentVideoTrack;
       if (!evidence.remotePresent) cancelInactivityRuntime("replica_absent");
       else if (!evidence.remoteAudioReady) cancelInactivityRuntime("remote_audio_unavailable");
       if (!inactivityCandidateMediaHealthyRef.current) {
@@ -3684,12 +4267,16 @@ export default function InterviewCviPage() {
         reconnectingRef.current = true;
         cancelInactivityRuntime("watchdog_recovery");
         transitionRecovery({ type: "start", at: recoveryStartedAt });
-        previousRemoteEvidence = {
-          remotePresent: false,
-          remoteAudioReady: false,
-          remoteVideoReady: false,
-          remoteParticipantCount: 0,
-        };
+        const previousReadiness = startupReadinessRef.current;
+        startupReadinessRef.current = transitionStartupReadiness(previousReadiness, "startup_recovering", false);
+        if (startupReadinessRef.current !== previousReadiness) {
+          sendLifecycleTelemetry("startup_readiness_changed", {
+            startup_readiness_state: startupReadinessRef.current,
+            reconnect_phase: "reconnecting_transport",
+          });
+        }
+        emitReconnectBindingSnapshot("initiation");
+        previousRemoteEvidence = emptyRemoteEvidence();
         beginProgressRecoveryDeadline();
         sendLifecycleTelemetry("reconnect_started", {
           progress_age_ms: boundedElapsed(lastProgressAtRef.current, recoveryStartedAt),
@@ -3706,6 +4293,9 @@ export default function InterviewCviPage() {
         }
         try {
           await recoveryCall.leave().catch(() => {});
+          if (remoteVideoRef.current?.srcObject) remoteVideoRef.current.srcObject = null;
+          remoteVideoAttachmentResultRef.current = "detached_for_reconnect";
+          emitReconnectBindingSnapshot("post_leave", emptyRemoteEvidence());
           if (!alive || endTriggeredRef.current) return;
           await recoveryCall.join({
             url: session.conversation_url,
@@ -3715,7 +4305,9 @@ export default function InterviewCviPage() {
           });
           if (!alive || endTriggeredRef.current) return;
           recordReconnectLocalJoin(Date.now());
-          syncParticipantsWithDiagnostics();
+          emitReconnectBindingSnapshot("rejoin_success");
+          void emitReceiveSettingsSnapshot();
+          syncParticipantsWithDiagnostics(undefined, "reconnect_rediscovery", "reconnect_enumeration");
         } catch {
           failProgressRecovery({ type: "join_failed", at: Date.now() });
         } finally {
@@ -3731,8 +4323,22 @@ export default function InterviewCviPage() {
       try {
         setLoading(true);
         setError("");
-        startupRemoteSeenRef.current = false;
+        startupReadyRef.current = false;
+        startupReadinessRef.current = transitionStartupReadiness(
+          startupReadinessRef.current,
+          "waiting_for_remote_participant",
+          true,
+        );
+        replicaProgressConfirmedRef.current = false;
         startupRecoveryAttemptedRef.current = false;
+        roomJoinedAtRef.current = null;
+        remoteSnapshotSignatureRef.current = "";
+        reconnectBindingSignaturesRef.current = {};
+        remoteVideoAttachmentSignatureRef.current = "";
+        remoteVideoAttachmentResultRef.current = "no_track";
+        previousRemoteParticipantRef.current = null;
+        previousRemoteAudioTrackRef.current = null;
+        previousRemoteVideoTrackRef.current = null;
         recordingStartRequestedRef.current = false;
         reconnectingRef.current = false;
         progressObservedRef.current = false;
@@ -3755,7 +4361,8 @@ export default function InterviewCviPage() {
 
         register("joined-meeting", () => {
           if (!alive || endTriggeredRef.current) return;
-          setLoading(false);
+          const initialJoin = roomJoinedAtRef.current === null;
+          if (initialJoin) roomJoinedAtRef.current = Date.now();
           inactivityTransportHealthyRef.current = true;
           if (progressRecoveryStateRef.current.phase === "reconnecting_transport") {
             recordReconnectLocalJoin(Date.now());
@@ -3765,18 +4372,44 @@ export default function InterviewCviPage() {
             meeting_state: "joined",
             ...recoveryMetadata(),
           });
-          syncParticipantsWithDiagnostics();
+          if (initialJoin) {
+            sendLifecycleTelemetry("startup_readiness_changed", {
+              startup_readiness_state: startupReadinessRef.current,
+              reconnect_phase: progressRecoveryStateRef.current.phase,
+            });
+          }
+          void emitReceiveSettingsSnapshot();
+          syncParticipantsWithDiagnostics(
+            undefined,
+            initialJoin ? "initial_discovery" : "reconnect_rediscovery",
+            initialJoin ? "participant_joined" : "reconnect_enumeration",
+          );
           void requestRecordingStart();
         });
-        const syncParticipantEvent = (event?: DailyEvent) => {
+        register("participant-joined", (event) => {
           if (!alive || endTriggeredRef.current) return;
-          syncParticipantsWithDiagnostics(event?.participants);
-        };
-        register("participant-joined", syncParticipantEvent);
-        register("participant-updated", syncParticipantEvent);
-        register("participant-left", syncParticipantEvent);
-        register("track-started", syncParticipantEvent);
-        register("track-stopped", syncParticipantEvent);
+          syncParticipantsWithDiagnostics(event?.participants, "participant_joined", "participant_joined");
+        });
+        register("participant-updated", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          syncParticipantsWithDiagnostics(event?.participants, "participant_updated", "participant_updated");
+        });
+        register("participant-left", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          syncParticipantsWithDiagnostics(event?.participants, "participant_left", "participant_left");
+        });
+        register("track-started", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          syncParticipantsWithDiagnostics(event?.participants, "track_started", "track_started");
+        });
+        register("track-stopped", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          syncParticipantsWithDiagnostics(event?.participants, "track_stopped", "track_stopped");
+        });
+        register("receive-settings-updated", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          void emitReceiveSettingsSnapshot(event?.receiveSettings ?? event?.data, true);
+        });
         register("left-meeting", () => {
           if (!alive || leavingRef.current || reconnectingRef.current) return;
           inactivityTransportHealthyRef.current = false;
@@ -3939,6 +4572,28 @@ export default function InterviewCviPage() {
             syncParticipantsWithDiagnostics();
           }
           const progressAt = Date.now();
+          if (isReplicaSpeaking || isReplicaUtterance) {
+            replicaProgressConfirmedRef.current = true;
+            const previousReadiness = startupReadinessRef.current;
+            const nextReadiness = transitionStartupReadiness(
+              previousReadiness,
+              "replica_progress_confirmed",
+              false,
+            );
+            startupReadinessRef.current = nextReadiness;
+            if (nextReadiness !== previousReadiness) {
+              sendLifecycleTelemetry("startup_readiness_changed", {
+                startup_readiness_state: nextReadiness,
+                reconnect_phase: progressRecoveryStateRef.current.phase,
+              });
+            }
+            if (nextReadiness !== "startup_failed") {
+              startupReadyRef.current = true;
+              clearStartupTimer();
+              setLoading(false);
+              setError("");
+            }
+          }
           const progressSource = isReplicaSpeaking
             ? "replica_started_speaking"
             : isReplicaUtterance
