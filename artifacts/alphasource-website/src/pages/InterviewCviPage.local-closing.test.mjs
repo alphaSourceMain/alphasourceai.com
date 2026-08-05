@@ -28,7 +28,7 @@ after(async () => server.close());
 
 test("zero sends one interrupt and one exact avatar Echo without a provider end", () => {
   assert.equal(closing.FINAL_CLOSING_START_TIMEOUT_MS, 5000);
-  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 12000);
+  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 10000);
   const state = closing.createInterviewTimeBoundaryState("synthetic");
   for (const remainingSeconds of [180, 60, 20, 1, 0.001]) {
     const result = closing.evaluateInterviewTimeBoundary({ state, remainingSeconds });
@@ -275,7 +275,7 @@ test("the first post-Echo PAL span stays audible even when Tavus assigns a diffe
   assert.equal(closing.closingProviderEndAllowed(completed.state), true);
 });
 
-test("terminal app-message handling never re-mutes an owned farewell for inference-id drift", async () => {
+test("terminal provider speech is diagnostic-only and cannot authorize an early provider end", async () => {
   const source = await readFile(sourcePath, "utf8");
   const closingComment = source.indexOf("Closing blocks ordinary turn-taking");
   const closingBranchStart = source.indexOf("if (avatarClosingActiveRef.current)", closingComment);
@@ -283,6 +283,10 @@ test("terminal app-message handling never re-mutes an owned farewell for inferen
   const closingBranch = source.slice(closingBranchStart, ordinaryBranchStart);
   assert.ok(closingBranchStart >= 0);
   assert.ok(ordinaryBranchStart > closingBranchStart);
+  assert.doesNotMatch(closingBranch, /recordClosingEchoSpeechEvent/);
+  assert.doesNotMatch(closingBranch, /finishAvatarClosingSpeech/);
+  assert.doesNotMatch(closingBranch, /persistBoundaryState/);
+  assert.doesNotMatch(closingBranch, /requestClosingProviderEnd/);
   assert.doesNotMatch(closingBranch, /foreign_suppressed|foreign_conflict/);
   assert.doesNotMatch(closingBranch, /closing_foreign_inference_suppressed/);
 });
@@ -317,6 +321,8 @@ test("the owner opens Tavus audio after Echo dispatch and a missing start signal
   assert.doesNotMatch(startTimeout, /finishAvatarClosingSpeech/);
   assert.doesNotMatch(startTimeout, /markClosingEchoFallback/);
   assert.doesNotMatch(startTimeout, /suppressRemotePalAudio/);
+  assert.match(fallbacks, /FINAL_CLOSING_COMPLETION_FALLBACK_MS/);
+  assert.match(fallbacks, /finishAvatarClosingSpeech\(fallback, "completion_timeout"\)/);
 });
 
 test("the runtime keeps normal video UI and contains no local closing asset or splash", async () => {

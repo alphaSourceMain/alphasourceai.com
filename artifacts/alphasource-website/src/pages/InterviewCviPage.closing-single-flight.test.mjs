@@ -33,6 +33,7 @@ const {
   advanceSharedFinalClosingRuntime,
   attachRemotePalAudioTrack,
   claimSharedFinalClosingRuntime,
+  finalClosingGraceDelayMs,
   finalClosingSharedStorageKey,
   readSharedFinalClosingRuntime,
   requestCandidateAudioUnpublish,
@@ -200,15 +201,20 @@ test("a stale owner can be taken over once without reopening dispatch reservatio
   const first = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-a", 1_000);
   assert.equal(first.owned, true);
   assert.equal(
-    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", 9_999).owned,
+    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", first.state.leaseExpiresAt - 1).owned,
     false,
   );
-  const takeover = claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-b", 10_000);
+  const takeover = claimSharedFinalClosingRuntime(
+    storage,
+    "conversation-a",
+    "tab-b",
+    first.state.leaseExpiresAt,
+  );
   assert.equal(takeover.owned, true);
   assert.equal(takeover.reason, "stale_owner_takeover");
   assert.equal(takeover.state.ownerTabId, "tab-b");
   assert.equal(
-    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-c", 10_001).owned,
+    claimSharedFinalClosingRuntime(storage, "conversation-a", "tab-c", takeover.state.leaseExpiresAt - 1).owned,
     false,
   );
 });
@@ -316,7 +322,13 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
   );
   const dispatched = readSharedFinalClosingRuntime(storage, "conversation-deadline");
   assert.equal(dispatched.farewellStartDeadlineAt, 5_200);
-  assert.equal(dispatched.farewellCompletionDeadlineAt, 12_200);
+  assert.equal(dispatched.farewellCompletionDeadlineAt, 10_200);
+  assert.ok(dispatched.leaseExpiresAt > dispatched.farewellCompletionDeadlineAt);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 200), 10_000);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 10_199), 1);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 10_200), 0);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 11_000), 0);
+  assert.equal(finalClosingGraceDelayMs(null, 200), null);
   advanceSharedFinalClosingRuntime(
     storage,
     "conversation-deadline",
@@ -326,7 +338,7 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
   );
   const audible = readSharedFinalClosingRuntime(storage, "conversation-deadline");
   assert.equal(audible.farewellStartDeadlineAt, 5_200);
-  assert.equal(audible.farewellCompletionDeadlineAt, 12_200);
+  assert.equal(audible.farewellCompletionDeadlineAt, 10_200);
 });
 
 test("ambiguous shared state fails closed and never grants ownership", () => {
@@ -420,9 +432,17 @@ test("runtime makes candidate unpublish best effort and gates PAL audio before i
   );
 });
 
-test("post-zero provider speech is parsed for closing completion while ordinary turns are blocked", async () => {
+test("post-zero provider speech is diagnostic-only while ordinary turns are blocked", async () => {
   const source = await readFile(sourcePath, "utf8");
-  assert.match(source, /if \(avatarClosingActiveRef\.current\)[\s\S]{0,900}recordClosingEchoSpeechEvent/);
+  const closingComment = source.indexOf("Closing blocks ordinary turn-taking");
+  const closingBranchStart = source.indexOf("if (avatarClosingActiveRef.current)", closingComment);
+  const ordinaryBranchStart = source.indexOf("const speech =", closingBranchStart);
+  const closingBranch = source.slice(closingBranchStart, ordinaryBranchStart);
+  assert.ok(closingBranchStart >= 0);
+  assert.ok(ordinaryBranchStart > closingBranchStart);
+  assert.doesNotMatch(closingBranch, /recordClosingEchoSpeechEvent/);
+  assert.doesNotMatch(closingBranch, /finishAvatarClosingSpeech/);
+  assert.doesNotMatch(closingBranch, /requestClosingProviderEnd/);
   assert.doesNotMatch(source, /register\("app-message"[\s\S]{0,500}if \(avatarClosingActiveRef\.current\) return;/);
   assert.match(
     source,
