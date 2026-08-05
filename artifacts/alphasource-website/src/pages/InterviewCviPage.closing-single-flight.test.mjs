@@ -322,12 +322,12 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
   );
   const dispatched = readSharedFinalClosingRuntime(storage, "conversation-deadline");
   assert.equal(dispatched.farewellStartDeadlineAt, 5_200);
-  assert.equal(dispatched.farewellCompletionDeadlineAt, 10_200);
+  assert.equal(dispatched.farewellCompletionDeadlineAt, 12_200);
   assert.ok(dispatched.leaseExpiresAt > dispatched.farewellCompletionDeadlineAt);
-  assert.equal(finalClosingGraceDelayMs(dispatched, 200), 10_000);
-  assert.equal(finalClosingGraceDelayMs(dispatched, 10_199), 1);
-  assert.equal(finalClosingGraceDelayMs(dispatched, 10_200), 0);
-  assert.equal(finalClosingGraceDelayMs(dispatched, 11_000), 0);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 200), 12_000);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 12_199), 1);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 12_200), 0);
+  assert.equal(finalClosingGraceDelayMs(dispatched, 13_000), 0);
   assert.equal(finalClosingGraceDelayMs(null, 200), null);
   advanceSharedFinalClosingRuntime(
     storage,
@@ -338,7 +338,7 @@ test("shared farewell deadlines survive later phases and cannot extend on remoun
   );
   const audible = readSharedFinalClosingRuntime(storage, "conversation-deadline");
   assert.equal(audible.farewellStartDeadlineAt, 5_200);
-  assert.equal(audible.farewellCompletionDeadlineAt, 10_200);
+  assert.equal(audible.farewellCompletionDeadlineAt, 12_200);
 });
 
 test("ambiguous shared state fails closed and never grants ownership", () => {
@@ -443,9 +443,21 @@ test("post-zero provider speech is diagnostic-only while ordinary turns are bloc
   assert.doesNotMatch(closingBranch, /recordClosingEchoSpeechEvent/);
   assert.doesNotMatch(closingBranch, /finishAvatarClosingSpeech/);
   assert.doesNotMatch(closingBranch, /requestClosingProviderEnd/);
+  assert.match(closingBranch, /!closingEchoDispatchRequestedRef\.current/);
   assert.doesNotMatch(source, /register\("app-message"[\s\S]{0,500}if \(avatarClosingActiveRef\.current\) return;/);
   assert.match(
     source,
     /progressWatchdogTimer = window\.setInterval[\s\S]{0,450}avatarClosingActiveRef\.current[\s\S]{0,120}stopProgressWatchdog\(\)/,
   );
+});
+
+test("single-flight closing clears both pre-Echo drain timers", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  const start = source.indexOf("const clearAutoEndTimers = useCallback");
+  const end = source.indexOf("const persistBoundaryState", start);
+  const cleanup = source.slice(start, end);
+  assert.match(cleanup, /closingDrainTimerRef\.current/);
+  assert.match(cleanup, /closingEchoGapTimerRef\.current/);
+  assert.match(cleanup, /window\.clearTimeout\(closingDrainTimerRef\.current\)/);
+  assert.match(cleanup, /window\.clearTimeout\(closingEchoGapTimerRef\.current\)/);
 });

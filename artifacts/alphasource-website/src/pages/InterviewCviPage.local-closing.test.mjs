@@ -28,7 +28,9 @@ after(async () => server.close());
 
 test("zero sends one interrupt and one exact avatar Echo without a provider end", () => {
   assert.equal(closing.FINAL_CLOSING_START_TIMEOUT_MS, 5000);
-  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 10000);
+  assert.equal(closing.FINAL_CLOSING_DRAIN_MS, 3500);
+  assert.equal(closing.FINAL_CLOSING_INTERRUPT_ECHO_GAP_MS, 300);
+  assert.equal(closing.FINAL_CLOSING_COMPLETION_FALLBACK_MS, 12000);
   const state = closing.createInterviewTimeBoundaryState("synthetic");
   for (const remainingSeconds of [180, 60, 20, 1, 0.001]) {
     const result = closing.evaluateInterviewTimeBoundary({ state, remainingSeconds });
@@ -287,8 +289,31 @@ test("terminal provider speech is diagnostic-only and cannot authorize an early 
   assert.doesNotMatch(closingBranch, /finishAvatarClosingSpeech/);
   assert.doesNotMatch(closingBranch, /persistBoundaryState/);
   assert.doesNotMatch(closingBranch, /requestClosingProviderEnd/);
+  assert.match(closingBranch, /!closingEchoDispatchRequestedRef\.current/);
+  assert.match(closingBranch, /suppressRemotePalAudio/);
   assert.doesNotMatch(closingBranch, /foreign_suppressed|foreign_conflict/);
   assert.doesNotMatch(closingBranch, /closing_foreign_inference_suppressed/);
+});
+
+test("terminal closing drains a stale inference before its one exact Echo", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  const start = source.indexOf("const dispatchTerminalClosing = useCallback");
+  const end = source.indexOf("const dispatchTerminalClosingWhenReady", start);
+  const dispatch = source.slice(start, end);
+  assert.ok(start >= 0);
+  assert.ok(end > start);
+  assert.match(dispatch, /closingDrainTimerRef\.current = window\.setTimeout/);
+  assert.match(dispatch, /FINAL_CLOSING_DRAIN_MS/);
+  assert.match(dispatch, /closingEchoGapTimerRef\.current = window\.setTimeout/);
+  assert.match(dispatch, /FINAL_CLOSING_INTERRUPT_ECHO_GAP_MS/);
+  assert.ok(
+    dispatch.indexOf("FINAL_CLOSING_DRAIN_MS") <
+      dispatch.indexOf("buildFinalClosingAnnouncementMessage"),
+  );
+  assert.ok(
+    dispatch.indexOf("FINAL_CLOSING_INTERRUPT_ECHO_GAP_MS") <
+      dispatch.indexOf("buildFinalClosingAnnouncementMessage"),
+  );
 });
 
 test("candidate audio publication failure does not become a farewell fallback", async () => {

@@ -378,11 +378,16 @@ export const CANDIDATE_INACTIVITY_NUDGE_TEXT =
 export const FINAL_CLOSING_ANNOUNCEMENT_TEXT =
   "We are out of time. Thank you for your time. I am ending the session now.";
 export const FINAL_CLOSING_START_TIMEOUT_MS = 5000;
+// Tavus can emit one delayed inference after the terminal interrupt. Keep that
+// stale turn inaudible, allow it to drain, then separate the final interrupt
+// from the one authoritative Echo so the two commands cannot race.
+export const FINAL_CLOSING_DRAIN_MS = 3500;
+export const FINAL_CLOSING_INTERRUPT_ECHO_GAP_MS = 300;
 // Tavus speaking-state events are useful diagnostics but are not reliable
 // enough to authorize termination: they may be duplicated, out of order, or
 // describe the PAL turn interrupted immediately before the terminal Echo.
 // Keep the session alive for this entire interval after the Echo dispatch.
-export const FINAL_CLOSING_MINIMUM_GRACE_MS = 10000;
+export const FINAL_CLOSING_MINIMUM_GRACE_MS = 12000;
 export const FINAL_CLOSING_COMPLETION_FALLBACK_MS = FINAL_CLOSING_MINIMUM_GRACE_MS;
 // Ownership must outlive the entire farewell grace so another tab cannot take
 // over between Echo dispatch and the one provider-end reservation.
@@ -2556,12 +2561,15 @@ export default function InterviewCviPage() {
   const closingCompletionTimerRef = useRef<number | null>(null);
   const closingCallReadyTimerRef = useRef<number | null>(null);
   const closingOwnershipTakeoverTimerRef = useRef<number | null>(null);
+  const closingDrainTimerRef = useRef<number | null>(null);
+  const closingEchoGapTimerRef = useRef<number | null>(null);
   const avatarClosingActiveRef = useRef(false);
   const avatarClosingOwnedRef = useRef(false);
   const farewellAudioAudibleRef = useRef(false);
   const closingNavigationRef = useRef(false);
   const candidateAudioUnpublishRequestedRef = useRef(false);
   const replicaInterruptRequestedRef = useRef(false);
+  const closingFinalInterruptRequestedRef = useRef(false);
   const closingEchoDispatchRequestedRef = useRef(false);
   const candidateAudioLockAbortRef = useRef<AbortController | null>(null);
   const startupReadyRef = useRef(false);
@@ -2654,6 +2662,14 @@ export default function InterviewCviPage() {
     if (closingOwnershipTakeoverTimerRef.current) {
       window.clearTimeout(closingOwnershipTakeoverTimerRef.current);
       closingOwnershipTakeoverTimerRef.current = null;
+    }
+    if (closingDrainTimerRef.current) {
+      window.clearTimeout(closingDrainTimerRef.current);
+      closingDrainTimerRef.current = null;
+    }
+    if (closingEchoGapTimerRef.current) {
+      window.clearTimeout(closingEchoGapTimerRef.current);
+      closingEchoGapTimerRef.current = null;
     }
   }, []);
 
@@ -3200,7 +3216,13 @@ export default function InterviewCviPage() {
     conversationId: string,
   ) => {
     if (!avatarClosingOwnedRef.current || typeof window === "undefined") return;
-    const call = callRef.current;
+    const closingDrainMs = FINAL_CLOSING_DRAIN_MS;
+    const closingEchoGapMs = FINAL_CLOSING_INTERRUPT_ECHO_GAP_MS;
+    if (
+      closingDrainTimerRef.current ||
+      closingEchoGapTimerRef.current ||
+      closingEchoDispatchRequestedRef.current
+    ) return;
     const dispatchReservation = advanceSharedFinalClosingRuntime(
       window.localStorage,
       conversationId,
@@ -3237,6 +3259,7 @@ export default function InterviewCviPage() {
     if (!replicaInterruptRequestedRef.current) {
       replicaInterruptRequestedRef.current = true;
       try {
+        const call = callRef.current;
         if (!call?.sendAppMessage) throw new Error("closing_interrupt_unavailable");
         call.sendAppMessage(buildReplicaInterruptMessage(conversationId), "*");
         advanceSharedFinalClosingRuntime(
@@ -3259,49 +3282,76 @@ export default function InterviewCviPage() {
       }
     }
 
-    if (closingEchoDispatchRequestedRef.current) return;
-    closingEchoDispatchRequestedRef.current = true;
-    const inferenceId = closingApplicationInferenceId(conversationId);
-    try {
-      if (!call?.sendAppMessage) throw new Error("closing_echo_unavailable");
-      call.sendAppMessage(
-        buildFinalClosingAnnouncementMessage(conversationId, inferenceId),
-        "*",
-      );
-      const dispatched = markClosingEchoDispatched(
-        timerRuntimeRef.current?.boundaryState || nextState,
-        inferenceId,
-      );
-      persistBoundaryState(dispatched);
-      advanceSharedFinalClosingRuntime(
-        window.localStorage,
-        conversationId,
-        finalClosingTabIdRef.current,
-        "ECHO_DISPATCHED",
-      );
-      // The direct Echo is the only PAL turn allowed after the ordered
-      // interrupt. Open the existing Tavus media immediately; never wait for
-      // an optional inference_id before allowing the farewell to be heard.
-      farewellAudioAudibleRef.current = true;
-      syncParticipants();
-      sendLifecycleTelemetry("closing_farewell_dispatched", {
-        closing_state: "FAREWELL_DISPATCHED",
-        dispatch_result_category: "sent",
-        remaining_time_bucket: "0_10",
-      });
-      armClosingFallbacks();
-    } catch {
-      const failed = markClosingEchoFallback(
-        timerRuntimeRef.current?.boundaryState || nextState,
-        "dispatch_failed",
-      );
-      sendLifecycleTelemetry("closing_farewell_dispatch_failed", {
-        closing_state: "FOREIGN_PAL_AUDIO_MUTED",
-        dispatch_result_category: "failed",
-        remaining_time_bucket: "0_10",
-      });
-      finishAvatarClosingSpeech(failed, "dispatch_failed");
-    }
+    closingDrainTimerRef.current = window.setTimeout(() => {
+      closingDrainTimerRef.current = null;
+      if (!avatarClosingOwnedRef.current || closingEchoDispatchRequestedRef.current) return;
+
+      if (!closingFinalInterruptRequestedRef.current) {
+        closingFinalInterruptRequestedRef.current = true;
+        try {
+          const call = callRef.current;
+          if (!call?.sendAppMessage) throw new Error("closing_final_interrupt_unavailable");
+          call.sendAppMessage(buildReplicaInterruptMessage(conversationId), "*");
+          sendLifecycleTelemetry("closing_interrupt_dispatched", {
+            closing_state: "FOREIGN_PAL_AUDIO_MUTED",
+            dispatch_result_category: "final_sent",
+            remaining_time_bucket: "0_10",
+          });
+        } catch {
+          sendLifecycleTelemetry("closing_interrupt_dispatched", {
+            closing_state: "FOREIGN_PAL_AUDIO_MUTED",
+            dispatch_result_category: "final_failed",
+            remaining_time_bucket: "0_10",
+          });
+        }
+      }
+
+      closingEchoGapTimerRef.current = window.setTimeout(() => {
+        closingEchoGapTimerRef.current = null;
+        if (!avatarClosingOwnedRef.current || closingEchoDispatchRequestedRef.current) return;
+        closingEchoDispatchRequestedRef.current = true;
+        const inferenceId = closingApplicationInferenceId(conversationId);
+        try {
+          const call = callRef.current;
+          if (!call?.sendAppMessage) throw new Error("closing_echo_unavailable");
+          call.sendAppMessage(
+            buildFinalClosingAnnouncementMessage(conversationId, inferenceId),
+            "*",
+          );
+          const dispatched = markClosingEchoDispatched(
+            timerRuntimeRef.current?.boundaryState || nextState,
+            inferenceId,
+          );
+          persistBoundaryState(dispatched);
+          advanceSharedFinalClosingRuntime(
+            window.localStorage,
+            conversationId,
+            finalClosingTabIdRef.current,
+            "ECHO_DISPATCHED",
+          );
+          // Only the authoritative terminal Echo may be heard after the drain.
+          farewellAudioAudibleRef.current = true;
+          syncParticipants();
+          sendLifecycleTelemetry("closing_farewell_dispatched", {
+            closing_state: "FAREWELL_DISPATCHED",
+            dispatch_result_category: "sent",
+            remaining_time_bucket: "0_10",
+          });
+          armClosingFallbacks();
+        } catch {
+          const failed = markClosingEchoFallback(
+            timerRuntimeRef.current?.boundaryState || nextState,
+            "dispatch_failed",
+          );
+          sendLifecycleTelemetry("closing_farewell_dispatch_failed", {
+            closing_state: "FOREIGN_PAL_AUDIO_MUTED",
+            dispatch_result_category: "failed",
+            remaining_time_bucket: "0_10",
+          });
+          finishAvatarClosingSpeech(failed, "dispatch_failed");
+        }
+      }, closingEchoGapMs);
+    }, closingDrainMs);
   }, [
     armClosingFallbacks,
     finishAvatarClosingSpeech,
@@ -4513,6 +4563,11 @@ export default function InterviewCviPage() {
           if (avatarClosingActiveRef.current) {
             if (!normalizedPalSpeaking) return;
             if (!avatarClosingOwnedRef.current) {
+              farewellAudioAudibleRef.current = false;
+              suppressRemotePalAudio(remoteAudioRef.current);
+              return;
+            }
+            if (!closingEchoDispatchRequestedRef.current) {
               farewellAudioAudibleRef.current = false;
               suppressRemotePalAudio(remoteAudioRef.current);
               return;
