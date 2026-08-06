@@ -377,6 +377,12 @@ export const CANDIDATE_INACTIVITY_NUDGE_TEXT =
   "Take your time. When you’re ready, you can continue.";
 export const FINAL_CLOSING_ANNOUNCEMENT_TEXT =
   "We are out of time. Thank you for your time. I am ending the session now.";
+const TERMINAL_INTERVIEW_TOOL_NAMES = new Set(["end_call", "end_interview"]);
+
+export function isTerminalInterviewToolName(value: unknown): boolean {
+  return TERMINAL_INTERVIEW_TOOL_NAMES.has(String(value ?? "").trim().toLowerCase());
+}
+
 export const FINAL_CLOSING_START_TIMEOUT_MS = 5000;
 // Tavus can emit one delayed inference after the terminal interrupt. Keep that
 // stale turn inaudible, allow it to drain, then separate the final interrupt
@@ -4759,8 +4765,8 @@ export default function InterviewCviPage() {
               data?.function?.name ??
               "",
             ).trim().toLowerCase();
-            if (toolName === "end_interview") {
-              void endInterview("tool_call");
+            if (isTerminalInterviewToolName(toolName)) {
+              void endInterview("closing_utterance");
               return;
             }
           }
