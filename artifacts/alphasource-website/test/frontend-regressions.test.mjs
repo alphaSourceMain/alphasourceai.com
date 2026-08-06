@@ -24,7 +24,10 @@ test("candidate application, verification, and launch routes remain wired", () =
   assert.match(access, /\/api\/candidate\/verify-otp/);
   assert.match(access, /\/create-tavus-interview/);
   assert.match(access, /Before you start your interview/);
-  assert.match(access, /preStartMaxInterviewMinutes/);
+  assert.doesNotMatch(access, /3 uninterrupted minutes to complete the interview/);
+  assert.doesNotMatch(access, /preStartMaxInterviewMinutes/);
+  assert.match(access, /data\?\.max_interview_minutes/);
+  assert.match(access, /max_interview_minutes: maxInterviewMinutes/);
 });
 
 test("candidate readiness has no competing spoken introduction or fixed warm-up", () => {
