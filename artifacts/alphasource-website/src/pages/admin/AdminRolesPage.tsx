@@ -815,12 +815,14 @@ export default function AdminRolesPage() {
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
-          <div className="min-w-[18rem] flex-1">
+          <div className="w-40 flex-shrink-0">
             <InterviewTypeField
               id="admin-role-interview-type"
               value={form.type}
               onChange={(event) => setForm({ ...form, type: event.target.value as InterviewType })}
               className={selectCls}
+              showLabel={false}
+              showDescription={false}
             />
           </div>
 
@@ -857,13 +859,7 @@ export default function AdminRolesPage() {
             {creatingRole ? "Creating..." : "Create"}
           </button>
         </div>
-        <div className="mt-4">
-          <MembershipTypeSummary
-            membershipLevel={membershipLevelForClient(selectedClient.id)}
-            interviewType={form.type}
-          />
-          <RubricGuidancePanel compact />
-        </div>
+        <RubricGuidancePanel compact />
       </div>
 
       {/* ── Search ────────────────────────────────────────── */}

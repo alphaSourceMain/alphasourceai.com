@@ -1124,13 +1124,14 @@ export default function RolesPage() {
               </div>
 
               {/* Interview Type */}
-              <div className="min-w-[18rem] flex-1">
+              <div className="w-44">
                 <InterviewTypeField
                   id="dashboard-role-interview-type"
                   value={interviewType}
                   onChange={(event) => setInterviewType(event.target.value as InterviewType)}
                   className="w-full px-4 py-2.5 rounded-xl border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#A380F6]/25 focus:border-[#A380F6] transition-all cursor-pointer"
                   selectStyle={fieldSurfaceStyle}
+                  showDescription={false}
                 />
               </div>
 
@@ -1198,14 +1199,7 @@ export default function RolesPage() {
                 {createBusy ? "Creating..." : "Create"}
               </button>
             </div>
-            <div className="mt-4">
-              <MembershipTypeSummary
-                membershipLevel={selectedMembershipLevel}
-                backendCapacity={selectedMembershipCapacity}
-                interviewType={interviewType}
-              />
-              <RubricGuidancePanel compact />
-            </div>
+            <RubricGuidancePanel compact />
           </form>
         </div>
       )}
