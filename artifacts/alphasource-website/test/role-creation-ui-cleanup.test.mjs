@@ -45,7 +45,7 @@ test("the canonical selector contains exactly Core, Leadership, and Technical", 
 });
 
 test("role creation uses the compact historical selector widths without inline prose", () => {
-  assert.match(dashboardCreate, /className=["']w-44["']/);
+  assert.match(dashboardCreate, /className=["']w-44 flex-shrink-0["']/);
   assert.match(adminCreate, /className=["'](?:relative )?w-40 flex-shrink-0["']/);
   for (const source of [dashboardCreate, adminCreate]) {
     assert.match(source, /showDescription=\{false\}/);
@@ -107,8 +107,21 @@ test("role creation, editing, and non-regeneration contracts are unchanged", () 
 });
 
 test("compact form keeps responsive wrapping and usable fixed controls", () => {
-  assert.match(dashboardCreate, /flex flex-wrap gap-3 items-end/);
-  assert.match(adminCreate, /flex gap-3 flex-wrap/);
-  assert.match(dashboardCreate, /flex-shrink-0/);
-  assert.match(adminCreate, /flex-shrink-0/);
+  assert.match(dashboardCreate, /flex flex-col gap-3 items-start sm:flex-row sm:flex-wrap sm:items-end/);
+  assert.match(adminCreate, /flex flex-col gap-3 items-start sm:flex-row sm:flex-wrap sm:items-stretch/);
+  assert.match(dashboardCreate, /w-full sm:flex-1 sm:min-w-\[200px\]/);
+  assert.match(adminCreate, /w-full sm:flex-1 sm:min-w-(?:36|48)/);
+  for (const source of [dashboardCreate, adminCreate]) {
+    assert.match(source, /max-w-\[calc\(100vw-2\.5rem\)\] lg:max-w-none/);
+  }
+  assert.match(dashboardCreate, /className=["']w-44 flex-shrink-0["']/);
+  assert.match(adminCreate, /className=["']w-40 flex-shrink-0["']/);
+});
+
+test("narrow role pages contain search and wide tables instead of expanding the document", () => {
+  const viewportCap = /min-w-0 max-w-\[calc\(100vw-2\.5rem\)\] lg:max-w-none/g;
+  assert.equal([...dashboardRoles.matchAll(viewportCap)].length, 3);
+  assert.equal([...adminRoles.matchAll(viewportCap)].length, 3);
+  assert.match(dashboardRoles, /<div className=["']overflow-x-auto["']>\s*<table className=["']min-w-\[960px\]/);
+  assert.match(adminRoles, /className=["']rounded-2xl overflow-x-auto min-w-0 max-w-\[calc\(100vw-2\.5rem\)\] lg:max-w-none["']/);
 });
