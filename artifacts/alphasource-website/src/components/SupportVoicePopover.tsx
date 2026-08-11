@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Headphones, HelpCircle, LoaderCircle, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { signalDashboardActivity } from "@/lib/dashboardActivity";
 import {
   SUPPORT_VOICE_CHUNK_SAMPLES,
   SUPPORT_VOICE_SAMPLE_RATE,
@@ -243,6 +244,7 @@ export default function SupportVoicePopover() {
 
   const startConversation = useCallback(() => {
     if (!available || !backendOrigin || state === "requesting" || state === "connecting" || state === "listening" || state === "speaking" || state === "muted") return;
+    signalDashboardActivity();
     const context = new AudioContext({ sampleRate: SUPPORT_VOICE_SAMPLE_RATE });
     const lifecycleEpoch = lifecycleEpochRef.current + 1;
     lifecycleEpochRef.current = lifecycleEpoch;
@@ -317,6 +319,7 @@ export default function SupportVoicePopover() {
           try { decoded = JSON.parse(event.data); } catch { return endConversation("error", "client_protocol_error"); }
           const message = parseSupportVoiceServerMessage(decoded);
           if (!message) return endConversation("error", "client_protocol_error");
+          if (message.type !== "audio_delta") signalDashboardActivity();
           if (message.type === "ready") {
             canSendRef.current = true;
             mutedRef.current = false;
