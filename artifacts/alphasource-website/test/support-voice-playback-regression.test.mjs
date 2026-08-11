@@ -48,6 +48,16 @@ test("long multi-sentence audio remains inside a bounded queue", () => {
   assert.equal(queue.queuedBytes, 0);
 });
 
+test("the bounded queue covers ten minutes of 24 kHz mono PCM16 without truncation", () => {
+  const queue = new playback.SupportVoicePlaybackQueue();
+  const fiveSeconds = new Int16Array(5 * 24_000);
+  for (let chunk = 0; chunk < 120; chunk += 1) assert.equal(queue.enqueue(fiveSeconds.slice()), "queued");
+  assert.equal(queue.queuedBytes, 10 * 60 * 24_000 * 2);
+  assert.equal(playback.SUPPORT_VOICE_PLAYBACK_MAX_BYTES, 32 * 1024 * 1024);
+  assert.ok(queue.queuedBytes < playback.SUPPORT_VOICE_PLAYBACK_MAX_BYTES);
+  queue.clear();
+});
+
 test("playback windows remain gapless across a long answer", () => {
   let next = 0;
   for (let index = 0; index < 400; index += 1) {
@@ -90,4 +100,13 @@ test("ending remains user-controlled or server-controlled and close reasons are 
   assert.doesNotMatch(voice, /socket\.close\([^)]*,\s*(?:event|decoded|message|encoded|audio)/);
   assert.doesNotMatch(voice, /console\.(?:log|warn|error)\([^)]*(?:encoded|samples|audio|transcript)/);
   assert.match(voice, /socket\.addEventListener\("error", \(\) => \{\s*credential = "";\s*\}, \{ once: true \}\);/);
+});
+
+test("assistant playback owns the microphone and speaking state until the queue drains", () => {
+  const voice = read("src/components/SupportVoicePopover.tsx");
+  assert.match(voice, /assistantPlaybackActiveRef\.current/);
+  assert.match(voice, /assistantPlaybackActiveRef\.current\s*=\s*true/);
+  assert.match(voice, /assistantPlaybackActiveRef\.current\s*\|\|\s*socket\.readyState\s*!==\s*WebSocket\.OPEN/);
+  assert.match(voice, /playbackQueueRef\.current\.pendingCount\s*===\s*0/);
+  assert.match(voice, /scheduledRef\.current\.size\s*===\s*0/);
 });

@@ -80,6 +80,7 @@ export default function SupportVoicePopover() {
   const playbackEpochRef = useRef(0);
   const nextPlaybackTimeRef = useRef(0);
   const responseActiveRef = useRef(false);
+  const assistantPlaybackActiveRef = useRef(false);
   const abandonNeededRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
   const mountedRef = useRef(true);
@@ -97,6 +98,7 @@ export default function SupportVoicePopover() {
     playbackPressureReportedRef.current = false;
     nextPlaybackTimeRef.current = 0;
     responseActiveRef.current = false;
+    assistantPlaybackActiveRef.current = false;
   }, []);
 
   const releaseMedia = useCallback(() => {
@@ -142,6 +144,17 @@ export default function SupportVoicePopover() {
     void abandonPending();
   }, [abandonPending, releaseMedia]);
 
+  const finishPlaybackIfDrained = useCallback(() => {
+    const playbackDrained = playbackQueueRef.current.pendingCount === 0 && scheduledRef.current.size === 0;
+    if (responseActiveRef.current || !assistantPlaybackActiveRef.current || !playbackDrained) return;
+    assistantPlaybackActiveRef.current = false;
+    if (mountedRef.current) {
+      setState((current) => ["ended", "error", "conflict", "idle", "requesting", "connecting"].includes(current)
+        ? current
+        : mutedRef.current ? "muted" : "listening");
+    }
+  }, []);
+
   const pumpPlayback = useCallback(() => {
     const context = contextRef.current;
     const epoch = playbackEpochRef.current;
@@ -172,14 +185,19 @@ export default function SupportVoicePopover() {
           playbackQueueRef.current.release(byteLength);
           channel.fill(0);
           try { source.disconnect(); } catch {}
-          if (epoch === playbackEpochRef.current) queueMicrotask(() => pumpPlaybackRef.current());
+          if (epoch === playbackEpochRef.current) {
+            queueMicrotask(() => {
+              pumpPlaybackRef.current();
+              finishPlaybackIfDrained();
+            });
+          }
         };
         source.start(window.startsAt);
       }
     } catch {
       endConversation("error", "client_media_error");
     }
-  }, [endConversation]);
+  }, [endConversation, finishPlaybackIfDrained]);
 
   pumpPlaybackRef.current = pumpPlayback;
 
@@ -205,7 +223,7 @@ export default function SupportVoicePopover() {
     const source = context.createMediaStreamSource(stream);
     const processor = context.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (event) => {
-      if (!canSendRef.current || mutedRef.current || socket.readyState !== WebSocket.OPEN) return;
+      if (!canSendRef.current || mutedRef.current || assistantPlaybackActiveRef.current || socket.readyState !== WebSocket.OPEN) return;
       const pcm = resampleToPcm16(event.inputBuffer.getChannelData(0), context.sampleRate);
       for (const sample of pcm) pcmQueueRef.current.push(sample);
       pcm.fill(0);
@@ -305,15 +323,19 @@ export default function SupportVoicePopover() {
             return setState((current) => nextSupportVoiceState(current, message, mutedRef.current));
           }
           if (message.type === "listening") {
-            if (message.active) {
-              responseActiveRef.current = false;
-              stopPlayback();
-            }
+            if (assistantPlaybackActiveRef.current) return;
             return setState((current) => nextSupportVoiceState(current, message, mutedRef.current));
           }
           if (message.type === "speaking") {
             responseActiveRef.current = message.active;
-            return setState((current) => nextSupportVoiceState(current, message, mutedRef.current));
+            if (message.active) {
+              assistantPlaybackActiveRef.current = true;
+              pcmQueueRef.current.fill(0);
+              pcmQueueRef.current = [];
+              return setState("speaking");
+            }
+            finishPlaybackIfDrained();
+            return;
           }
           if (message.type === "audio_delta") return scheduleAudio(message.audio);
           if (message.type === "ended") return endConversation("ended", "server_ended");
@@ -332,7 +354,7 @@ export default function SupportVoicePopover() {
         endConversation("error", "client_setup_error");
       }
     })();
-  }, [available, backendOrigin, endConversation, releaseMedia, scheduleAudio, startCapture, state, stopPlayback]);
+  }, [available, backendOrigin, endConversation, finishPlaybackIfDrained, releaseMedia, scheduleAudio, startCapture, state]);
 
   const toggleMute = useCallback(() => {
     mutedRef.current = !mutedRef.current;

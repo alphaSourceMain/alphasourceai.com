@@ -1,5 +1,5 @@
 export const SUPPORT_VOICE_PLAYBACK_LOOKAHEAD_SOURCES = 3;
-export const SUPPORT_VOICE_PLAYBACK_MAX_BYTES = 4 * 1024 * 1024;
+export const SUPPORT_VOICE_PLAYBACK_MAX_BYTES = 32 * 1024 * 1024;
 export const SUPPORT_VOICE_PLAYBACK_MAX_PENDING_CHUNKS = 4096;
 
 export type SupportVoicePlaybackAdmission = "queued" | "pressure" | "invalid";
