@@ -13,11 +13,28 @@ import {
   parseSupportVoiceServerMessage,
   type VoiceState,
 } from "@/lib/supportVoiceServerMessages";
+import {
+  SUPPORT_VOICE_PLAYBACK_LOOKAHEAD_SOURCES,
+  SupportVoicePlaybackQueue,
+  nextSupportVoicePlaybackWindow,
+} from "@/lib/supportVoicePlaybackQueue";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const env = (typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {}) as Record<string, unknown>;
 const QA_API_ORIGIN = "https://ia-backend-qa.onrender.com";
 const FEATURE_ENABLED = String(env.VITE_SUPPORT_VOICE_ENABLED || "").trim() === "true";
+type ClientCloseReason =
+  | "user_end"
+  | "popover_closed"
+  | "signed_out"
+  | "component_unmounted"
+  | "server_ended"
+  | "client_cancelled"
+  | "client_protocol_error"
+  | "client_media_error"
+  | "client_capture_backpressure"
+  | "client_network_error"
+  | "client_setup_error";
 
 function resolveBackendOrigin(): string | null {
   const raw = String(env.VITE_BACKEND_URL || "").trim();
@@ -56,9 +73,11 @@ export default function SupportVoicePopover() {
   const canSendRef = useRef(false);
   const mutedRef = useRef(false);
   const scheduledRef = useRef(new Set<AudioBufferSourceNode>());
+  const playbackQueueRef = useRef(new SupportVoicePlaybackQueue());
+  const pumpPlaybackRef = useRef<() => void>(() => {});
+  const playbackPressureReportedRef = useRef(false);
   const playbackEpochRef = useRef(0);
   const nextPlaybackTimeRef = useRef(0);
-  const queuedPlaybackBytesRef = useRef(0);
   const responseActiveRef = useRef(false);
   const abandonNeededRef = useRef(false);
   const lifecycleEpochRef = useRef(0);
@@ -73,7 +92,8 @@ export default function SupportVoicePopover() {
       try { source.buffer?.getChannelData(0).fill(0); } catch {}
     }
     scheduledRef.current.clear();
-    queuedPlaybackBytesRef.current = 0;
+    playbackQueueRef.current.clear();
+    playbackPressureReportedRef.current = false;
     nextPlaybackTimeRef.current = 0;
     responseActiveRef.current = false;
   }, []);
@@ -109,50 +129,75 @@ export default function SupportVoicePopover() {
     }).catch(() => {});
   }, [backendOrigin]);
 
-  const endConversation = useCallback((next: VoiceState = "ended") => {
+  const endConversation = useCallback((next: VoiceState = "ended", reason: ClientCloseReason = next === "error" ? "client_setup_error" : "user_end") => {
     lifecycleEpochRef.current += 1;
     const socket = websocketRef.current;
     websocketRef.current = null;
     if (socket && socket.readyState < WebSocket.CLOSING) {
-      try { socket.close(1000, "ended"); } catch {}
+      try { socket.close(next === "error" ? 4000 : 1000, reason); } catch {}
     }
     releaseMedia();
     if (mountedRef.current) setState(next);
     void abandonPending();
   }, [abandonPending, releaseMedia]);
 
+  const pumpPlayback = useCallback(() => {
+    const context = contextRef.current;
+    const epoch = playbackEpochRef.current;
+    if (!context || epoch !== playbackEpochRef.current) return;
+    try {
+      while (scheduledRef.current.size < SUPPORT_VOICE_PLAYBACK_LOOKAHEAD_SOURCES) {
+        const samples = playbackQueueRef.current.take();
+        if (!samples) break;
+        const byteLength = samples.byteLength;
+        const buffer = context.createBuffer(1, samples.length, SUPPORT_VOICE_SAMPLE_RATE);
+        const channel = buffer.getChannelData(0);
+        for (let index = 0; index < samples.length; index += 1) channel[index] = samples[index] / 0x8000;
+        samples.fill(0);
+        if (epoch !== playbackEpochRef.current) {
+          channel.fill(0);
+          playbackQueueRef.current.release(byteLength);
+          break;
+        }
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        const window = nextSupportVoicePlaybackWindow(context.currentTime, nextPlaybackTimeRef.current, buffer.duration);
+        if (!window) throw new Error("invalid_playback_window");
+        nextPlaybackTimeRef.current = window.endsAt;
+        scheduledRef.current.add(source);
+        source.onended = () => {
+          scheduledRef.current.delete(source);
+          playbackQueueRef.current.release(byteLength);
+          channel.fill(0);
+          try { source.disconnect(); } catch {}
+          if (epoch === playbackEpochRef.current) queueMicrotask(() => pumpPlaybackRef.current());
+        };
+        source.start(window.startsAt);
+      }
+    } catch {
+      endConversation("error", "client_media_error");
+    }
+  }, [endConversation]);
+
+  pumpPlaybackRef.current = pumpPlayback;
+
   const scheduleAudio = useCallback((encoded: unknown) => {
     const context = contextRef.current;
     const samples = standardBase64ToPcm16(encoded);
-    if (!context || !samples || samples.byteLength === 0) return endConversation("error");
+    if (!context || !samples || samples.byteLength === 0) return endConversation("error", "client_media_error");
     if (!responseActiveRef.current) { samples.fill(0); return; }
-    if (scheduledRef.current.size >= 12 || queuedPlaybackBytesRef.current + samples.byteLength > 512 * 1024) {
+    const admission = playbackQueueRef.current.enqueue(samples);
+    if (admission !== "queued") {
       samples.fill(0);
-      return endConversation("error");
-    }
-    const epoch = playbackEpochRef.current;
-    const buffer = context.createBuffer(1, samples.length, SUPPORT_VOICE_SAMPLE_RATE);
-    const channel = buffer.getChannelData(0);
-    for (let index = 0; index < samples.length; index += 1) channel[index] = samples[index] / 0x8000;
-    samples.fill(0);
-    if (epoch !== playbackEpochRef.current) {
-      channel.fill(0);
+      if (admission === "pressure" && !playbackPressureReportedRef.current) {
+        playbackPressureReportedRef.current = true;
+        console.warn("[support-voice] playback_pressure");
+      }
+      if (admission === "invalid") return endConversation("error", "client_media_error");
       return;
     }
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    const startsAt = Math.max(context.currentTime + 0.015, nextPlaybackTimeRef.current);
-    nextPlaybackTimeRef.current = startsAt + buffer.duration;
-    queuedPlaybackBytesRef.current += buffer.length * 2;
-    scheduledRef.current.add(source);
-    source.onended = () => {
-      scheduledRef.current.delete(source);
-      queuedPlaybackBytesRef.current = Math.max(0, queuedPlaybackBytesRef.current - buffer.length * 2);
-      channel.fill(0);
-      try { source.disconnect(); } catch {}
-    };
-    source.start(startsAt);
+    pumpPlaybackRef.current();
   }, [endConversation]);
 
   const startCapture = useCallback((context: AudioContext, stream: MediaStream, socket: WebSocket) => {
@@ -167,7 +212,7 @@ export default function SupportVoicePopover() {
         const chunk = new Int16Array(pcmQueueRef.current.splice(0, SUPPORT_VOICE_CHUNK_SAMPLES));
         const frame = JSON.stringify({ type: "input_audio_buffer.append", audio: pcm16ToStandardBase64(chunk) });
         chunk.fill(0);
-        if (socket.bufferedAmount > 256 * 1024 || new TextEncoder().encode(frame).byteLength > 48 * 1024) return endConversation("error");
+        if (socket.bufferedAmount > 256 * 1024 || new TextEncoder().encode(frame).byteLength > 48 * 1024) return endConversation("error", "client_capture_backpressure");
         socket.send(frame);
       }
     };
@@ -218,7 +263,7 @@ export default function SupportVoicePopover() {
         }
         if (lifecycleEpoch !== lifecycleEpochRef.current) {
           abandonNeededRef.current = response.status === 201;
-          return endConversation("ended");
+          return endConversation("ended", "client_cancelled");
         }
         if (response.status === 409) {
           releaseMedia();
@@ -237,7 +282,7 @@ export default function SupportVoicePopover() {
         socket.addEventListener("open", () => {
           if (lifecycleEpoch !== lifecycleEpochRef.current) {
             credential = "";
-            return endConversation("ended");
+            return endConversation("ended", "client_cancelled");
           }
           try {
             socket.send(JSON.stringify({ type: "authenticate", credential }));
@@ -248,11 +293,11 @@ export default function SupportVoicePopover() {
           startCapture(context, stream, socket);
         }, { once: true });
         socket.addEventListener("message", (event) => {
-          if (typeof event.data !== "string") return endConversation("error");
+          if (typeof event.data !== "string") return endConversation("error", "client_protocol_error");
           let decoded: unknown;
-          try { decoded = JSON.parse(event.data); } catch { return endConversation("error"); }
+          try { decoded = JSON.parse(event.data); } catch { return endConversation("error", "client_protocol_error"); }
           const message = parseSupportVoiceServerMessage(decoded);
-          if (!message) return endConversation("error");
+          if (!message) return endConversation("error", "client_protocol_error");
           if (message.type === "ready") {
             canSendRef.current = true;
             mutedRef.current = false;
@@ -270,8 +315,8 @@ export default function SupportVoicePopover() {
             return setState((current) => nextSupportVoiceState(current, message, mutedRef.current));
           }
           if (message.type === "audio_delta") return scheduleAudio(message.audio);
-          if (message.type === "ended") return endConversation("ended");
-          if (message.type === "error") return endConversation("error");
+          if (message.type === "ended") return endConversation("ended", "server_ended");
+          if (message.type === "error") return endConversation("error", "client_network_error");
         });
         socket.addEventListener("close", () => {
           credential = "";
@@ -281,10 +326,10 @@ export default function SupportVoicePopover() {
         });
         socket.addEventListener("error", () => {
           credential = "";
-          endConversation("error");
+          endConversation("error", "client_network_error");
         }, { once: true });
       } catch {
-        endConversation("error");
+        endConversation("error", "client_setup_error");
       }
     })();
   }, [available, backendOrigin, endConversation, releaseMedia, scheduleAudio, startCapture, state, stopPlayback]);
@@ -320,12 +365,12 @@ export default function SupportVoicePopover() {
       }
     })();
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") endConversation("ended");
+      if (event === "SIGNED_OUT") endConversation("ended", "signed_out");
     });
     return () => {
       mountedRef.current = false;
       data.subscription.unsubscribe();
-      endConversation("ended");
+      endConversation("ended", "component_unmounted");
     };
   }, [endConversation]);
 
@@ -333,7 +378,7 @@ export default function SupportVoicePopover() {
 
   const active = ["requesting", "connecting", "listening", "speaking", "muted"].includes(state);
   return (
-    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next && active) endConversation("ended"); }}>
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next && active) endConversation("ended", "popover_closed"); }}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -375,11 +420,12 @@ export default function SupportVoicePopover() {
               {state === "muted" ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
               {state === "muted" ? "Unmute" : "Mute"}
             </button>
-            <button type="button" onClick={() => endConversation("ended")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-red-200 px-3 text-xs font-black text-red-600">
+            <button type="button" onClick={() => endConversation("ended", "user_end")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-red-200 px-3 text-xs font-black text-red-600">
               <PhoneOff className="h-4 w-4" /> End
             </button>
           </div>
         )}
+        {active && <p className="mt-2 text-center text-[11px]" style={{ color: "var(--as-text-muted)" }}>Ends after two minutes without voice activity, or when you choose End.</p>}
         <a href="/dashboard/support" className="mt-3 inline-flex w-full items-center justify-center gap-1.5 text-center text-xs font-bold text-[#7252C7] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7252C7]/45 dark:text-[#C7B5FF]">
           <HelpCircle className="h-3.5 w-3.5" /> View Help Center
         </a>
