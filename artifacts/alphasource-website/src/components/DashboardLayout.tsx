@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   Search,
   Building2,
-  Phone,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppearance } from "@/context/AppearanceContext";
@@ -30,12 +29,7 @@ import { useClient, type Client } from "@/context/ClientContext";
 import AppearanceSelector from "@/components/AppearanceSelector";
 import DashboardBrand from "@/components/DashboardBrand";
 import TawkWidget from "@/components/TawkWidget";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  AI_SUPPORT_PHONE_DISPLAY,
-  AI_SUPPORT_PHONE_LABEL,
-  AI_SUPPORT_PHONE_URI,
-} from "@/lib/supportContact";
+import SupportVoicePopover from "@/components/SupportVoicePopover";
 
 const env =
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
@@ -780,58 +774,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1" />
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Open AI Customer Support"
-                className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold transition-colors hover:border-[#A380F6]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A380F6]/45 sm:px-3"
-                style={{
-                  backgroundColor: "var(--as-accent-soft)",
-                  borderColor: "var(--as-border)",
-                  color: "var(--as-text-muted)",
-                }}
-              >
-                <HelpCircle className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Support</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              aria-label="AI Customer Support contact"
-              className="w-[calc(100vw-2rem)] max-w-72 rounded-lg border p-4 shadow-lg"
-              style={{ backgroundColor: "var(--as-surface)", borderColor: "var(--as-border)", color: "var(--as-text)" }}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: "var(--as-accent-soft-strong)", color: "#A380F6" }}
-                >
-                  <Phone className="h-4 w-4" aria-hidden="true" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-black">AI Customer Support</p>
-                  <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--as-text-muted)" }}>
-                    Need help? Call our AI Customer Support line.
-                  </p>
-                </div>
-              </div>
-              <a
-                href={AI_SUPPORT_PHONE_URI}
-                aria-label={AI_SUPPORT_PHONE_LABEL}
-                className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#A380F6] px-4 text-sm font-black text-white transition-colors hover:bg-[#8E6EE0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A380F6]/50 focus-visible:ring-offset-2"
-              >
-                {AI_SUPPORT_PHONE_DISPLAY}
-              </a>
-              <a
-                href="/dashboard/support"
-                className="mt-3 block text-center text-xs font-bold text-[#A380F6] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A380F6]/45"
-              >
-                View Help Center
-              </a>
-            </PopoverContent>
-          </Popover>
+          <SupportVoicePopover />
           <div className="mr-2">
             <AppearanceSelector />
           </div>

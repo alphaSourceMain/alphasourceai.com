@@ -15,6 +15,7 @@ const contact = read("src/lib/supportContact.ts");
 const contactData = JSON.parse(read("src/lib/support-contact.json"));
 const footer = read("src/components/Footer.tsx");
 const dashboard = read("src/components/DashboardLayout.tsx");
+const browserVoice = read("src/components/SupportVoicePopover.tsx");
 const supportPage = read("src/pages/SupportPage.tsx");
 const publicFaq = read("src/pages/FaqPage.tsx");
 const prerender = read("scripts/prerender-public-routes.mjs");
@@ -65,43 +66,45 @@ test("one phone entry is rendered in the shared footer", () => {
   assert.equal((footer.match(/href=\{AI_SUPPORT_PHONE_URI\}/g) || []).length, 1);
 });
 
-test("dashboard renders a compact Support trigger", () => {
-  assert.match(dashboard, /aria-label="Open AI Customer Support"/);
-  assert.match(dashboard, /<span className="hidden sm:inline">Support<\/span>/);
+test("dashboard renders the approved Talk with Support browser control", () => {
+  assert.match(dashboard, /<SupportVoicePopover \/>/);
+  assert.match(browserVoice, /aria-label="Talk with Support"/);
+  assert.match(browserVoice, /<span>Talk with Support<\/span>/);
 });
 
 test("dashboard support panel is initially closed and controlled by Radix Popover", () => {
-  assert.match(dashboard, /<Popover>/);
-  assert.doesNotMatch(dashboard, /defaultOpen|open=\{true\}/);
+  assert.match(browserVoice, /useState\(false\)/);
+  assert.match(browserVoice, /<Popover open=\{open\}/);
 });
 
-test("dashboard Support trigger opens the associated popover", () => {
-  assert.match(dashboard, /<PopoverTrigger asChild>/);
-  assert.match(dashboard, /<PopoverContent/);
+test("dashboard support trigger opens the associated browser voice popover", () => {
+  assert.match(browserVoice, /<PopoverTrigger asChild>/);
+  assert.match(browserVoice, /<PopoverContent/);
 });
 
-test("dashboard panel shows the AI Customer Support number", () => {
-  assert.match(dashboard, /Need help\? Call our AI Customer Support line\./);
-  assert.match(dashboard, /\{AI_SUPPORT_PHONE_DISPLAY\}/);
+test("logged-in dashboard no longer shows the support phone number", () => {
+  assert.doesNotMatch(dashboard, /AI_SUPPORT_PHONE/);
+  assert.doesNotMatch(browserVoice, /AI_SUPPORT_PHONE|605\) 599-8008|tel:/);
 });
 
-test("dashboard call link uses the canonical telephone URI and label", () => {
-  assert.match(dashboard, /href=\{AI_SUPPORT_PHONE_URI\}/);
-  assert.match(dashboard, /aria-label=\{AI_SUPPORT_PHONE_LABEL\}/);
+test("dashboard voice control requires an explicit microphone action", () => {
+  assert.match(browserVoice, /Start support conversation/);
+  assert.match(browserVoice, /getUserMedia/);
+  assert.match(browserVoice, /onClick=\{startConversation\}/);
 });
 
 test("dashboard panel retains keyboard and Escape closing through Radix", () => {
   assert.match(read("src/components/ui/popover.tsx"), /@radix-ui\/react-popover/);
-  assert.match(dashboard, /<PopoverContent[\s\S]*aria-label="AI Customer Support contact"/);
+  assert.match(browserVoice, /<PopoverContent[\s\S]*aria-label="Browser AI support"/);
 });
 
 test("dashboard Help Center remains navigable without duplicating the quick-support purpose", () => {
   assert.match(dashboard, /label: "Help Center", href: "\/dashboard\/support"/);
-  assert.match(dashboard, /View Help Center/);
+  assert.match(browserVoice, /View Help Center/);
 });
 
 test("dashboard popover is constrained for narrow viewports", () => {
-  assert.match(dashboard, /w-\[calc\(100vw-2rem\)\] max-w-72/);
+  assert.match(browserVoice, /w-\[calc\(100vw-2rem\)\] max-w-sm/);
 });
 
 test("existing public support page includes secondary phone support", () => {
@@ -113,7 +116,9 @@ test("public FAQ is not expanded with a duplicate phone block", () => {
   assert.doesNotMatch(publicFaq, /605\) 599-8008|AI_SUPPORT_PHONE/);
 });
 
-test("phase one adds no xAI, microphone, websocket, or tracking behavior", () => {
-  assert.doesNotMatch(product, /XAI_API_KEY|api\.x\.ai|WebSocket|mediaDevices|getUserMedia/);
+test("browser voice never embeds an xAI key or connects directly to xAI", () => {
+  assert.doesNotMatch(product, /XAI_API_KEY|api\.x\.ai|wss:\/\/api\.x\.ai/);
+  assert.match(browserVoice, /WebSocket/);
+  assert.match(browserVoice, /mediaDevices\.getUserMedia/);
   assert.doesNotMatch(contact, /fetch\(|XMLHttpRequest|analytics|tracking/i);
 });
