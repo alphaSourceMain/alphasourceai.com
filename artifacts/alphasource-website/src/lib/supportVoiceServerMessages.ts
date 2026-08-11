@@ -2,6 +2,16 @@ export type VoiceState = "idle" | "requesting" | "connecting" | "listening" | "s
 
 type SupportVoiceEndReason = "ended" | "idle_timeout" | "max_duration";
 
+const NORMAL_SUPPORT_VOICE_CLOSE_REASONS = new Set([
+  "ended",
+  "user_end",
+  "popover_closed",
+  "signed_out",
+  "component_unmounted",
+  "server_ended",
+  "client_cancelled",
+]);
+
 export type SupportVoiceServerMessage =
   | { type: "ready" }
   | { type: "listening"; active: boolean }
@@ -51,5 +61,5 @@ export function nextSupportVoiceState(current: VoiceState, message: SupportVoice
 export function nextSupportVoiceStateAfterClose(current: VoiceState, code: number, reason: string): VoiceState {
   if (current === "error") return "error";
   if (current === "ended") return "ended";
-  return code === 1000 && reason === "ended" ? "ended" : "error";
+  return code === 1000 && NORMAL_SUPPORT_VOICE_CLOSE_REASONS.has(reason) ? "ended" : "error";
 }
