@@ -43,3 +43,9 @@ test("server message envelope rejects unknown fields and unsupported terminal co
     { type: "error", code: "provider_detail" },
   ]) assert.equal(protocol.parseSupportVoiceServerMessage(value), null);
 });
+
+test("a WebSocket error prelude cannot overwrite an intentional or clean server end", () => {
+  assert.equal(protocol.nextSupportVoiceStateAfterClose("ended", 1006, ""), "ended");
+  assert.equal(protocol.nextSupportVoiceStateAfterClose("listening", 1000, "ended"), "ended");
+  assert.equal(protocol.nextSupportVoiceStateAfterClose("listening", 1006, ""), "error");
+});

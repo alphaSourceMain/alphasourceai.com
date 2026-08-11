@@ -47,3 +47,9 @@ export function nextSupportVoiceState(current: VoiceState, message: SupportVoice
   if (message.type === "speaking") return muted ? "muted" : message.active ? "speaking" : "listening";
   return current;
 }
+
+export function nextSupportVoiceStateAfterClose(current: VoiceState, code: number, reason: string): VoiceState {
+  if (current === "error") return "error";
+  if (current === "ended") return "ended";
+  return code === 1000 && reason === "ended" ? "ended" : "error";
+}

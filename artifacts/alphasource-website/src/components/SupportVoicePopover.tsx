@@ -10,6 +10,7 @@ import {
 } from "@/lib/supportVoiceAudio";
 import {
   nextSupportVoiceState,
+  nextSupportVoiceStateAfterClose,
   parseSupportVoiceServerMessage,
   type VoiceState,
 } from "@/lib/supportVoiceServerMessages";
@@ -318,15 +319,14 @@ export default function SupportVoicePopover() {
           if (message.type === "ended") return endConversation("ended", "server_ended");
           if (message.type === "error") return endConversation("error", "client_network_error");
         });
-        socket.addEventListener("close", () => {
+        socket.addEventListener("close", (event) => {
           credential = "";
           if (websocketRef.current === socket) websocketRef.current = null;
           releaseMedia();
-          if (mountedRef.current) setState((current) => current === "error" ? "error" : "ended");
+          if (mountedRef.current) setState((current) => nextSupportVoiceStateAfterClose(current, event.code, event.reason));
         });
         socket.addEventListener("error", () => {
           credential = "";
-          endConversation("error", "client_network_error");
         }, { once: true });
       } catch {
         endConversation("error", "client_setup_error");
