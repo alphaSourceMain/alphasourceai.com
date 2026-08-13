@@ -409,7 +409,7 @@ export default function OverviewPage() {
 
             <div className="mb-4 flex items-end gap-6 border-b" style={{ borderColor: "var(--as-border)" }}>
               <h2 className="border-b-2 border-[#0A1547] pb-3 text-sm font-black dark:border-[#A380F6]">Today&apos;s decisions</h2>
-              <Link href="/dashboard/candidates" className="pb-3 text-sm font-semibold" style={{ color: "var(--as-text-muted)" }}>Timeline</Link>
+              <Link href="/dashboard/candidates" className="pb-3 text-sm font-semibold" style={{ color: "var(--as-text-muted)" }}>All candidates</Link>
               <span className="ml-auto flex items-center gap-2 pb-2">
                 <span className="hidden text-[10px] font-black uppercase tracking-wider sm:inline" style={{ color: "var(--as-text-muted)" }}>Compare</span>
                 <label className="sr-only" htmlFor="overview-timeframe">Metrics timeframe</label>

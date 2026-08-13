@@ -416,6 +416,17 @@ interface DashboardLayoutProps {
   title:    string;
 }
 
+const DASHBOARD_PAGE_DESCRIPTIONS: Record<string, string> = {
+  Overview: "Your hiring pipeline at a glance. Prioritize decisions and keep things moving.",
+  Roles: "Create and manage interview roles, capacity, and status for this client.",
+  Automation: "Configure review criteria, digest timing, reviewers, and scheduling workflows.",
+  Candidates: "Review, filter, and manage candidates across roles and interview stages.",
+  Members: "Manage dashboard access and client membership for your team.",
+  Billing: "Review membership, usage, billing status, agreements, and payment activity.",
+  Entities: "Manage parent and child entities, labels, and client scope structure.",
+  Support: "Find practical guidance for roles, candidates, reports, billing, and team access.",
+};
+
 export default function DashboardLayout({ children, title }: DashboardLayoutProps) {
   const [mobileOpen,         setMobileOpen]         = useState(false);
   const [collapsed,          setCollapsed]           = useState(() => readStoredSidebarCollapsed());
@@ -529,6 +540,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
   const filteredClients = clientSearchTerm
     ? clients.filter((client) => clientSearchText(client).includes(clientSearchTerm))
     : clients;
+  const pageDescription = DASHBOARD_PAGE_DESCRIPTIONS[title] || "Manage your alphaScreen workspace.";
   const clientSearchPlaceholder = getClientSearchPlaceholder(clients);
   return (
     <div
@@ -700,12 +712,8 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
             <Menu className="w-5 h-5" />
           </button>
           <div className="min-w-0 flex-1">
-            {title === "Overview" ? (
-              <>
-                <h1 className="truncate text-2xl font-black leading-tight" style={{ color: "var(--as-text)" }}>{title}</h1>
-                <p className="mt-1 hidden text-sm sm:block" style={{ color: "var(--as-text-muted)" }}>Your hiring pipeline at a glance. Prioritize decisions and keep things moving.</p>
-              </>
-            ) : <span className="sr-only">{title}</span>}
+            <h1 className="truncate text-2xl font-black leading-tight" style={{ color: "var(--as-text)" }}>{title}</h1>
+            <p className="mt-1 truncate text-xs sm:text-sm" style={{ color: "var(--as-text-muted)" }}>{pageDescription}</p>
           </div>
 
           <div className="relative min-w-0" ref={dropdownRef}>
