@@ -13,6 +13,8 @@ const navbar = read("src/components/Navbar.tsx");
 const footer = read("src/components/Footer.tsx");
 const styles = read("src/index.css");
 const home = read("src/pages/HomePage.tsx");
+const about = read("src/pages/AboutPage.tsx");
+const alphaScreen = read("src/pages/AlphaScreenPage.tsx");
 
 test("the full public site exposes the dashboard-style appearance contract", () => {
   assert.match(appearance, /value: "light"/);
@@ -35,6 +37,13 @@ test("approved rest-of-site treatment keeps the footer and theme provider-neutra
   assert.match(footer, /AI_SUPPORT_PHONE_DISPLAY/);
   assert.match(styles, /\.public-site-rest\.dark main/);
   assert.match(styles, /\.dark \.gradient-hero-bg/);
+});
+
+test("dark technology copy and how-it-works card sizing remain consistent", () => {
+  assert.match(about, /font-semibold text-\[#0A1547\]/);
+  assert.match(about, /text-\[#0A1547\]\/70/);
+  assert.doesNotMatch(about, /color: item\.weight === "semibold"/);
+  assert.match(alphaScreen, /min-h-\[10\.625rem\] h-full bg-white rounded-2xl/);
 });
 
 test("approved homepage structure keeps the continuous dark value band", () => {

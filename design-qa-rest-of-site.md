@@ -53,8 +53,18 @@ The Figma About light frame and the local About light implementation were inspec
 
 - P2: the privacy notice originally rendered outside the appearance provider and stayed light in dark mode. Fixed by placing it inside the public theme shell; dark banner and dialog rechecked.
 - P2: the desktop appearance control could briefly shrink during route transitions. Fixed with a non-shrinking, no-wrap trigger; header spacing rechecked.
+- P2: the two Technology card descriptions used inline navy colors that overrode the dark-theme text mapping. Fixed by moving both colors and the emphasized weight into theme-aware utility classes. Post-fix evidence: `/private/tmp/alphasource-about-technology-dark-fixed.png`.
+- P2: the four alphaScreen How It Works cards followed their individual content height, leaving card three taller than the others. Fixed by using card three's 170px height as the shared minimum and allowing growth when responsive wrapping requires it. All four rendered desktop cards measured `290.5 × 170` CSS pixels. Post-fix evidence: `/private/tmp/alphasource-how-it-works-equal-cards-dark-fixed.png`.
 - No actionable P0, P1, or P2 issues remain.
+
+## Final refinement comparison
+
+- Source issue captures: `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-2d6a0a6a-39d4-4a70-808c-d1e09d07f37a.png` and `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-738ff5b5-6905-458a-a6b7-3ba887effae9.png`.
+- Source pixels: `1715 × 1316` at the owner's desktop dark-mode view.
+- Implementation pixels: `1274 × 717` at the in-app desktop dark-mode viewport and device scale factor 1.
+- The focused Technology and How It Works regions were reviewed together with their corresponding implementation captures. The intended differences—light card copy and equal 170px workflow cards—are visible, while surrounding typography, spacing, palette, content, icons, and behavior remain unchanged.
+- Browser console warnings/errors: none.
 
 ## Final result
 
-Passed.
+final result: passed
