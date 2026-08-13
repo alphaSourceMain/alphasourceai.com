@@ -1,11 +1,28 @@
-import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
-import { Redirect, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+import {
+  Redirect,
+  Switch,
+  Route,
+  Router as WouterRouter,
+  useLocation,
+} from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { AppearanceProvider } from "@/context/AppearanceContext";
-import { TrackingConsentProvider, useTrackingConsent } from "@/context/TrackingConsentContext";
+import { AppearanceProvider, useAppearance } from "@/context/AppearanceContext";
+import {
+  TrackingConsentProvider,
+  useTrackingConsent,
+} from "@/context/TrackingConsentContext";
 import { ClientProvider } from "@/context/ClientContext";
 import { AdminClientProvider } from "@/context/AdminClientContext";
 import Navbar from "@/components/Navbar";
@@ -193,6 +210,22 @@ function MembershipAgreementSignerRoute({ params }: { params?: { token?: string 
     <PublicCheckoutBoundaryRoute>
       <MembershipAgreementSignerPage params={params} />
     </PublicCheckoutBoundaryRoute>
+  );
+}
+
+function PublicSiteShell({ children }: { children: ReactNode }) {
+  const { resolvedMode } = useAppearance();
+  const [location] = useLocation();
+  const isHomePage = location === "/";
+  const activeMode = isHomePage ? resolvedMode : "light";
+
+  return (
+    <div
+      className={`public-site-shell min-h-screen ${activeMode === "dark" ? "dark" : ""}`}
+      data-theme={activeMode}
+    >
+      {children}
+    </div>
   );
 }
 const DASHBOARD_INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
@@ -624,10 +657,12 @@ function Router() {
     );
   } else {
     content = (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1">
-        <Switch>
+      <AppearanceProvider>
+        <PublicSiteShell>
+          <div className="min-h-screen flex flex-col bg-white text-[#0A1547] transition-colors duration-300 dark:bg-[#080E2E] dark:text-white">
+            <Navbar />
+            <main className="flex-1">
+              <Switch>
           <Route path="/checkout/password-setup-preview/" component={PasswordSetupPreviewPage} />
           <Route path="/checkout/password-setup-preview" component={PasswordSetupPreviewPage} />
           <Route path="/checkout/subscription-success/" component={CheckoutSubscriptionSuccessRoute} />
@@ -662,18 +697,30 @@ function Router() {
           <Route path="/terms/"      component={TermsPage} />
           <Route path="/terms"       component={TermsPage} />
           <Route component={NotFound} />
-        </Switch>
-      </main>
-      <Footer />
-      {isPublicTawkRoute && (
-        <TawkWidget
-          enabled={visitorChatEnabled && (env as Record<string, unknown>).VITE_TAWK_PUBLIC_ENABLED === "true"}
-          propertyId={String((env as Record<string, unknown>).VITE_TAWK_PUBLIC_PROPERTY_ID || "")}
-          widgetId={String((env as Record<string, unknown>).VITE_TAWK_PUBLIC_WIDGET_ID || "")}
-          variant="public"
-        />
-      )}
-    </div>
+              </Switch>
+            </main>
+            <Footer />
+            {isPublicTawkRoute && (
+              <TawkWidget
+                enabled={
+                  visitorChatEnabled &&
+                  (env as Record<string, unknown>).VITE_TAWK_PUBLIC_ENABLED ===
+                    "true"
+                }
+                propertyId={String(
+                  (env as Record<string, unknown>)
+                    .VITE_TAWK_PUBLIC_PROPERTY_ID || "",
+                )}
+                widgetId={String(
+                  (env as Record<string, unknown>).VITE_TAWK_PUBLIC_WIDGET_ID ||
+                    "",
+                )}
+                variant="public"
+              />
+            )}
+          </div>
+        </PublicSiteShell>
+      </AppearanceProvider>
     );
   }
 
