@@ -32,6 +32,7 @@ test("the full public site exposes the dashboard-style appearance contract", () 
 test("approved rest-of-site treatment keeps the footer and theme provider-neutral", () => {
   assert.match(footer, /const EXPLORE_LINKS/);
   assert.match(footer, /const PRODUCT_LINKS/);
+  assert.match(footer, /Agentic AI that enhances human judgment — helping teams reclaim time and spot potential in every talent interaction\./);
   assert.match(footer, />Email us</);
   assert.match(footer, />AI Customer Support</);
   assert.match(footer, /AI_SUPPORT_PHONE_DISPLAY/);
@@ -67,7 +68,7 @@ test("owner-approved hero and alphaScreen motion timings remain intact", () => {
 });
 
 test("public routes, contact form, and sign-in affordances remain wired", () => {
-  for (const href of ["/", "/about", "/alphascreen", "/alphascreen/how-it-works", "/#contact", "/faq"]) {
+  for (const href of ["/", "/about/", "/alphascreen", "/alphascreen/how-it-works", "/#contact", "/faq"]) {
     assert.match(navbar, new RegExp(`href: "${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
   assert.match(home, /<LeadCaptureForm/);

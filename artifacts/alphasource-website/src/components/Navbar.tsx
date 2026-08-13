@@ -121,7 +121,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: "Home", href: "/" },
-    { label: "About", href: "/about" },
+    { label: "About", href: "/about/" },
     { label: "alphaScreen", href: "/alphascreen" },
     { label: "How It Works", href: "/alphascreen/how-it-works" },
     { label: "Get in Touch", href: "/#contact" },

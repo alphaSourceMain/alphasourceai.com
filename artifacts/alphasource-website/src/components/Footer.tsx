@@ -113,7 +113,7 @@ export default function Footer() {
               <img src={alphaSourceLogoDark} alt="alphaSource AI" className="h-9 w-auto" />
             </div>
             <p className="max-w-xs text-sm leading-relaxed text-white/60">
-              Practical AI for better hiring decisions.
+              Agentic AI that enhances human judgment — helping teams reclaim time and spot potential in every talent interaction.
             </p>
             <div className="flex gap-3 mt-6">
               <a
