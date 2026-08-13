@@ -23,6 +23,7 @@ The hosted capture was opened beside the approved Figma export in one visual com
 2. Compared the hosted QA implementation with that frame at the browser's wide desktop viewport.
 3. Preserved intentional live-data substitutions: alphaScreen does not expose open-requisition, hire-rate, scheduled-call, or event-type data through the current dashboard APIs, so the implementation uses truthful role, capacity, candidate, completion, and review data instead of mock values.
 4. Verified dark mode using computed styles after selecting Dark, then restored the user's System appearance setting.
+5. Follow-up correction pass on 2026-08-13 restored shared-header titles and descriptions across all client dashboard pages, replaced the native Appearance select with a styled accessible radio menu, and relabeled the Overview candidates link so its destination is honest.
 
 ## Findings and corrections
 
@@ -44,6 +45,15 @@ The hosted capture was opened beside the approved Figma export in one visual com
 - Quick Guide opens the existing eight-step tour and Escape closes it: PASS
 - Browser console errors: 0
 
+## Follow-up correction evidence
+
+- Hosted correction commit: `d0e651c40ed9cca4926055e5d5aec69328dce7aa`
+- Implementation screenshot: `/tmp/alphascreen-dashboard-header-control-fixes.jpg`
+- Shared-header title and description verified on Roles, Automation, Candidates, Members, Billing, Entities, and Support: PASS
+- Appearance menu presents Light, Dark, and System as `menuitemradio` choices, with System selected in the captured state: PASS
+- Overview link beside Today's decisions reads `All candidates` and routes to `/dashboard/candidates`: PASS
+- Browser console errors after correction: 0
+
 ## Final result
 
-PASS — the hosted QA dashboard materially matches approved Option 3, uses real QA data, retains existing behavior, and introduces no public-site or production change.
+passed
