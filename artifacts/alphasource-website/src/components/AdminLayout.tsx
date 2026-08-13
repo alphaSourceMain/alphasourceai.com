@@ -118,6 +118,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
   const sidebarW  = collapsed ? "w-[72px]" : "w-60";
   const contentML = collapsed ? "lg:ml-[72px]" : "lg:ml-60";
+  const contentW  = collapsed ? "lg:w-[calc(100%-72px)]" : "lg:w-[calc(100%-15rem)]";
   const isOverview = location === "/admin";
   const clientSearchTerm = clientSearch.trim().toLowerCase();
   const filteredClients = clientSearchTerm
@@ -342,7 +343,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       )}
 
       {/* ── Main content ──────────────────────────────────────── */}
-      <div className={`flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ${contentML}`}>
+      <div className={`flex min-h-screen w-full min-w-0 flex-none flex-col transition-all duration-300 ${contentML} ${contentW}`}>
         {/* The overview owns its desktop Figma header; this bar remains on mobile for navigation and appearance. */}
         <header
           className={`sticky top-0 z-20 flex h-14 items-center px-5 ${isOverview ? "lg:hidden" : ""}`}

@@ -28,6 +28,7 @@ test("admin shell follows the approved dark-rail hierarchy without removing cont
   assert.match(layout, /System status/);
   assert.match(layout, /<AppearanceSelector \/>/);
   assert.match(layout, /const isOverview = location === "\/admin"/);
+  assert.match(layout, /lg:w-\[calc\(100%-15rem\)\]/);
   assert.match(layout, /isOverview \? "lg:hidden" : ""/);
   assert.doesNotMatch(layout, /!isOverview && <header/);
   assert.match(layout, /aria-label="Open menu"/);
