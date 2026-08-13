@@ -27,7 +27,7 @@ export default function AppearanceSelector({ alwaysShowLabel = false }: { always
         <button
           type="button"
           aria-label={`Appearance: ${selectedOption.label}`}
-          className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black shadow-sm transition-all hover:border-[#A380F6]/45 hover:bg-[var(--as-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A380F6]/40 ${alwaysShowLabel ? "w-full" : ""}`}
+          className={`inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-xs font-black shadow-sm transition-all hover:border-[#A380F6]/45 hover:bg-[var(--as-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A380F6]/40 ${alwaysShowLabel ? "w-full" : ""}`}
           style={{
             backgroundColor: "var(--as-surface)",
             borderColor: "var(--as-border)",

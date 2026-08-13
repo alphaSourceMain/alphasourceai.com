@@ -217,12 +217,11 @@ function PublicSiteShell({ children }: { children: ReactNode }) {
   const { resolvedMode } = useAppearance();
   const [location] = useLocation();
   const isHomePage = location === "/";
-  const activeMode = isHomePage ? resolvedMode : "light";
 
   return (
     <div
-      className={`public-site-shell min-h-screen ${activeMode === "dark" ? "dark" : ""}`}
-      data-theme={activeMode}
+      className={`public-site-shell min-h-screen ${isHomePage ? "public-site-home" : "public-site-rest"} ${resolvedMode === "dark" ? "dark" : ""}`}
+      data-theme={resolvedMode}
     >
       {children}
     </div>
@@ -603,7 +602,6 @@ function Router() {
     location.startsWith("/accommodation-request/") ||
     location === "/interview-cvi" ||
     location === "/interview-complete";
-  const isPublicSite = !isDashboard && !isAdmin && !isAutomationDigestApproval && !isAutomationApproval && !isInterview;
   const isPublicTawkRoute = PUBLIC_TAWK_ROUTES.has(normalizedLocation);
 
   let content: ReactNode;
@@ -700,6 +698,7 @@ function Router() {
               </Switch>
             </main>
             <Footer />
+            <TrackingConsentNotice visible />
             {isPublicTawkRoute && (
               <TawkWidget
                 enabled={
@@ -730,7 +729,6 @@ function Router() {
       <PageAnalytics location={location} />
       <IDPixelLoader location={location} />
       {content}
-      <TrackingConsentNotice visible={isPublicSite} />
     </>
   );
 }

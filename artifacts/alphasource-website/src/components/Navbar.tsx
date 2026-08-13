@@ -127,8 +127,6 @@ export default function Navbar() {
     { label: "Get in Touch", href: "/#contact" },
     { label: "FAQ", href: "/faq" },
   ];
-  const isHomePage = location === "/";
-
   const pageDimOverlay = setupSpotlightVisible && typeof document !== "undefined"
     ? createPortal(
         <button
@@ -203,7 +201,7 @@ export default function Navbar() {
               className={`${setupSpotlightVisible ? "relative z-30 flex" : "hidden"} items-center gap-3 xl:flex`}
               ref={dropdownRef}
             >
-              {isHomePage && <AppearanceSelector />}
+              <AppearanceSelector />
               <div className="relative">
                 <button
                   onClick={() => {
@@ -363,11 +361,9 @@ export default function Navbar() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="xl:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-1 dark:bg-[#070E36] dark:border-[#2A3568]">
-            {isHomePage && (
-              <div className="mb-3 px-3">
-                <AppearanceSelector alwaysShowLabel />
-              </div>
-            )}
+            <div className="mb-3 px-3">
+              <AppearanceSelector alwaysShowLabel />
+            </div>
             {navLinks.map((link) => (
               <a
                 key={link.label}

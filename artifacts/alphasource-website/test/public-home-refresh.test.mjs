@@ -10,16 +10,31 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const app = read("src/App.tsx");
 const appearance = read("src/components/AppearanceSelector.tsx");
 const navbar = read("src/components/Navbar.tsx");
+const footer = read("src/components/Footer.tsx");
+const styles = read("src/index.css");
 const home = read("src/pages/HomePage.tsx");
 
-test("public homepage exposes the dashboard-style appearance contract", () => {
+test("the full public site exposes the dashboard-style appearance contract", () => {
   assert.match(appearance, /value: "light"/);
   assert.match(appearance, /value: "dark"/);
   assert.match(appearance, /value: "system"/);
   assert.match(appearance, /alwaysShowLabel/);
-  assert.match(navbar, /isHomePage && <AppearanceSelector \/>/);
+  assert.match(navbar, /<AppearanceSelector \/>/);
   assert.match(navbar, /<AppearanceSelector alwaysShowLabel \/>/);
-  assert.match(app, /const activeMode = isHomePage \? resolvedMode : "light"/);
+  assert.doesNotMatch(navbar, /isHomePage && <AppearanceSelector/);
+  assert.match(app, /data-theme=\{resolvedMode\}/);
+  assert.match(app, /public-site-rest/);
+  assert.doesNotMatch(app, /resolvedMode : "light"/);
+});
+
+test("approved rest-of-site treatment keeps the footer and theme provider-neutral", () => {
+  assert.match(footer, /const EXPLORE_LINKS/);
+  assert.match(footer, /const PRODUCT_LINKS/);
+  assert.match(footer, />Email us</);
+  assert.match(footer, />AI Customer Support</);
+  assert.match(footer, /AI_SUPPORT_PHONE_DISPLAY/);
+  assert.match(styles, /\.public-site-rest\.dark main/);
+  assert.match(styles, /\.dark \.gradient-hero-bg/);
 });
 
 test("approved homepage structure keeps the continuous dark value band", () => {
