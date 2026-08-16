@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Check, Mail, MessageSquareText, ShieldCheck } from "lucide-react";
 import { alphaSourceLogo } from "@/assets/branding";
+import { SMS_CONSENT_COPY_VERSION, SMS_CONSENT_DISCLOSURE } from "../lib/smsOtp";
 
 type DeliveryChannel = "email" | "sms";
-
-const disclosureVersion = "sms-consent-v1";
 
 function DeliveryChoice({
   channel,
@@ -68,7 +67,7 @@ export default function SmsConsentEvidencePage() {
     <div
       className="min-h-screen bg-[#F7F8FC] text-[#0A1547]"
       style={{ fontFamily: "'Raleway', sans-serif" }}
-      data-consent-copy-version={disclosureVersion}
+      data-consent-copy-version={SMS_CONSENT_COPY_VERSION}
     >
       <header className="flex h-16 items-center border-b border-[#0A1547]/[0.07] bg-white px-5 sm:px-8">
         <img src={alphaSourceLogo} alt="alphaSource AI" className="h-8 w-auto" />
@@ -146,7 +145,7 @@ export default function SmsConsentEvidencePage() {
             {channel === "sms" && (
               <div className="mt-5 rounded-2xl border border-[#A380F6]/20 bg-[#A380F6]/[0.05] p-4">
                 <p className="text-xs font-semibold leading-relaxed text-[#0A1547]/75">
-                  By selecting <strong>Text Message</strong>, you agree to receive a one-time transactional verification code from alphaScreen at the number shown above. Message and data rates may apply. Reply STOP to opt out or HELP for help. You may choose Email instead.
+                  {SMS_CONSENT_DISCLOSURE}
                 </p>
                 <p className="mt-3 text-[11px] font-semibold text-[#0A1547]/55">
                   Review our{" "}

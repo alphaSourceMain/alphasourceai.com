@@ -5,10 +5,12 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pagePath = path.join(projectRoot, "src/pages/SmsConsentEvidencePage.tsx");
 const appPath = path.join(projectRoot, "src/App.tsx");
+const contractPath = path.join(projectRoot, "src/lib/smsOtp.ts");
 const imagePath = path.join(projectRoot, "public/compliance/alphascreen-sms-opt-in.jpg");
 
 const page = fs.readFileSync(pagePath, "utf8");
 const app = fs.readFileSync(appPath, "utf8");
+const contract = fs.readFileSync(contractPath, "utf8");
 const image = fs.readFileSync(imagePath);
 
 const requiredCopy = [
@@ -23,7 +25,7 @@ const requiredCopy = [
   "SMS sending is disabled on this compliance-evidence page",
 ];
 
-const missing = requiredCopy.filter((text) => !page.includes(text));
+const missing = requiredCopy.filter((text) => !`${page}\n${contract}`.includes(text));
 if (missing.length > 0) {
   throw new Error(`SMS consent evidence is missing required copy: ${missing.join(", ")}`);
 }

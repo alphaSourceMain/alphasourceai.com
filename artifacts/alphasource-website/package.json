@@ -12,6 +12,7 @@
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:html": "node scripts/verify-html-integrity.mjs",
     "verify:sms-consent-evidence": "node scripts/verify-sms-consent-evidence.mjs",
+    "verify:sms-candidate-ui": "node scripts/verify-sms-candidate-ui.mjs",
     "verify:recovery-core-ui": "node scripts/verify-recovery-core-ui.mjs"
   },
   "devDependencies": {
