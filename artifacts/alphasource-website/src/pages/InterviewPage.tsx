@@ -145,9 +145,7 @@ const backendBase = firstBase(
 );
 const candidateApiBase = firstBase(
   env.VITE_CANDIDATE_API_BASE,
-  import.meta.env.PROD
-    ? "/candidate-api"
-    : backendBase ? joinUrl(backendBase, "/api/candidate") : "",
+  backendBase ? joinUrl(backendBase, "/api/candidate") : "",
 );
 const smsUiEnabled = isCandidateSmsUiEnabled(env);
 

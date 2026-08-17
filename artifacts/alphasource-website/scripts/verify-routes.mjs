@@ -48,7 +48,6 @@ for (const privateDir of ["dashboard", "admin", "membership-agreement", "intervi
 
 const redirectRules = readRedirectRules();
 const expectedRules = [
-  ...manifest.proxyRewrites,
   ...manifest.publicRedirects,
   ...manifest.publicRewrites,
   ...manifest.spaShellRewrites,
