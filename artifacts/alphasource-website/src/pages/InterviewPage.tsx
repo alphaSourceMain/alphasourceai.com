@@ -170,16 +170,17 @@ function readRoleToken(): string {
 }
 
 function readRecoveryOtpSeed() {
-  const empty = { challenge_id: "", candidate_id: "", email: "" };
+  const empty = { challenge_id: "", candidate_id: "", email: "", delivery_channel: "email" as OtpDeliveryChannel };
   if (typeof window === "undefined") return empty;
   try {
     const url = new URL(window.location.href);
     const challengeId = String(url.searchParams.get("challenge_id") || "").trim();
     const candidateId = String(url.searchParams.get("candidate_id") || "").trim();
     const recoveryEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
+    const deliveryChannel: OtpDeliveryChannel = url.searchParams.get("delivery_channel") === "sms" ? "sms" : "email";
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuid.test(challengeId) || !uuid.test(candidateId) || !/\S+@\S+\.\S+/.test(recoveryEmail)) return empty;
-    return { challenge_id: challengeId, candidate_id: candidateId, email: recoveryEmail };
+    return { challenge_id: challengeId, candidate_id: candidateId, email: recoveryEmail, delivery_channel: deliveryChannel };
   } catch {
     return empty;
   }
@@ -204,7 +205,7 @@ export default function InterviewPage() {
   const [phoneCountry, setPhoneCountry] = useState<CandidatePhoneCountry>("US");
   const [phone, setPhone]             = useState("");
   const [resumeFile, setResumeFile]   = useState<File | null>(null);
-  const [otpChannel, setOtpChannel] = useState<OtpDeliveryChannel>("email");
+  const [otpChannel, setOtpChannel] = useState<OtpDeliveryChannel>(recoveryOtpSeed.delivery_channel);
   const [dragging, setDragging]       = useState(false);
   const [errors, setErrors]           = useState<Record<string, string>>({});
   const fileRef                       = useRef<HTMLInputElement>(null);
@@ -215,7 +216,7 @@ export default function InterviewPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
   const [resendError, setResendError] = useState("");
-  const [activeOtpChannel, setActiveOtpChannel] = useState<OtpDeliveryChannel>("email");
+  const [activeOtpChannel, setActiveOtpChannel] = useState<OtpDeliveryChannel>(recoveryOtpSeed.delivery_channel);
   const [smsFallbackRequired, setSmsFallbackRequired] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
