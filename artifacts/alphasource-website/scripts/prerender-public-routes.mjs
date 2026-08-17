@@ -1095,6 +1095,9 @@ function writeSpaShellRoute(route) {
 function writeStaticRoutingFile() {
   const lines = [
     "# Code-owned Render static routing. Source: render-routes.json.",
+    "# Same-origin candidate API proxy. Keep before all SPA rewrites.",
+    ...routingManifest.proxyRewrites.map(formatRouteRule),
+    "",
     "# Public bare-route redirects.",
     ...routingManifest.publicRedirects.map(formatRouteRule),
     "",

@@ -34,6 +34,9 @@
     { "source": "/alphascreen/for-dental-groups", "destination": "/alphascreen/for-dental-groups/", "status": 301 },
     { "source": "/alphascreen/roi", "destination": "/alphascreen/roi/", "status": 301 }
   ],
+  "proxyRewrites": [
+    { "source": "/candidate-api/*", "destination": "https://ia-backend-qa.onrender.com/api/candidate/*", "status": 200 }
+  ],
   "publicRewrites": [
     { "source": "/about/", "destination": "/about/index.html", "status": 200 },
     { "source": "/faq/", "destination": "/faq/index.html", "status": 200 },

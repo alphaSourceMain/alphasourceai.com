@@ -13,6 +13,7 @@ import {
 } from "../lib/candidatePhone";
 import { getCandidateFlowError } from "../lib/candidateFlowErrors";
 import { clearCandidateSubmissionKey, getOrCreateCandidateSubmissionKey } from "../lib/candidateSubmission";
+import { postCandidateSubmission } from "../lib/candidateSubmissionTransport";
 import { alphaSourceLogo } from "@/assets/branding";
 import {
   SMS_CONSENT_COPY_VERSION,
@@ -141,6 +142,12 @@ const backendBase = firstBase(
   env.VITE_PUBLIC_BACKEND_URL,
   env.PUBLIC_BACKEND_URL,
   env.BACKEND_URL,
+);
+const candidateApiBase = firstBase(
+  env.VITE_CANDIDATE_API_BASE,
+  import.meta.env.PROD
+    ? "/candidate-api"
+    : backendBase ? joinUrl(backendBase, "/api/candidate") : "",
 );
 const smsUiEnabled = isCandidateSmsUiEnabled(env);
 
@@ -525,24 +532,33 @@ export default function InterviewPage() {
     setOtpError("");
 
     try {
-      const body = new FormData();
-      body.append("first_name", firstName.trim());
-      body.append("last_name", lastName.trim());
-      body.append("email", email.trim());
-      body.append("phone", normalizedPhone);
-      body.append("phone_country", phoneCountry);
-      body.append("role_token", roleToken);
-      body.append("submission_key", getOrCreateCandidateSubmissionKey(roleToken));
-      body.append("otp_channel", selectedChannel);
-      if (selectedChannel === "sms") {
-        body.append("consent_copy_version", SMS_CONSENT_COPY_VERSION);
-      }
-      if (resumeFile) body.append("resume", resumeFile);
+      const submissionKey = getOrCreateCandidateSubmissionKey(roleToken);
+      const buildBody = () => {
+        const body = new FormData();
+        body.append("first_name", firstName.trim());
+        body.append("last_name", lastName.trim());
+        body.append("email", email.trim());
+        body.append("phone", normalizedPhone);
+        body.append("phone_country", phoneCountry);
+        body.append("role_token", roleToken);
+        body.append("submission_key", submissionKey);
+        body.append("otp_channel", selectedChannel);
+        if (selectedChannel === "sms") {
+          body.append("consent_copy_version", SMS_CONSENT_COPY_VERSION);
+        }
+        if (resumeFile) body.append("resume", resumeFile);
+        return body;
+      };
 
-      const resp = await fetch(joinUrl(backendBase, "/api/candidate/submit"), {
-        method: "POST",
-        credentials: "include",
-        body,
+      const resp = await postCandidateSubmission({
+        url: joinUrl(candidateApiBase, "/submit"),
+        buildBody,
+        onRetry: () => {
+          setErrors((current) => ({
+            ...current,
+            submit: "The upload connection was interrupted. Reconnecting safely…",
+          }));
+        },
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
@@ -581,7 +597,10 @@ export default function InterviewPage() {
       setStep("otp");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      setErrors((e) => ({ ...e, submit: "Network error. Please try again." }));
+      setErrors((e) => ({
+        ...e,
+        submit: "The upload connection was interrupted. Your information is still here; please try again.",
+      }));
     } finally {
       setSubmitLoading(false);
     }
@@ -604,7 +623,7 @@ export default function InterviewPage() {
     setResendMessage("");
     setResendError("");
     try {
-      const resp = await fetch(joinUrl(backendBase, "/api/candidate/verify-otp/resend"), {
+      const resp = await fetch(joinUrl(candidateApiBase, "/verify-otp/resend"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -683,7 +702,7 @@ export default function InterviewPage() {
     setVerifyLoading(true);
     setOtpError("");
     try {
-      const resp = await fetch(joinUrl(backendBase, "/api/candidate/verify-otp"), {
+      const resp = await fetch(joinUrl(candidateApiBase, "/verify-otp"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
