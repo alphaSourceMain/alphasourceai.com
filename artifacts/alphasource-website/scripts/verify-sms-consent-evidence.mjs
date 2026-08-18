@@ -15,10 +15,10 @@ const image = fs.readFileSync(imagePath);
 
 const requiredCopy = [
   "Text Message",
-  "one-time transactional verification code",
+  "transactional verification-code text messages",
   "Message and data rates may apply",
   "Reply STOP to opt out or HELP for help",
-  "You may choose Email instead",
+  "Text message consent is optional; you may choose Email instead",
   "/terms/",
   "/privacy/",
   "never sends marketing messages",
