@@ -10,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
+import PatentPendingBadge from "@/components/PatentPendingBadge";
 import { alphaSourceSymbol } from "@/assets/branding";
 
 const EASE_OUT = "easeOut" as const;
@@ -563,8 +564,11 @@ function AlphaScreenFeatureSection() {
                   />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-[#0A1547] dark:text-white">
-                    alphaScreen
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-bold text-[#0A1547] dark:text-white">
+                      alphaScreen
+                    </div>
+                    <PatentPendingBadge className="min-h-6 px-2.5 py-0.5 text-[10px]" />
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#02D99D] animate-pulse" />
