@@ -66,3 +66,49 @@
 ## Final Result
 
 final result: passed
+
+---
+
+# alphaScreen Brand and Motion System - Design QA
+
+## Scope
+
+- Approved Figma file: `iajQJtowOf4cFTCnghYgmq`.
+- Reference frames: public website `24:16`, dashboard `24:39`, processing `24:134`, report `24:146`.
+- Code applies the approved brand roles to the existing alphaSource/alphaScreen product without replacing established page content, routes, dashboard controls, or report structure.
+
+## Evidence
+
+- Vector source-to-render comparison: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/frontend/alphascreen-brand-qa-20260826/vector-fidelity/source-vs-vector-duotone.png`.
+- Figma-to-browser public comparison: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/frontend/alphascreen-brand-qa-20260826/compare-public-figma-vs-local.png`.
+- Mobile browser capture at 390 x 844: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/frontend/alphascreen-brand-qa-20260826/local-public-mobile.png`.
+- Active processing state: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/frontend/alphascreen-brand-qa-20260826/local-processing-active.png`.
+- Settled processing state: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/frontend/alphascreen-brand-qa-20260826/local-processing-settled.png`.
+- Figma report and rendered PDF comparison: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/backend/alphascreen-brand-qa-20260826/compare-report-figma-vs-render.png`.
+- Grok Build 4.6 Senior QA approval: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-qa-20260826/grok-4.6-senior-qa-result.md`.
+
+## Findings and corrections
+
+1. The first browser pass used a heavier split-weight wordmark than the approved Figma lockup.
+   - Corrected to a single medium-weight `alphaScreen` wordmark and reduced the public hero scale.
+   - The refined desktop and mobile captures show the lighter lockup without clipping or overflow.
+2. #09 exposure is confined to the active layer of the breathing component.
+   - Static lockups, persistent dashboard chrome, and the candidate report use #08 only.
+3. Motion is task-bound and restrained.
+   - Three 2,400 ms cycles finish on #08; reduced-motion CSS disables the animation and hides #09.
+4. The Figma public/report frames are conceptual brand-placement references, not replacements for the product's working page copy, video, dashboard data, or report sections.
+   - Comparison focused on mark treatment, wordmark, hierarchy, context, motion role, and static-document behavior.
+
+## Verification
+
+- Eight SVG masters contain path geometry and no raster `<image>` or embedded image data.
+- Source-to-vector normalized RMSE range: 0.0308761 to 0.0537961; no material visible divergence found in side-by-side inspection.
+- Desktop and mobile public surfaces preserve the corporate alphaSource header while clearly identifying the alphaScreen product.
+- The active processing example breathes; its settled capture returns to #08.
+- The rendered candidate report has a sharp static navy #08 lockup and preserves the existing first-page Patent Pending wording.
+- Typecheck, production build, prerender/HTML integrity, route verification, brand-contract verification, and the full backend suite pass.
+- Grok Build 4.6 verdict: APPROVE, with hosted authenticated QA UAT retained as the post-deploy gate.
+
+## Final Result
+
+final result: passed
