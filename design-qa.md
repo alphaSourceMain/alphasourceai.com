@@ -69,6 +69,68 @@ final result: passed
 
 ---
 
+# alphaScreen 8C Placement Refinement - Design QA
+
+## Scope
+
+- QA frontend only. Production is outside this change.
+- Public alphaScreen and pricing heroes use the owner's field-free teal 8C full-name lockup with restrained mark-only breathing.
+- Dashboard chrome keeps a static lockup, enlarges the mark to 40 px full / 36 px compact, and uses a white wordmark on navy.
+- Candidate interview, live interview, text interview, accommodation, terms, and SMS-evidence headers use a static alphaScreen 8C lockup.
+- Corporate alphaSource navbar/footer identity, Patent Pending, dashboard support/tour controls, OTP/SMS behavior, and routes remain unchanged.
+
+## Source Visual Truth
+
+- alphaScreen page: `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-dd4e7eb1-0f08-44fb-b9ae-9ee5a786671d.png` (1829 x 951).
+- Pricing page: `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-0bd24d0c-0823-412e-adf1-9732bef2cfc3.png` (1829 x 951).
+- Authenticated dashboard: `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-d3be7801-2cba-4d98-b5ff-68b8e6b7582e.png` (1829 x 1125).
+- Candidate entry: `/private/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-86adea02-2bee-4127-9101-0bd59f6b2525.png` (1829 x 1125).
+- Logo geometry source: the owner's exact `lockup-icon-08-white.png` and `lockup-icon-09-white.png` exports from `alphaScreen-logo-directions.pdf`.
+
+## Comparison Evidence
+
+- alphaScreen full view: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-alphascreen-full.png` (3658 x 951).
+- alphaScreen focus: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-alphascreen-focus.png` (1600 x 550).
+- Pricing full view: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-pricing-full.png` (3658 x 951).
+- Pricing focus: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-pricing-focus.png` (1640 x 600).
+- Candidate full view: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-candidate-full.png` (3658 x 1125).
+- Candidate focus: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/compare-candidate-focus.png` (1829 x 200).
+- Each comparison places the current owner-supplied screenshot on the left and the local implementation at the same viewport on the right.
+
+## Required Fidelity Surfaces
+
+- Asset fidelity: teal masters are path-only vectors traced from the owner's exact 08/09 exports; the full-name wordmark uses Raleway ExtraLight 200.
+- Motion: only the mark breathes; the wordmark remains static. Motion is three 2,400 ms cycles, settles on 08, and reduced-motion displays static 08.
+- Public hierarchy: the field-free lockup replaces the prior filled-square/product treatment without displacing Patent Pending, calls to action, or the pricing membership H1.
+- Candidate hierarchy: the alphaScreen lockup replaces the corporate header identity without altering form, verification, resume, accommodation, or submission controls.
+- Dashboard hierarchy: the mark is enlarged within the existing sidebar slot and remains static; the dark sidebar receives a white wordmark for contrast.
+
+## Comparison History
+
+1. P1 accessibility - the first composite lockup hid its visible wordmark and applied `aria-label` to a generic span.
+   - Fix: expose the visible `alphaScreen` text, remove the unsupported wrapper label, keep only the mark decorative, and add verifier assertions for that contract.
+   - Post-fix result: TypeScript, production build, brand/accessibility verifier, and 136/136 frontend tests pass; Grok Build 4.6 changed its verdict from DENY to APPROVE.
+2. Visual comparison - public alphaScreen, pricing, and candidate surfaces showed no actionable P0, P1, or P2 mismatch after the approved refinements.
+3. Authenticated dashboard - source-level layout and sizing passed review; hosted visual confirmation remains the post-deploy UAT gate.
+
+## Browser Interaction and Console Checks
+
+- Local alphaScreen, pricing, and candidate pages were rendered in the in-app Browser using the QA environment configuration.
+- Successful comparison passes produced no new application console errors.
+- An initial preview without QA environment values produced expected stale configuration/network errors; that preview was discarded and restarted with the QA configuration before evidence capture.
+- Public/candidate layout, navigation, CTA, form, and responsive continuity were inspected. No source route or interaction handler was changed.
+
+## Independent Review
+
+- Round 1 DENY: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/grok-4.6-round-1-verdict.md`.
+- Round 2 APPROVE: `/Users/jasongardner/Desktop/ai-interview-final/QA/evidence/alphascreen-brand-refinement-qa-20260827/grok-4.6-round-2-verdict.md`.
+
+## Final Result
+
+final result: pending hosted authenticated dashboard QA
+
+---
+
 # alphaScreen Brand and Motion System - Design QA
 
 ## Scope
