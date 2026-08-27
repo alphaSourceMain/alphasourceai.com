@@ -98,3 +98,57 @@ The approved admin reference and hosted capture were inspected together in one v
 ## Final result
 
 passed
+
+---
+
+# alphaScreen Hero Lockup Refinement QA — 2026-08-27
+
+## Source and implementation
+
+- Source visual truth: `/var/folders/4y/1dcg3x8j7311g869tdrtrb7c0000gn/T/codex-clipboard-4b4e8cb7-3382-43d1-853e-357b9913939e.png`
+- Source pixels: 1829 × 1276.
+- Browser-rendered implementation: `http://localhost:4177/alphascreen`
+- Desktop implementation screenshot: `/private/tmp/alphascreen-hero-refinement-desktop-local-v2-20260827.png`
+- Desktop implementation pixels: 1596 × 1272 from an 1828 × 1276 CSS viewport override; the in-app browser applied output scaling.
+- Mobile implementation screenshot: `/private/tmp/alphascreen-hero-refinement-mobile-local-v2-20260827.png`
+- Mobile CSS viewport: 390 × 844; screenshot captured at the in-app browser's output density.
+- Narrow-mobile implementation screenshot: `/private/tmp/alphascreen-hero-refinement-320-local-v2-20260827.png`
+- Narrow-mobile CSS viewport: 320 × 844.
+- Full-view comparison: `/private/tmp/alphascreen-hero-refinement-comparison-20260827.png`
+- Focused hero comparison: `/private/tmp/alphascreen-hero-refinement-focused-comparison-v2-20260827.png`
+- Comparison normalization: each source/implementation panel was proportionally resized and centered in an equal 900 × 628 full-view frame or 900 × 372 focused frame. Absolute pixel parity was not inferred from the browser's output scaling.
+- State: public alphaScreen landing page, light/System appearance, hero at initial scroll position, no consent overlay.
+
+## Findings
+
+- No remaining P0, P1, or P2 mismatch.
+- Fonts and typography: the existing alphaScreen extra-light wordmark and public-site typography remain unchanged; the desktop wordmark is about 15% larger and the new small Patent Pending line reads as subordinate lockup metadata.
+- Spacing and layout: both desktop columns now top-align; the wordmark top is 160 CSS px, the vector mark top is 170.69 CSS px, and the video card top is 176 CSS px, so the lockup begins slightly above the card as requested. Existing hero body rhythm, CTA spacing, card radius, and elevation remain intact.
+- Colors and tokens: the teal breathing mark, navy wordmark, lilac tagline, and restrained lilac patent text continue using the established alphaScreen palette.
+- Image quality and asset fidelity: the existing vector 08/09 breathing masters and the same demo video are preserved; no substitute, rasterized, CSS-drawn, or inline-SVG asset was introduced.
+- Copy and content: both former pills are removed. Patent Pending appears once as a subscript to the wordmark. All remaining hero copy and calls to action are unchanged.
+- Accessibility and behavior: the H1 exposes `alphaScreen Patent Pending`; reduced-motion behavior remains owned by the existing breathing component. Browser console warnings/errors: 0.
+- Responsive behavior: the first 390 px pass showed the desktop-sized subscript clipping at the right edge. The corrected mobile layout scales the lockup within the available width and positions Patent Pending directly beneath the wordmark. A follow-up 320 px check prompted by Grok's first-pass residual-risk note then exposed overflow masking at that narrower width; a sub-360 px size tier corrected it. Final 320 px H1 bounds are x=24 to x=292.28 within the 320 px viewport, the patent line is fully visible, and horizontal overflow is 0.
+
+## Comparison history
+
+1. Initial desktop comparison confirmed the requested removal of both pills, larger lockup, and top alignment.
+2. Initial mobile comparison found one P2 responsive issue: the Patent Pending subscript was clipped because the enlarged single-line lockup consumed the available width.
+3. Fixed the mobile treatment with breakpoint-specific lockup sizing and a right-aligned subscript beneath the wordmark, while keeping the full desktop enlargement and desktop inline subscript.
+4. Re-captured at 390 × 844 and 1828 × 1276 CSS viewports. Post-fix evidence shows no clipping, no horizontal overflow, preserved hierarchy, and the requested desktop alignment.
+5. After Grok's first APPROVE noted that 320 px was untested, captured `/private/tmp/alphascreen-hero-refinement-320-local-20260827.png`; this exposed a P2 clip hidden by the hero's `overflow-hidden` treatment.
+6. Added a sub-360 px lockup tier without changing the approved 390 px or desktop sizes. Re-captured `/private/tmp/alphascreen-hero-refinement-320-local-v2-20260827.png`; the full lockup and subscript fit inside the content width with no console errors or horizontal overflow.
+
+## Interaction and validation evidence
+
+- View pricing, See how it works, and Request demo remain visible and semantically linked.
+- Focused patent/hero tests: 11 passed, 0 failed.
+- TypeScript: passed.
+- alphaScreen vector-brand verifier: passed, 10 masters.
+- Production build, 13-route prerender, and 14-file HTML boot-integrity check: passed.
+- Narrow-width evidence: 320 × 844 CSS viewport passed after correction.
+- Full repository test discovery: 122 passed, 2 unrelated pre-existing support-voice assertion failures. The associated source and test files are byte-identical to `origin/main` and outside this change.
+
+## Final result
+
+passed
