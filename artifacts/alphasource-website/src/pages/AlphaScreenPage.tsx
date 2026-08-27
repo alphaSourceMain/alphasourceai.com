@@ -54,8 +54,8 @@ function HeroSection() {
               <h1>
                 <AlphaScreenBreathingLockup
                   treatment="teal"
-                  markClassName="h-12 w-12 lg:h-14 lg:w-14"
-                  wordmarkClassName="text-4xl lg:text-5xl"
+                  markClassName="h-[3.45rem] w-[3.45rem] lg:h-[4.025rem] lg:w-[4.025rem]"
+                  wordmarkClassName="text-[2.5875rem] lg:text-[3.45rem]"
                 />
               </h1>
             </motion.div>
