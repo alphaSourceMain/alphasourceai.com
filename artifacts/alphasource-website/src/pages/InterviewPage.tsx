@@ -17,6 +17,10 @@ import { postCandidateSubmission } from "../lib/candidateSubmissionTransport";
 import { alphaScreenMark08Teal } from "@/assets/branding";
 import CandidateHeader from "@/components/CandidateHeader";
 import {
+  releaseMicrophoneSampleResources,
+  sustainedVoiceDetected,
+} from "../lib/microphonePreflight";
+import {
   SMS_CONSENT_COPY_VERSION,
   SMS_CONSENT_DISCLOSURE,
   acceptedDeliveryOutcome,
@@ -312,6 +316,7 @@ export default function InterviewPage() {
   const micSamplesRef = useRef<Array<{ at: number; rms: number }>>([]);
   const micLastDisplayAtRef = useRef(0);
   const micSampleRecorderRef = useRef<MediaRecorder | null>(null);
+  const micSampleTrackRef = useRef<MediaStreamTrack | null>(null);
   const micSampleTimerRef = useRef<number | null>(null);
   const micSampleUrlRef = useRef("");
   const networkCheckAbortRef = useRef<AbortController | null>(null);
@@ -356,15 +361,19 @@ export default function InterviewPage() {
       window.clearTimeout(micSampleTimerRef.current);
       micSampleTimerRef.current = null;
     }
-    if (micSampleRecorderRef.current && micSampleRecorderRef.current.state !== "inactive") {
-      micSampleRecorderRef.current.ondataavailable = null;
-      micSampleRecorderRef.current.onstop = null;
-      micSampleRecorderRef.current.stop();
-    }
+    const sampleRecorder = micSampleRecorderRef.current;
+    const sampleTrack = micSampleTrackRef.current;
+    const sampleUrl = micSampleUrlRef.current;
     micSampleRecorderRef.current = null;
-    setMicSampleRecording(false);
-    if (micSampleUrlRef.current) URL.revokeObjectURL(micSampleUrlRef.current);
+    micSampleTrackRef.current = null;
     micSampleUrlRef.current = "";
+    releaseMicrophoneSampleResources({
+      recorder: sampleRecorder,
+      sampleTrack,
+      sampleUrl,
+      revokeObjectUrl: (url) => URL.revokeObjectURL(url),
+    });
+    setMicSampleRecording(false);
     setMicSampleUrl("");
     if (micCheckTimerRef.current !== null) {
       window.clearTimeout(micCheckTimerRef.current);
@@ -374,14 +383,14 @@ export default function InterviewPage() {
       window.cancelAnimationFrame(micAnimationRef.current);
       micAnimationRef.current = null;
     }
-    if (micAudioContextRef.current) {
-      void micAudioContextRef.current.close().catch(() => {});
-      micAudioContextRef.current = null;
-    }
-    if (previewStreamRef.current) {
-      previewStreamRef.current.getTracks().forEach((track) => track.stop());
-      previewStreamRef.current = null;
-    }
+    const audioContext = micAudioContextRef.current;
+    micAudioContextRef.current = null;
+    try { void audioContext?.close().catch(() => {}); } catch { /* continue cleanup */ }
+    const previewStream = previewStreamRef.current;
+    previewStreamRef.current = null;
+    previewStream?.getTracks().forEach((track) => {
+      try { track.stop(); } catch { /* continue cleanup */ }
+    });
     if (previewVideoRef.current) {
       previewVideoRef.current.srcObject = null;
     }
@@ -475,15 +484,9 @@ export default function InterviewPage() {
           micSamplesRef.current.push({ at: now, rms });
           micSamplesRef.current = micSamplesRef.current.filter((sample) => sample.at >= now - MIC_SAMPLE_WINDOW_MS);
 
-          let voicedMs = 0;
-          for (let index = 1; index < micSamplesRef.current.length; index += 1) {
-            const previous = micSamplesRef.current[index - 1];
-            const current = micSamplesRef.current[index];
-            if (current.rms >= MIC_READY_RMS) {
-              voicedMs += Math.min(100, Math.max(0, current.at - previous.at));
-            }
+          if (sustainedVoiceDetected(micSamplesRef.current, MIC_READY_RMS, MIC_REQUIRED_VOICED_MS)) {
+            setMicSignalDetected(true);
           }
-          if (voicedMs >= MIC_REQUIRED_VOICED_MS) setMicSignalDetected(true);
 
           if (now - micLastDisplayAtRef.current >= 50) {
             micLastDisplayAtRef.current = now;
@@ -582,21 +585,35 @@ export default function InterviewPage() {
     const audioTrack = previewStreamRef.current?.getAudioTracks?.()[0];
     if (!audioTrack || typeof MediaRecorder === "undefined" || micSampleRecording) return;
 
-    if (micSampleUrlRef.current) URL.revokeObjectURL(micSampleUrlRef.current);
+    if (micSampleUrlRef.current) {
+      try { URL.revokeObjectURL(micSampleUrlRef.current); } catch { /* continue reset */ }
+    }
     micSampleUrlRef.current = "";
     setMicSampleUrl("");
     setDeviceError("");
 
     try {
-      const recorder = new MediaRecorder(new MediaStream([audioTrack]));
+      const sampleTrack = audioTrack.clone();
+      const recorder = new MediaRecorder(new MediaStream([sampleTrack]));
       const chunks: BlobPart[] = [];
+      let finalized = false;
       micSampleRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
-      recorder.onstop = () => {
-        micSampleRecorderRef.current = null;
+      micSampleTrackRef.current = sampleTrack;
+      const finalize = (outcome: "complete" | "failed") => {
+        if (finalized) return;
+        finalized = true;
+        if (micSampleTimerRef.current !== null) {
+          window.clearTimeout(micSampleTimerRef.current);
+          micSampleTimerRef.current = null;
+        }
+        if (micSampleRecorderRef.current === recorder) micSampleRecorderRef.current = null;
+        if (micSampleTrackRef.current === sampleTrack) micSampleTrackRef.current = null;
+        try { sampleTrack.stop(); } catch { /* recorder cleanup must not stick the UI */ }
         setMicSampleRecording(false);
+        if (outcome === "failed") {
+          setDeviceError("A voice sample could not be recorded in this browser. The live level check is still available.");
+          return;
+        }
         if (chunks.length === 0) {
           setDeviceError("The voice sample was empty. Select another microphone and try again.");
           return;
@@ -605,14 +622,35 @@ export default function InterviewPage() {
         micSampleUrlRef.current = sampleUrl;
         setMicSampleUrl(sampleUrl);
       };
-      recorder.start();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch { /* finalize below */ }
+        finalize("failed");
+      };
+      recorder.onstop = () => finalize("complete");
       setMicSampleRecording(true);
+      recorder.start();
       micSampleTimerRef.current = window.setTimeout(() => {
         micSampleTimerRef.current = null;
-        if (recorder.state !== "inactive") recorder.stop();
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch {
+          finalize("failed");
+        }
       }, 3000);
     } catch {
+      releaseMicrophoneSampleResources({
+        recorder: micSampleRecorderRef.current,
+        sampleTrack: micSampleTrackRef.current,
+      });
       micSampleRecorderRef.current = null;
+      micSampleTrackRef.current = null;
       setMicSampleRecording(false);
       setDeviceError("A voice sample could not be recorded in this browser. The live level check is still available.");
     }

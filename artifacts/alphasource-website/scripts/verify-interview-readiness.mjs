@@ -14,11 +14,14 @@ assert.match(preflightSource, /supported\.noiseSuppression[\s\S]*audioConstraint
 assert.match(preflightSource, /MIC_READY_RMS = 0\.018/);
 assert.match(preflightSource, /MIC_REQUIRED_VOICED_MS = 350/);
 assert.match(preflightSource, /20 \* Math\.log10\(rms\)/);
-assert.match(preflightSource, /voicedMs >= MIC_REQUIRED_VOICED_MS/);
+assert.match(preflightSource, /sustainedVoiceDetected\(micSamplesRef\.current, MIC_READY_RMS, MIC_REQUIRED_VOICED_MS\)/);
 assert.match(preflightSource, /Say one short sentence in your normal voice/);
 assert.match(preflightSource, /Automatic level adjustment is active/);
 assert.match(preflightSource, /verifiedAudioProcessingResult\(supported, audioTrack\.getSettings\?\.\(\) \|\| \{\}\)/);
-assert.match(preflightSource, /new MediaRecorder\(new MediaStream\(\[audioTrack\]\)\)/);
+assert.match(preflightSource, /const sampleTrack = audioTrack\.clone\(\)/);
+assert.match(preflightSource, /new MediaRecorder\(new MediaStream\(\[sampleTrack\]\)\)/);
+assert.match(preflightSource, /recorder\.onerror/);
+assert.match(preflightSource, /releaseMicrophoneSampleResources/);
 assert.match(preflightSource, /Record voice sample/);
 assert.match(preflightSource, /Stays on this device/);
 assert.match(preflightSource, /disabled=\{deviceLoading \|\| !previewAudioTrackLive \|\| !previewVideoTrackLive \|\| !micSignalDetected\}/);

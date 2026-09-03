@@ -406,7 +406,7 @@ function buildSupportedAudioProcessingSettings(
   };
 }
 
-function verifyAppliedAudioProcessing(track?: MediaStreamTrack | null): AudioProcessingResult {
+export function verifyAppliedAudioProcessing(track?: MediaStreamTrack | null): AudioProcessingResult {
   if (!track) return "failed";
   const supported = navigator.mediaDevices?.getSupportedConstraints?.() || {};
   const settings = track.getSettings?.() || {};
