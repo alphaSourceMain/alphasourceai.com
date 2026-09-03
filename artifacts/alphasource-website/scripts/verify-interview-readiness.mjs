@@ -7,6 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const preflightSource = await readFile(path.join(root, "src/pages/InterviewPage.tsx"), "utf8");
 const liveSource = await readFile(path.join(root, "src/pages/InterviewCviPage.tsx"), "utf8");
 const candidatesSource = await readFile(path.join(root, "src/pages/dashboard/CandidatesPage.tsx"), "utf8");
+const interviewStatusSource = await readFile(path.join(root, "src/lib/interviewStatus.ts"), "utf8");
 
 assert.match(preflightSource, /supported\.autoGainControl[\s\S]*audioConstraints\.autoGainControl = true/);
 assert.match(preflightSource, /supported\.echoCancellation[\s\S]*audioConstraints\.echoCancellation = true/);
@@ -43,7 +44,7 @@ assert.match(liveSource, />\s*\{microphoneRecoveryBusy \? "Refreshing…" : "Try
 assert.doesNotMatch(liveSource, /local_media_preflight_result[\s\S]{0,1200}(device_id|device_label|exact_audio_level)/);
 
 for (const label of ["Not started", "No response", "Tech issue", "Processing", "Incomplete", "Scored"]) {
-  assert.match(candidatesSource, new RegExp(label.replace(" ", "\\s+")));
+  assert.match(interviewStatusSource, new RegExp(label.replace(" ", "\\s+")));
 }
 assert.match(candidatesSource, /emptyState=\{c\.interviewState\}/);
 
