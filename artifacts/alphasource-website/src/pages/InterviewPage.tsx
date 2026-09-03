@@ -118,14 +118,45 @@ type DevicePreferences = {
   preflightVideoTrackLive?: boolean;
   preflightOverride?: boolean;
   preflightAudioProcessingRequested?: boolean;
+  preflightAudioProcessingResult?: AudioProcessingResult;
 };
 type LocalAudioLevelState = "unavailable" | "silent" | "low" | "ready";
+type AudioProcessingResult = "default" | "applied" | "unsupported" | "failed";
 type NetworkCheck = {
   checking: boolean;
   bars: number;
   latencyMs: number | null;
 };
 const networkStatusText = ["Connection unavailable", "Weak connection", "Fair connection", "Good connection", "Strong connection"];
+const MIC_READY_RMS = 0.018;
+const MIC_SAMPLE_WINDOW_MS = 1500;
+const MIC_REQUIRED_VOICED_MS = 350;
+const MIC_METER_FLOOR_DB = -60;
+const MIC_METER_CEILING_DB = -18;
+
+function microphoneMeterPercent(rms: number): number {
+  if (!Number.isFinite(rms) || rms <= 0) return 0;
+  const decibels = 20 * Math.log10(rms);
+  const scaled = ((decibels - MIC_METER_FLOOR_DB) / (MIC_METER_CEILING_DB - MIC_METER_FLOOR_DB)) * 100;
+  return Math.max(0, Math.min(100, Math.round(scaled)));
+}
+
+function verifiedAudioProcessingResult(
+  supported: MediaTrackSupportedConstraints,
+  settings: MediaTrackSettings,
+): AudioProcessingResult {
+  if (supported.autoGainControl === true) {
+    if (settings.autoGainControl === true) return "applied";
+    if (settings.autoGainControl === false) return "failed";
+    return "default";
+  }
+  const requestedKeys = (["autoGainControl", "echoCancellation", "noiseSuppression"] as const)
+    .filter((key) => supported[key] === true);
+  if (requestedKeys.length === 0) return "unsupported";
+  if (requestedKeys.some((key) => settings[key] === true)) return "applied";
+  if (requestedKeys.some((key) => typeof settings[key] === "boolean")) return "failed";
+  return "default";
+}
 
 const env = (
   typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {}
@@ -266,15 +297,23 @@ export default function InterviewPage() {
   const [previewAudioTrackLive, setPreviewAudioTrackLive] = useState(false);
   const [previewVideoTrackLive, setPreviewVideoTrackLive] = useState(false);
   const [preflightAudioProcessingRequested, setPreflightAudioProcessingRequested] = useState(false);
+  const [preflightAudioProcessingResult, setPreflightAudioProcessingResult] = useState<AudioProcessingResult>("default");
   const [networkOnline, setNetworkOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [networkCheck, setNetworkCheck] = useState<NetworkCheck>({ checking: false, bars: 0, latencyMs: null });
   const [speakerTesting, setSpeakerTesting] = useState(false);
+  const [micSampleRecording, setMicSampleRecording] = useState(false);
+  const [micSampleUrl, setMicSampleUrl] = useState("");
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
   const micAnimationRef = useRef<number | null>(null);
   const micAudioContextRef = useRef<AudioContext | null>(null);
   const micCheckTimerRef = useRef<number | null>(null);
-  const micMaxLevelRef = useRef(0);
+  const micMaxRmsRef = useRef(0);
+  const micSamplesRef = useRef<Array<{ at: number; rms: number }>>([]);
+  const micLastDisplayAtRef = useRef(0);
+  const micSampleRecorderRef = useRef<MediaRecorder | null>(null);
+  const micSampleTimerRef = useRef<number | null>(null);
+  const micSampleUrlRef = useRef("");
   const networkCheckAbortRef = useRef<AbortController | null>(null);
 
   /* ── Helpers ─────────────────────────────────────────────────── */
@@ -313,6 +352,20 @@ export default function InterviewPage() {
   }
 
   function stopDevicePreview() {
+    if (micSampleTimerRef.current !== null) {
+      window.clearTimeout(micSampleTimerRef.current);
+      micSampleTimerRef.current = null;
+    }
+    if (micSampleRecorderRef.current && micSampleRecorderRef.current.state !== "inactive") {
+      micSampleRecorderRef.current.ondataavailable = null;
+      micSampleRecorderRef.current.onstop = null;
+      micSampleRecorderRef.current.stop();
+    }
+    micSampleRecorderRef.current = null;
+    setMicSampleRecording(false);
+    if (micSampleUrlRef.current) URL.revokeObjectURL(micSampleUrlRef.current);
+    micSampleUrlRef.current = "";
+    setMicSampleUrl("");
     if (micCheckTimerRef.current !== null) {
       window.clearTimeout(micCheckTimerRef.current);
       micCheckTimerRef.current = null;
@@ -337,7 +390,11 @@ export default function InterviewPage() {
     setMicCheckComplete(false);
     setPreviewAudioTrackLive(false);
     setPreviewVideoTrackLive(false);
-    micMaxLevelRef.current = 0;
+    setPreflightAudioProcessingRequested(false);
+    setPreflightAudioProcessingResult("default");
+    micMaxRmsRef.current = 0;
+    micSamplesRef.current = [];
+    micLastDisplayAtRef.current = 0;
   }
 
   async function loadDeviceOptions() {
@@ -387,6 +444,11 @@ export default function InterviewPage() {
       if (!selectedMicrophoneDeviceId && microphoneId) setSelectedMicrophoneDeviceId(microphoneId);
       setPreviewAudioTrackLive(Boolean(audioTrack && audioTrack.readyState === "live" && audioTrack.enabled));
       setPreviewVideoTrackLive(Boolean(videoTrack && videoTrack.readyState === "live" && videoTrack.enabled));
+      if (audioTrack) {
+        setPreflightAudioProcessingResult(
+          verifiedAudioProcessingResult(supported, audioTrack.getSettings?.() || {}),
+        );
+      }
 
       const AudioCtor =
         window.AudioContext ||
@@ -407,10 +469,31 @@ export default function InterviewPage() {
             const diff = (value - 128) / 128;
             sum += diff * diff;
           }
-          const nextLevel = Math.min(100, Math.round(Math.sqrt(sum / data.length) * 140));
-          micMaxLevelRef.current = Math.max(micMaxLevelRef.current, nextLevel);
-          if (nextLevel >= 3) setMicSignalDetected(true);
-          setMicLevel(nextLevel);
+          const rms = Math.sqrt(sum / data.length);
+          const now = performance.now();
+          micMaxRmsRef.current = Math.max(micMaxRmsRef.current, rms);
+          micSamplesRef.current.push({ at: now, rms });
+          micSamplesRef.current = micSamplesRef.current.filter((sample) => sample.at >= now - MIC_SAMPLE_WINDOW_MS);
+
+          let voicedMs = 0;
+          for (let index = 1; index < micSamplesRef.current.length; index += 1) {
+            const previous = micSamplesRef.current[index - 1];
+            const current = micSamplesRef.current[index];
+            if (current.rms >= MIC_READY_RMS) {
+              voicedMs += Math.min(100, Math.max(0, current.at - previous.at));
+            }
+          }
+          if (voicedMs >= MIC_REQUIRED_VOICED_MS) setMicSignalDetected(true);
+
+          if (now - micLastDisplayAtRef.current >= 50) {
+            micLastDisplayAtRef.current = now;
+            const displayLevel = microphoneMeterPercent(rms);
+            setMicLevel((previous) => Math.round(
+              displayLevel >= previous
+                ? previous * 0.45 + displayLevel * 0.55
+                : previous * 0.82 + displayLevel * 0.18,
+            ));
+          }
           micAnimationRef.current = window.requestAnimationFrame(tick);
         };
         tick();
@@ -432,7 +515,7 @@ export default function InterviewPage() {
   function currentPreflightAudioState(): LocalAudioLevelState {
     if (!previewAudioTrackLive) return "unavailable";
     if (micSignalDetected) return "ready";
-    return micMaxLevelRef.current > 0 ? "low" : "silent";
+    return micMaxRmsRef.current > 0 ? "low" : "silent";
   }
 
   function handleOverrideDeviceCheck() {
@@ -444,6 +527,7 @@ export default function InterviewPage() {
       preflightVideoTrackLive: previewVideoTrackLive,
       preflightOverride: true,
       preflightAudioProcessingRequested,
+      preflightAudioProcessingResult,
     });
     setDeviceError("");
     stopDevicePreview();
@@ -459,6 +543,7 @@ export default function InterviewPage() {
       preflightVideoTrackLive: previewVideoTrackLive,
       preflightOverride: false,
       preflightAudioProcessingRequested,
+      preflightAudioProcessingResult,
     });
     stopDevicePreview();
     setDeviceModalOpen(false);
@@ -490,6 +575,46 @@ export default function InterviewPage() {
     } catch {
       setSpeakerTesting(false);
       setDeviceError("Could not play the speaker test sound in this browser.");
+    }
+  }
+
+  function recordMicrophoneSample() {
+    const audioTrack = previewStreamRef.current?.getAudioTracks?.()[0];
+    if (!audioTrack || typeof MediaRecorder === "undefined" || micSampleRecording) return;
+
+    if (micSampleUrlRef.current) URL.revokeObjectURL(micSampleUrlRef.current);
+    micSampleUrlRef.current = "";
+    setMicSampleUrl("");
+    setDeviceError("");
+
+    try {
+      const recorder = new MediaRecorder(new MediaStream([audioTrack]));
+      const chunks: BlobPart[] = [];
+      micSampleRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        micSampleRecorderRef.current = null;
+        setMicSampleRecording(false);
+        if (chunks.length === 0) {
+          setDeviceError("The voice sample was empty. Select another microphone and try again.");
+          return;
+        }
+        const sampleUrl = URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+        micSampleUrlRef.current = sampleUrl;
+        setMicSampleUrl(sampleUrl);
+      };
+      recorder.start();
+      setMicSampleRecording(true);
+      micSampleTimerRef.current = window.setTimeout(() => {
+        micSampleTimerRef.current = null;
+        if (recorder.state !== "inactive") recorder.stop();
+      }, 3000);
+    } catch {
+      micSampleRecorderRef.current = null;
+      setMicSampleRecording(false);
+      setDeviceError("A voice sample could not be recorded in this browser. The live level check is still available.");
     }
   }
 
@@ -910,6 +1035,9 @@ export default function InterviewPage() {
             ...(typeof savedDevicePreferences.preflightAudioProcessingRequested === "boolean"
               ? { preflightAudioProcessingRequested: savedDevicePreferences.preflightAudioProcessingRequested }
               : {}),
+            ...(savedDevicePreferences.preflightAudioProcessingResult
+              ? { preflightAudioProcessingResult: savedDevicePreferences.preflightAudioProcessingResult }
+              : {}),
           }),
         );
       } catch {}
@@ -1065,14 +1193,40 @@ export default function InterviewPage() {
                       {micSignalDetected ? "Mic ready" : micCheckComplete ? "Mic low" : "Speak now"}
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="relative h-2 rounded-full bg-gray-100 overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${micLevel}%`, backgroundColor: "#02D99D" }} />
+                    <div className="absolute inset-y-0 w-px bg-[#0A1547]/25" style={{ left: "55%" }} aria-hidden="true" />
                   </div>
                   <p className="mt-2 text-[10px] text-[#0A1547]/50 font-semibold leading-relaxed">
                     {micCheckComplete && !micSignalDetected
-                      ? "We can’t hear enough audio. Move closer or select another microphone, then try again."
-                      : "Say a few words in your normal speaking voice. The meter should move and show “Mic ready.”"}
+                      ? "We can’t hear a sustained speaking level. Move closer or select another microphone, then try again."
+                      : "Say one short sentence in your normal voice. The meter should cross the marker and show “Mic ready.”"}
                   </p>
+                  {preflightAudioProcessingResult === "applied" && (
+                    <p className="mt-1 text-[10px] font-semibold text-[#009E73]">Automatic level adjustment is active.</p>
+                  )}
+                  {typeof MediaRecorder !== "undefined" && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={recordMicrophoneSample}
+                        disabled={micSampleRecording || !previewAudioTrackLive}
+                        className="rounded-full border border-[#0A1547]/10 bg-white px-3 py-1.5 text-[10px] font-black text-[#0A1547] transition-colors hover:bg-[#0A1547]/5 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {micSampleRecording ? "Recording 3 seconds…" : "Record voice sample"}
+                      </button>
+                      <span className="text-[9px] font-semibold text-[#0A1547]/40">Stays on this device</span>
+                    </div>
+                  )}
+                  {micSampleUrl && (
+                    <audio
+                      src={micSampleUrl}
+                      controls
+                      preload="metadata"
+                      aria-label="Play your microphone test recording"
+                      className="mt-2 h-8 w-full"
+                    />
+                  )}
                 </div>
               </div>
 

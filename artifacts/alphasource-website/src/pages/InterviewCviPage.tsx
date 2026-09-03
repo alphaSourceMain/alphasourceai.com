@@ -21,9 +21,11 @@ type LiveSessionState = {
   preflightVideoTrackLive?: boolean;
   preflightOverride?: boolean;
   preflightAudioProcessingRequested?: boolean;
+  preflightAudioProcessingResult?: AudioProcessingResult;
 };
 
 type LocalAudioLevelState = "unavailable" | "silent" | "low" | "ready";
+type AudioProcessingResult = "default" | "applied" | "unsupported" | "failed";
 
 type DailyTrackSlot = {
   state?: string;
@@ -402,6 +404,23 @@ function buildSupportedAudioProcessingSettings(
       supported.autoGainControl || supported.echoCancellation || supported.noiseSuppression,
     ),
   };
+}
+
+function verifyAppliedAudioProcessing(track?: MediaStreamTrack | null): AudioProcessingResult {
+  if (!track) return "failed";
+  const supported = navigator.mediaDevices?.getSupportedConstraints?.() || {};
+  const settings = track.getSettings?.() || {};
+  if (supported.autoGainControl === true) {
+    if (settings.autoGainControl === true) return "applied";
+    if (settings.autoGainControl === false) return "failed";
+    return "default";
+  }
+  const requestedKeys = (["echoCancellation", "noiseSuppression"] as const)
+    .filter((key) => supported[key] === true);
+  if (requestedKeys.length === 0) return "unsupported";
+  if (requestedKeys.some((key) => settings[key] === true)) return "applied";
+  if (requestedKeys.some((key) => typeof settings[key] === "boolean")) return "failed";
+  return "default";
 }
 // The current interview design already uses a two-minute candidate warning.
 // This guard protects ordinary long answers without allowing a missing stop
@@ -2048,6 +2067,12 @@ function readLiveState(): LiveSessionState | null {
       preflightVideoTrackLive: parsed?.preflightVideoTrackLive === true,
       preflightOverride: parsed?.preflightOverride === true,
       preflightAudioProcessingRequested: parsed?.preflightAudioProcessingRequested === true,
+      preflightAudioProcessingResult:
+        parsed?.preflightAudioProcessingResult === "applied" ||
+        parsed?.preflightAudioProcessingResult === "unsupported" ||
+        parsed?.preflightAudioProcessingResult === "failed"
+          ? parsed.preflightAudioProcessingResult
+          : "default",
     };
   } catch {
     return null;
@@ -3067,7 +3092,9 @@ export default function InterviewCviPage() {
       if (canRequestProcessing && typeof call.updateInputSettings === "function") {
         try {
           await call.updateInputSettings({ audio: { settings: audioSettings } });
-          audioProcessingResult = "applied";
+          audioProcessingResult = verifyAppliedAudioProcessing(
+            extractTrack(localDailyParticipant(call)?.tracks?.audio),
+          );
         } catch {
           audioProcessingResult = "failed";
         }
@@ -4118,12 +4145,20 @@ export default function InterviewCviPage() {
       }
       try {
         await call.updateInputSettings({ audio: { settings } });
-        sendLifecycleTelemetry("local_audio_recovery_succeeded", {
+        const refreshedAudioTrack = extractTrack(localDailyParticipant(call)?.tracks?.audio);
+        const audioProcessingResult = verifyAppliedAudioProcessing(refreshedAudioTrack);
+        const refreshedAudioTrackLive = Boolean(
+          refreshedAudioTrack && refreshedAudioTrack.readyState !== "ended" && refreshedAudioTrack.enabled,
+        );
+        sendLifecycleTelemetry(
+          audioProcessingResult === "failed" ? "local_audio_recovery_failed" : "local_audio_recovery_succeeded",
+          {
           local_audio_level_state: session.preflightAudioState,
-          local_audio_recovery_result: "succeeded",
-          audio_processing_result: "applied",
-          local_audio_track_live: localAudioTrackLive,
-        });
+          local_audio_recovery_result: audioProcessingResult === "failed" ? "failed" : "succeeded",
+          audio_processing_result: audioProcessingResult,
+          local_audio_track_live: refreshedAudioTrackLive,
+          },
+        );
       } catch {
         sendLifecycleTelemetry("local_audio_recovery_failed", {
           local_audio_level_state: session.preflightAudioState,
@@ -4750,6 +4785,7 @@ export default function InterviewCviPage() {
                 input_level_detected: session.preflightAudioState === "ready",
                 preflight_override: session.preflightOverride === true,
                 audio_processing_requested: session.preflightAudioProcessingRequested === true,
+                audio_processing_result: session.preflightAudioProcessingResult || "default",
               });
             }
             sendLifecycleTelemetry("startup_readiness_changed", {
