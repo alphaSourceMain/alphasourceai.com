@@ -16,7 +16,14 @@ type LiveSessionState = {
   candidate_assistance_contact?: string;
   selectedCameraDeviceId?: string;
   selectedMicrophoneDeviceId?: string;
+  preflightAudioState?: LocalAudioLevelState;
+  preflightAudioTrackLive?: boolean;
+  preflightVideoTrackLive?: boolean;
+  preflightOverride?: boolean;
+  preflightAudioProcessingRequested?: boolean;
 };
+
+type LocalAudioLevelState = "unavailable" | "silent" | "low" | "ready";
 
 type DailyTrackSlot = {
   state?: string;
@@ -325,6 +332,7 @@ type DailyEvent = {
   participants?: Record<string, DailyParticipant>;
   meetingState?: string;
   receiveSettings?: unknown;
+  audioLevel?: number;
 };
 
 type DailyCallObject = {
@@ -342,6 +350,13 @@ type DailyCallObject = {
   setLocalAudio?: (enabled: boolean, options?: { forceDiscardTrack?: boolean }) => DailyCallObject;
   setInputDevicesAsync?: (devices: { videoDeviceId?: string; audioDeviceId?: string }) => Promise<unknown>;
   setInputDevices?: (devices: { videoDeviceId?: string; audioDeviceId?: string }) => Promise<unknown> | unknown;
+  startLocalAudioLevelObserver?: (interval?: number) => Promise<void>;
+  stopLocalAudioLevelObserver?: () => void;
+  getLocalAudioLevel?: () => number;
+  updateInputSettings?: (settings: {
+    audio?: { settings?: MediaTrackConstraints; processor?: { type: "none" | "noise-cancellation" } };
+    video?: { settings?: MediaTrackConstraints };
+  }) => Promise<unknown>;
 };
 
 type DailySdk = {
@@ -364,6 +379,30 @@ const PROGRESS_STALL_MS = 45000;
 const PROGRESS_WATCHDOG_INTERVAL_MS = 5000;
 const RECOVERY_PROGRESS_TIMEOUT_MS = 30000;
 const IDLE_ENGAGEMENT_GRACE_MS = 30000;
+const LOCAL_AUDIO_READY_THRESHOLD = 0.01;
+
+function buildSupportedAudioProcessingSettings(
+  audioDeviceId?: string,
+  currentSettings: MediaTrackConstraints = {},
+) {
+  const supported = typeof navigator !== "undefined"
+    ? navigator.mediaDevices?.getSupportedConstraints?.() || {}
+    : {};
+  // Daily replaces the complete constraint set when updateInputSettings() is
+  // used, so retain the active track's constraints and change only the
+  // browser-supported processing switches needed for quiet-input recovery.
+  const settings: MediaTrackConstraints = { ...currentSettings };
+  if (audioDeviceId) settings.deviceId = audioDeviceId;
+  if (supported.autoGainControl) settings.autoGainControl = true;
+  if (supported.echoCancellation) settings.echoCancellation = true;
+  if (supported.noiseSuppression) settings.noiseSuppression = true;
+  return {
+    settings,
+    canRequestProcessing: Boolean(
+      supported.autoGainControl || supported.echoCancellation || supported.noiseSuppression,
+    ),
+  };
+}
 // The current interview design already uses a two-minute candidate warning.
 // This guard protects ordinary long answers without allowing a missing stop
 // event to suppress the watchdog for the remainder of the interview.
@@ -1999,6 +2038,16 @@ function readLiveState(): LiveSessionState | null {
       candidate_assistance_contact: parsed?.candidate_assistance_contact ? String(parsed.candidate_assistance_contact) : undefined,
       selectedCameraDeviceId: parsed?.selectedCameraDeviceId ? String(parsed.selectedCameraDeviceId) : undefined,
       selectedMicrophoneDeviceId: parsed?.selectedMicrophoneDeviceId ? String(parsed.selectedMicrophoneDeviceId) : undefined,
+      preflightAudioState:
+        parsed?.preflightAudioState === "silent" ||
+        parsed?.preflightAudioState === "low" ||
+        parsed?.preflightAudioState === "ready"
+          ? parsed.preflightAudioState
+          : "unavailable",
+      preflightAudioTrackLive: parsed?.preflightAudioTrackLive === true,
+      preflightVideoTrackLive: parsed?.preflightVideoTrackLive === true,
+      preflightOverride: parsed?.preflightOverride === true,
+      preflightAudioProcessingRequested: parsed?.preflightAudioProcessingRequested === true,
     };
   } catch {
     return null;
@@ -2593,6 +2642,11 @@ export default function InterviewCviPage() {
   const [progressStalled, setProgressStalled] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasLocalVideo, setHasLocalVideo] = useState(false);
+  const [localAudioLevelState, setLocalAudioLevelState] = useState<LocalAudioLevelState>(
+    session?.preflightAudioState || "unavailable",
+  );
+  const [microphoneNotice, setMicrophoneNotice] = useState("");
+  const [microphoneRecoveryBusy, setMicrophoneRecoveryBusy] = useState(false);
 
   const callRef = useRef<DailyCallObject | null>(null);
   const leavingRef = useRef(false);
@@ -2664,6 +2718,10 @@ export default function InterviewCviPage() {
   const palSpeechEventOrdinalRef = useRef(0);
   const telemetrySequenceRef = useRef(0);
   const telemetryPendingRef = useRef<Set<Promise<unknown>>>(new Set());
+  const preflightTelemetrySentRef = useRef(false);
+  const localAudioLevelStateRef = useRef<LocalAudioLevelState>(session?.preflightAudioState || "unavailable");
+  const lastLocalAudioLevelRef = useRef(0);
+  const audioDetectedSincePalTurnRef = useRef(session?.preflightAudioState === "ready");
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -2846,6 +2904,9 @@ export default function InterviewCviPage() {
     if (!call) return;
 
     try {
+      call.stopLocalAudioLevelObserver?.();
+    } catch {}
+    try {
       await call.leave().catch(() => {});
     } catch {}
     try {
@@ -2958,6 +3019,100 @@ export default function InterviewCviPage() {
     };
   }, [sendLifecycleTelemetry]);
 
+  const commitLocalAudioLevelState = useCallback((
+    nextState: LocalAudioLevelState,
+    metadata: ReliabilityMetadata = {},
+  ) => {
+    if (localAudioLevelStateRef.current === nextState) return;
+    localAudioLevelStateRef.current = nextState;
+    setLocalAudioLevelState(nextState);
+    sendLifecycleTelemetry("local_audio_level_state_changed", {
+      local_audio_level_state: nextState,
+      local_audio_track_live: inactivityCandidateMediaHealthyRef.current,
+      input_level_detected: nextState === "ready",
+      ...metadata,
+    });
+  }, [sendLifecycleTelemetry]);
+
+  const recoverLocalMicrophone = useCallback(async () => {
+    if (microphoneRecoveryBusy) return;
+    const call = callRef.current;
+    if (!call) return;
+
+    setMicrophoneRecoveryBusy(true);
+    setMicrophoneNotice("Refreshing your microphone…");
+    sendLifecycleTelemetry("local_audio_recovery_requested", {
+      local_audio_level_state: localAudioLevelStateRef.current,
+      local_audio_recovery_result: "requested",
+      audio_processing_requested: true,
+    });
+
+    let audioProcessingResult: "default" | "applied" | "unsupported" | "failed" = "default";
+    try {
+      call.setLocalAudio?.(true);
+      if (session?.selectedMicrophoneDeviceId) {
+        if (typeof call.setInputDevicesAsync === "function") {
+          await call.setInputDevicesAsync({ audioDeviceId: session.selectedMicrophoneDeviceId });
+        } else if (typeof call.setInputDevices === "function") {
+          await call.setInputDevices({ audioDeviceId: session.selectedMicrophoneDeviceId });
+        }
+      }
+
+      const activeAudioTrack = extractTrack(localDailyParticipant(call)?.tracks?.audio);
+      const { settings: audioSettings, canRequestProcessing } =
+        buildSupportedAudioProcessingSettings(
+          session?.selectedMicrophoneDeviceId,
+          activeAudioTrack?.getConstraints?.() || {},
+        );
+      if (canRequestProcessing && typeof call.updateInputSettings === "function") {
+        try {
+          await call.updateInputSettings({ audio: { settings: audioSettings } });
+          audioProcessingResult = "applied";
+        } catch {
+          audioProcessingResult = "failed";
+        }
+      } else if (!canRequestProcessing || typeof call.updateInputSettings !== "function") {
+        audioProcessingResult = "unsupported";
+      }
+
+      if (typeof call.startLocalAudioLevelObserver === "function") {
+        await call.startLocalAudioLevelObserver(250).catch(() => {});
+      }
+      const localParticipant = localDailyParticipant(call);
+      const audioTrack = extractTrack(localParticipant?.tracks?.audio);
+      const localAudioTrackLive = Boolean(audioTrack && audioTrack.readyState !== "ended" && audioTrack.enabled);
+      inactivityCandidateMediaHealthyRef.current = localAudioTrackLive;
+      audioDetectedSincePalTurnRef.current = false;
+      if (!localAudioTrackLive) throw new Error("local-audio-track-unavailable");
+
+      commitLocalAudioLevelState(lastLocalAudioLevelRef.current > 0 ? "low" : "silent", {
+        audio_processing_requested: true,
+        audio_processing_result: audioProcessingResult,
+      });
+      setMicrophoneNotice("Microphone refreshed. Say a few words so we can confirm the level.");
+      sendLifecycleTelemetry("local_audio_recovery_succeeded", {
+        local_audio_level_state: localAudioLevelStateRef.current,
+        local_audio_recovery_result: "succeeded",
+        audio_processing_result: audioProcessingResult,
+        local_audio_track_live: true,
+      });
+    } catch {
+      commitLocalAudioLevelState("unavailable", {
+        audio_processing_requested: true,
+        audio_processing_result: audioProcessingResult,
+      });
+      setMicrophoneNotice("We still can’t confirm your microphone. Check browser permissions or choose another input device.");
+      sendLifecycleTelemetry("local_audio_recovery_failed", {
+        local_audio_level_state: "unavailable",
+        local_audio_recovery_result: "failed",
+        audio_processing_result: audioProcessingResult,
+        local_audio_track_live: false,
+      });
+    } finally {
+      setMicrophoneRecoveryBusy(false);
+    }
+  }, [commitLocalAudioLevelState, microphoneRecoveryBusy, sendLifecycleTelemetry, session?.selectedMicrophoneDeviceId]);
+
   const currentInactivityEligibility = useCallback((): CandidateInactivityEligibility => {
     const remote = inactivityRemoteEvidenceRef.current;
     return {
@@ -3045,6 +3200,7 @@ export default function InterviewCviPage() {
   }, [commitInactivityTransition]);
 
   const armInactivityRuntime = useCallback((event: NormalizedPalSpeakingEvent) => {
+    audioDetectedSincePalTurnRef.current = false;
     const eligibility = currentInactivityEligibility();
     const transition = armCandidateInactivityNudge(
       inactivityStateRef.current,
@@ -3098,6 +3254,15 @@ export default function InterviewCviPage() {
       const dispatched = recordCandidateInactivityNudgeDispatch(deadline.state, sent);
       inactivityStateRef.current = dispatched.state;
       if (sent) {
+        if (!audioDetectedSincePalTurnRef.current) {
+          const quietState: LocalAudioLevelState = !inactivityCandidateMediaHealthyRef.current
+            ? "unavailable"
+            : lastLocalAudioLevelRef.current > 0
+              ? "low"
+              : "silent";
+          commitLocalAudioLevelState(quietState);
+          setMicrophoneNotice("We may not be hearing you. Try refreshing your microphone, then answer again.");
+        }
         sendLifecycleTelemetry(
           "candidate_inactivity_nudge_sent",
           inactivityTelemetryMetadata(dispatched.state, deadlineEligibility, deadline),
@@ -3109,6 +3274,7 @@ export default function InterviewCviPage() {
   }, [
     clearInactivityTimer,
     commitInactivityTransition,
+    commitLocalAudioLevelState,
     currentInactivityEligibility,
     inactivityTelemetryMetadata,
     sendLifecycleTelemetry,
@@ -3917,6 +4083,56 @@ export default function InterviewCviPage() {
         console.warn("[InterviewCviPage] Could not apply selected input devices; using defaults.", error);
       }
     };
+    const startLocalAudioMonitoring = async () => {
+      if (!call || typeof call.startLocalAudioLevelObserver !== "function") return;
+      try {
+        await call.startLocalAudioLevelObserver(250);
+      } catch {
+        commitLocalAudioLevelState("unavailable");
+      }
+    };
+    const applyQuietPreflightAudioRecovery = async () => {
+      if (!call || (session.preflightAudioState !== "low" && session.preflightAudioState !== "silent")) return;
+      const currentAudioTrack = extractTrack(localDailyParticipant(call)?.tracks?.audio);
+      const { settings, canRequestProcessing } =
+        buildSupportedAudioProcessingSettings(
+          session.selectedMicrophoneDeviceId,
+          currentAudioTrack?.getConstraints?.() || {},
+        );
+      const localAudioTrackLive = Boolean(
+        currentAudioTrack && currentAudioTrack.readyState !== "ended" && currentAudioTrack.enabled,
+      );
+      sendLifecycleTelemetry("local_audio_recovery_requested", {
+        local_audio_level_state: session.preflightAudioState,
+        local_audio_recovery_result: "requested",
+        audio_processing_requested: true,
+      });
+      if (!canRequestProcessing || typeof call.updateInputSettings !== "function") {
+        sendLifecycleTelemetry("local_audio_recovery_failed", {
+          local_audio_level_state: session.preflightAudioState,
+          local_audio_recovery_result: "failed",
+          audio_processing_result: "unsupported",
+          local_audio_track_live: localAudioTrackLive,
+        });
+        return;
+      }
+      try {
+        await call.updateInputSettings({ audio: { settings } });
+        sendLifecycleTelemetry("local_audio_recovery_succeeded", {
+          local_audio_level_state: session.preflightAudioState,
+          local_audio_recovery_result: "succeeded",
+          audio_processing_result: "applied",
+          local_audio_track_live: localAudioTrackLive,
+        });
+      } catch {
+        sendLifecycleTelemetry("local_audio_recovery_failed", {
+          local_audio_level_state: session.preflightAudioState,
+          local_audio_recovery_result: "failed",
+          audio_processing_result: "failed",
+          local_audio_track_live: localAudioTrackLive,
+        });
+      }
+    };
 
     type ReconnectBindingPhase = "initiation" | "post_leave" | "rejoin_success" | "participant_rediscovery" | "track_rebinding" | "recovery_deadline";
     const emitReconnectBindingMetadata = (phase: ReconnectBindingPhase, metadata: ReliabilityMetadata) => {
@@ -4523,10 +4739,28 @@ export default function InterviewCviPage() {
             ...recoveryMetadata(),
           });
           if (initialJoin) {
+            if (!preflightTelemetrySentRef.current) {
+              preflightTelemetrySentRef.current = true;
+              sendLifecycleTelemetry("local_media_preflight_result", {
+                local_media_permission_state:
+                  session.preflightAudioTrackLive || session.preflightVideoTrackLive ? "granted" : "unknown",
+                local_audio_level_state: session.preflightAudioState || "unavailable",
+                local_audio_track_live: session.preflightAudioTrackLive === true,
+                local_video_track_live: session.preflightVideoTrackLive === true,
+                input_level_detected: session.preflightAudioState === "ready",
+                preflight_override: session.preflightOverride === true,
+                audio_processing_requested: session.preflightAudioProcessingRequested === true,
+              });
+            }
             sendLifecycleTelemetry("startup_readiness_changed", {
               startup_readiness_state: startupReadinessRef.current,
               reconnect_phase: progressRecoveryStateRef.current.phase,
             });
+          }
+          if (initialJoin) {
+            void applyQuietPreflightAudioRecovery().finally(() => startLocalAudioMonitoring());
+          } else {
+            void startLocalAudioMonitoring();
           }
           void emitReceiveSettingsSnapshot();
           syncParticipantsWithDiagnostics(
@@ -4559,6 +4793,17 @@ export default function InterviewCviPage() {
         register("receive-settings-updated", (event) => {
           if (!alive || endTriggeredRef.current) return;
           void emitReceiveSettingsSnapshot(event?.receiveSettings ?? event?.data, true);
+        });
+        register("local-audio-level", (event) => {
+          if (!alive || endTriggeredRef.current) return;
+          const audioLevel = Number(event?.audioLevel ?? call?.getLocalAudioLevel?.() ?? 0);
+          if (!Number.isFinite(audioLevel)) return;
+          lastLocalAudioLevelRef.current = Math.max(0, Math.min(1, audioLevel));
+          if (audioLevel >= LOCAL_AUDIO_READY_THRESHOLD) {
+            audioDetectedSincePalTurnRef.current = true;
+            commitLocalAudioLevelState("ready");
+            setMicrophoneNotice("");
+          }
         });
         register("left-meeting", () => {
           if (!alive || leavingRef.current || reconnectingRef.current) return;
@@ -4764,6 +5009,9 @@ export default function InterviewCviPage() {
             }
           }
           if (isCandidateSpeaking) {
+            audioDetectedSincePalTurnRef.current = true;
+            commitLocalAudioLevelState("ready");
+            setMicrophoneNotice("");
             const started = beginCandidateSpeaking(candidateSpeakingStateRef.current, progressAt);
             candidateSpeakingStateRef.current = started.state;
             if (started.started) {
@@ -4783,6 +5031,9 @@ export default function InterviewCviPage() {
           }
           if (eventType === "conversation.utterance") {
             if (isCandidateUtterance) {
+              audioDetectedSincePalTurnRef.current = true;
+              commitLocalAudioLevelState("ready");
+              setMicrophoneNotice("");
               recordInactivityCandidateActivity("candidate_utterance");
               candidateSpeakingStateRef.current =
                 endCandidateSpeaking(candidateSpeakingStateRef.current).state;
@@ -4876,6 +5127,9 @@ export default function InterviewCviPage() {
       cancelInactivityRuntime("unmount", true);
       candidateSpeakingStateRef.current = createCandidateSpeakingState();
       replicaSpeakingRef.current = false;
+      try {
+        call?.stopLocalAudioLevelObserver?.();
+      } catch {}
       if (call?.off) {
         for (const [eventName, handler] of handlers) {
           try {
@@ -4890,6 +5144,7 @@ export default function InterviewCviPage() {
     armInactivityRuntime,
     cancelInactivityRuntime,
     clearStartupTimer,
+    commitLocalAudioLevelState,
     endInterview,
     finishAvatarClosingSpeech,
     leaveLiveRoute,
@@ -5086,6 +5341,23 @@ export default function InterviewCviPage() {
               </div>
             )}
           </div>
+
+          {microphoneNotice && !progressStalled && (
+            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[#F59E0B]/35 bg-[#FFFBEB] px-4 py-3 text-[#3A2600] sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black">Microphone {localAudioLevelState === "unavailable" ? "unavailable" : "low"}</p>
+                <p className="mt-0.5 text-[11px] font-semibold leading-relaxed opacity-80">{microphoneNotice}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { void recoverLocalMicrophone(); }}
+                disabled={microphoneRecoveryBusy}
+                className="shrink-0 rounded-full bg-[#0A1547] px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {microphoneRecoveryBusy ? "Refreshing…" : "Try microphone"}
+              </button>
+            </div>
+          )}
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <button

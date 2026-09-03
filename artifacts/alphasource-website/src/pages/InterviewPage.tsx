@@ -113,7 +113,13 @@ const isValidResumeFile = (file: File | null | undefined) =>
 type DevicePreferences = {
   selectedCameraDeviceId?: string;
   selectedMicrophoneDeviceId?: string;
+  preflightAudioState?: LocalAudioLevelState;
+  preflightAudioTrackLive?: boolean;
+  preflightVideoTrackLive?: boolean;
+  preflightOverride?: boolean;
+  preflightAudioProcessingRequested?: boolean;
 };
+type LocalAudioLevelState = "unavailable" | "silent" | "low" | "ready";
 type NetworkCheck = {
   checking: boolean;
   bars: number;
@@ -255,6 +261,11 @@ export default function InterviewPage() {
   const [selectedMicrophoneDeviceId, setSelectedMicrophoneDeviceId] = useState("");
   const [savedDevicePreferences, setSavedDevicePreferences] = useState<DevicePreferences>({});
   const [micLevel, setMicLevel] = useState(0);
+  const [micSignalDetected, setMicSignalDetected] = useState(false);
+  const [micCheckComplete, setMicCheckComplete] = useState(false);
+  const [previewAudioTrackLive, setPreviewAudioTrackLive] = useState(false);
+  const [previewVideoTrackLive, setPreviewVideoTrackLive] = useState(false);
+  const [preflightAudioProcessingRequested, setPreflightAudioProcessingRequested] = useState(false);
   const [networkOnline, setNetworkOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [networkCheck, setNetworkCheck] = useState<NetworkCheck>({ checking: false, bars: 0, latencyMs: null });
   const [speakerTesting, setSpeakerTesting] = useState(false);
@@ -262,6 +273,8 @@ export default function InterviewPage() {
   const previewStreamRef = useRef<MediaStream | null>(null);
   const micAnimationRef = useRef<number | null>(null);
   const micAudioContextRef = useRef<AudioContext | null>(null);
+  const micCheckTimerRef = useRef<number | null>(null);
+  const micMaxLevelRef = useRef(0);
   const networkCheckAbortRef = useRef<AbortController | null>(null);
 
   /* ── Helpers ─────────────────────────────────────────────────── */
@@ -300,6 +313,10 @@ export default function InterviewPage() {
   }
 
   function stopDevicePreview() {
+    if (micCheckTimerRef.current !== null) {
+      window.clearTimeout(micCheckTimerRef.current);
+      micCheckTimerRef.current = null;
+    }
     if (micAnimationRef.current !== null) {
       window.cancelAnimationFrame(micAnimationRef.current);
       micAnimationRef.current = null;
@@ -316,6 +333,11 @@ export default function InterviewPage() {
       previewVideoRef.current.srcObject = null;
     }
     setMicLevel(0);
+    setMicSignalDetected(false);
+    setMicCheckComplete(false);
+    setPreviewAudioTrackLive(false);
+    setPreviewVideoTrackLive(false);
+    micMaxLevelRef.current = 0;
   }
 
   async function loadDeviceOptions() {
@@ -335,9 +357,19 @@ export default function InterviewPage() {
     setDeviceError("");
     stopDevicePreview();
     try {
+      const supported = navigator.mediaDevices.getSupportedConstraints?.() || {};
+      const audioConstraints: MediaTrackConstraints = {};
+      if (selectedMicrophoneDeviceId) audioConstraints.deviceId = { exact: selectedMicrophoneDeviceId };
+      if (supported.autoGainControl) audioConstraints.autoGainControl = true;
+      if (supported.echoCancellation) audioConstraints.echoCancellation = true;
+      if (supported.noiseSuppression) audioConstraints.noiseSuppression = true;
+      const audioProcessingRequested = Boolean(
+        supported.autoGainControl || supported.echoCancellation || supported.noiseSuppression,
+      );
+      setPreflightAudioProcessingRequested(audioProcessingRequested);
       const constraints: MediaStreamConstraints = {
         video: selectedCameraDeviceId ? { deviceId: { exact: selectedCameraDeviceId } } : true,
-        audio: selectedMicrophoneDeviceId ? { deviceId: { exact: selectedMicrophoneDeviceId } } : true,
+        audio: Object.keys(audioConstraints).length > 0 ? audioConstraints : true,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       previewStreamRef.current = stream;
@@ -347,18 +379,22 @@ export default function InterviewPage() {
       }
 
       await loadDeviceOptions();
-      const cameraId = stream.getVideoTracks()[0]?.getSettings?.().deviceId || "";
-      const microphoneId = stream.getAudioTracks()[0]?.getSettings?.().deviceId || "";
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      const cameraId = videoTrack?.getSettings?.().deviceId || "";
+      const microphoneId = audioTrack?.getSettings?.().deviceId || "";
       if (!selectedCameraDeviceId && cameraId) setSelectedCameraDeviceId(cameraId);
       if (!selectedMicrophoneDeviceId && microphoneId) setSelectedMicrophoneDeviceId(microphoneId);
+      setPreviewAudioTrackLive(Boolean(audioTrack && audioTrack.readyState === "live" && audioTrack.enabled));
+      setPreviewVideoTrackLive(Boolean(videoTrack && videoTrack.readyState === "live" && videoTrack.enabled));
 
-      const audioTrack = stream.getAudioTracks()[0];
       const AudioCtor =
         window.AudioContext ||
         (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (audioTrack && AudioCtor) {
         const audioContext = new AudioCtor();
         micAudioContextRef.current = audioContext;
+        if (audioContext.state === "suspended") await audioContext.resume().catch(() => {});
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
@@ -371,22 +407,44 @@ export default function InterviewPage() {
             const diff = (value - 128) / 128;
             sum += diff * diff;
           }
-          setMicLevel(Math.min(100, Math.round(Math.sqrt(sum / data.length) * 140)));
+          const nextLevel = Math.min(100, Math.round(Math.sqrt(sum / data.length) * 140));
+          micMaxLevelRef.current = Math.max(micMaxLevelRef.current, nextLevel);
+          if (nextLevel >= 3) setMicSignalDetected(true);
+          setMicLevel(nextLevel);
           micAnimationRef.current = window.requestAnimationFrame(tick);
         };
         tick();
+        micCheckTimerRef.current = window.setTimeout(() => {
+          micCheckTimerRef.current = null;
+          setMicCheckComplete(true);
+        }, 2500);
+      } else {
+        setMicCheckComplete(true);
       }
     } catch {
-      setDeviceError("Could not access your camera or microphone. You can allow permissions, try again, or skip and use browser defaults.");
+      setMicCheckComplete(true);
+      setDeviceError("Could not access your camera or microphone. Allow permissions and try again, or continue only if you have confirmed your devices another way.");
     } finally {
       setDeviceLoading(false);
     }
   }
 
-  function handleSkipDeviceCheck() {
-    setSavedDevicePreferences({});
-    setSelectedCameraDeviceId("");
-    setSelectedMicrophoneDeviceId("");
+  function currentPreflightAudioState(): LocalAudioLevelState {
+    if (!previewAudioTrackLive) return "unavailable";
+    if (micSignalDetected) return "ready";
+    return micMaxLevelRef.current > 0 ? "low" : "silent";
+  }
+
+  function handleOverrideDeviceCheck() {
+    setSavedDevicePreferences({
+      selectedCameraDeviceId: selectedCameraDeviceId || undefined,
+      selectedMicrophoneDeviceId: selectedMicrophoneDeviceId || undefined,
+      preflightAudioState: currentPreflightAudioState(),
+      preflightAudioTrackLive: previewAudioTrackLive,
+      preflightVideoTrackLive: previewVideoTrackLive,
+      preflightOverride: true,
+      preflightAudioProcessingRequested,
+    });
     setDeviceError("");
     stopDevicePreview();
     setDeviceModalOpen(false);
@@ -396,6 +454,11 @@ export default function InterviewPage() {
     setSavedDevicePreferences({
       selectedCameraDeviceId: selectedCameraDeviceId || undefined,
       selectedMicrophoneDeviceId: selectedMicrophoneDeviceId || undefined,
+      preflightAudioState: currentPreflightAudioState(),
+      preflightAudioTrackLive: previewAudioTrackLive,
+      preflightVideoTrackLive: previewVideoTrackLive,
+      preflightOverride: false,
+      preflightAudioProcessingRequested,
     });
     stopDevicePreview();
     setDeviceModalOpen(false);
@@ -832,6 +895,21 @@ export default function InterviewPage() {
             ...(savedDevicePreferences.selectedMicrophoneDeviceId
               ? { selectedMicrophoneDeviceId: savedDevicePreferences.selectedMicrophoneDeviceId }
               : {}),
+            ...(savedDevicePreferences.preflightAudioState
+              ? { preflightAudioState: savedDevicePreferences.preflightAudioState }
+              : {}),
+            ...(typeof savedDevicePreferences.preflightAudioTrackLive === "boolean"
+              ? { preflightAudioTrackLive: savedDevicePreferences.preflightAudioTrackLive }
+              : {}),
+            ...(typeof savedDevicePreferences.preflightVideoTrackLive === "boolean"
+              ? { preflightVideoTrackLive: savedDevicePreferences.preflightVideoTrackLive }
+              : {}),
+            ...(typeof savedDevicePreferences.preflightOverride === "boolean"
+              ? { preflightOverride: savedDevicePreferences.preflightOverride }
+              : {}),
+            ...(typeof savedDevicePreferences.preflightAudioProcessingRequested === "boolean"
+              ? { preflightAudioProcessingRequested: savedDevicePreferences.preflightAudioProcessingRequested }
+              : {}),
           }),
         );
       } catch {}
@@ -983,11 +1061,18 @@ export default function InterviewPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[10px] font-black uppercase tracking-widest text-[#0A1547]/40">Microphone level</span>
-                    <span className="text-[10px] font-semibold text-[#0A1547]/35">{micLevel}%</span>
+                    <span className={`text-[10px] font-black ${micSignalDetected ? "text-[#009E73]" : "text-[#0A1547]/45"}`}>
+                      {micSignalDetected ? "Mic ready" : micCheckComplete ? "Mic low" : "Speak now"}
+                    </span>
                   </div>
                   <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${micLevel}%`, backgroundColor: "#02D99D" }} />
                   </div>
+                  <p className="mt-2 text-[10px] text-[#0A1547]/50 font-semibold leading-relaxed">
+                    {micCheckComplete && !micSignalDetected
+                      ? "We can’t hear enough audio. Move closer or select another microphone, then try again."
+                      : "Say a few words in your normal speaking voice. The meter should move and show “Mic ready.”"}
+                  </p>
                 </div>
               </div>
 
@@ -1084,17 +1169,20 @@ export default function InterviewPage() {
             </div>
 
             <div className="px-6 py-5 border-t border-gray-100 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={handleSkipDeviceCheck}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#0A1547]/55 bg-[#0A1547]/5 hover:bg-[#0A1547]/10 transition-colors"
-              >
-                Skip
-              </button>
+              {(micCheckComplete || deviceError) && !micSignalDetected && (
+                <button
+                  type="button"
+                  onClick={handleOverrideDeviceCheck}
+                  className="px-5 py-2.5 rounded-full text-sm font-bold text-[#0A1547]/55 bg-[#0A1547]/5 hover:bg-[#0A1547]/10 transition-colors"
+                >
+                  Continue anyway
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleProceedDeviceCheck}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-white hover:opacity-90 transition-opacity"
+                disabled={deviceLoading || !previewAudioTrackLive || !previewVideoTrackLive || !micSignalDetected}
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ backgroundColor: "#A380F6" }}
               >
                 Proceed
