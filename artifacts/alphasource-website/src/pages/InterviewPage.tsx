@@ -191,6 +191,10 @@ const candidateApiBase = firstBase(
   env.VITE_CANDIDATE_API_BASE,
   backendBase ? joinUrl(backendBase, "/api/candidate") : "",
 );
+const candidateSubmitUrl = firstBase(
+  env.VITE_CANDIDATE_SUBMIT_URL,
+  joinUrl(candidateApiBase, "/submit"),
+);
 const smsUiEnabled = isCandidateSmsUiEnabled(env);
 
 function joinUrl(base: string, path: string): string {
@@ -779,7 +783,7 @@ export default function InterviewPage() {
       };
 
       const resp = await postCandidateSubmission({
-        url: joinUrl(candidateApiBase, "/submit"),
+        url: candidateSubmitUrl,
         buildBody,
         onRetry: () => {
           setErrors((current) => ({

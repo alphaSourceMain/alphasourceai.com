@@ -9,6 +9,11 @@ const transportSource = fs.readFileSync(path.join(projectRoot, "src/lib/candidat
 const assertions = [
   [pageSource.includes("env.VITE_CANDIDATE_API_BASE"), "candidate API base is environment-gated"],
   [pageSource.includes('backendBase ? joinUrl(backendBase, "/api/candidate") : ""'), "candidate API safely falls back to the configured backend"],
+  [pageSource.includes("env.VITE_CANDIDATE_SUBMIT_URL"), "candidate submit URL supports a QA-only transport override"],
+  [pageSource.includes('joinUrl(candidateApiBase, "/submit")'), "candidate submit safely falls back to the existing endpoint"],
+  [pageSource.includes("url: candidateSubmitUrl"), "candidate submit uses the scoped transport URL"],
+  [pageSource.includes('joinUrl(candidateApiBase, "/verify-otp/resend")'), "OTP resend keeps its existing endpoint"],
+  [pageSource.includes('joinUrl(candidateApiBase, "/verify-otp")'), "OTP verification keeps its existing endpoint"],
   [pageSource.includes("postCandidateSubmission({"), "candidate submit uses bounded transport helper"],
   [pageSource.includes("const submissionKey = getOrCreateCandidateSubmissionKey(roleToken)"), "one submission key is reused across attempts"],
   [transportSource.includes("CANDIDATE_SUBMISSION_MAX_ATTEMPTS = 2"), "transport permits exactly two total attempts"],
