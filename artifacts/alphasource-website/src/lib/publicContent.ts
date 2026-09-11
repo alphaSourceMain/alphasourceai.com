@@ -95,7 +95,7 @@ export const publicFaqSections: PublicFaqSection[] = [
       {
         question: "How do I get help during setup?",
         answer:
-          "Use the public support page or contact alphaSource at info@alphasourceai.com with the buyer email, company name, and a short description of the setup issue.",
+          "Use the public support page or contact alphaSource at support@alphasourceai.com with the buyer email, company name, and a short description of the setup issue.",
       },
       {
         question: "Can client users sign in with a passkey?",
@@ -293,7 +293,7 @@ export const publicSupportTopics: PublicSupportTopic[] = [
 ];
 
 export const publicSupportQuestions: PublicFaqItem[] = [
-  { question: "Can browser AI support contact the team for me?", answer: "Talk with Support in the client dashboard provides informational voice guidance. It cannot inspect accounts, make changes, send email, create a ticket, or arrange follow-up. Email info@alphasourceai.com when the team needs to review an account-specific issue. AI Customer Support is also available at (605) 599-8008; do not assume a browser conversation sent a team message." },
+  { question: "Can browser AI support contact the team for me?", answer: "Talk with Support in the client dashboard provides AI guidance. When email escalation is available, it can submit a brief issue summary and reply email to support@alphasourceai.com after you explicitly approve sending them. It sends only for requested escalation, not after every conversation. It cannot inspect accounts, change records, transfer a browser call, or promise when the team will respond. If submission is not confirmed, email the support team directly. AI Customer Support is also available at (605) 599-8008." },
   deviceCheckFaq,
   launchRecoveryFaq,
   microphoneRecoveryFaq,
@@ -302,7 +302,7 @@ export const publicSupportQuestions: PublicFaqItem[] = [
   {
     question: "How do I get help during alphaScreen setup?",
     answer:
-      "Contact alphaSource at info@alphasourceai.com with your company name, buyer email, and a brief description of the setup issue.",
+      "Contact alphaSource at support@alphasourceai.com with your company name, buyer email, and a brief description of the setup issue.",
   },
   {
     question: "What should I do if the account or password setup email is missing?",

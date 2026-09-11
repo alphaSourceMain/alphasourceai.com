@@ -54,10 +54,10 @@ export default function DashboardFaqPage() {
       <section aria-labelledby="support-contact-heading" className="rounded-2xl p-6 mb-5" style={surfaceCardStyle}>
         <h2 id="support-contact-heading" className="text-base font-black" style={primaryTextStyle}>Contact support</h2>
         <p className="mt-2 text-sm leading-relaxed" style={mutedTextStyle}>
-          Email the team for account-specific help. Talk with Support in the sidebar provides browser AI guidance; it cannot inspect accounts, change settings, send messages, or arrange follow-up.
+          Email the team for account-specific help. Talk with Support provides AI guidance and, when available, can submit a brief support message after you approve the summary and reply email. It cannot inspect accounts, change settings, or transfer the browser call.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <a href="mailto:info@alphasourceai.com" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Email the support team</a>
+          <a href="mailto:support@alphasourceai.com" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Email the support team</a>
           <a href={AI_SUPPORT_PHONE_URI} className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>AI Customer Support: {AI_SUPPORT_PHONE_DISPLAY}</a>
           <a href="#common-questions" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Find an answer</a>
         </div>

@@ -1,7 +1,7 @@
 import { capacityFaq, membershipTermFaq, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, scoringFaqs, interviewStatusFaq, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-09-11.1";
+export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-09-11.3";
 
 export const faqSections = [
   {
@@ -265,7 +265,7 @@ export const faqSections = [
     items: [
       {
         question: "How do I contact support?",
-        answer: "Email info@alphasourceai.com for team follow-up, or call AI Customer Support at (605) 599-8008. In the dashboard, Talk with Support opens browser AI guidance. The browser assistant cannot inspect your account, make changes, send an email, or arrange follow-up. For account-specific help, send the team an email rather than assuming the browser conversation created a request.",
+        answer: "Email support@alphasourceai.com for team follow-up, or call AI Customer Support at (605) 599-8008. In the dashboard, Talk with Support provides AI guidance. When email escalation is available, the assistant offers a phone contact route or a message to support. It asks you to confirm your reply email and a brief issue summary before sending. Only an explicit submission confirmation means the request was submitted. The browser assistant cannot transfer the browser call, inspect your account, change records, or promise a response time. Do not share candidate records, passwords, codes, private links, or payment details.",
       },
       {
         question: "What information should I include when reporting a problem?",
