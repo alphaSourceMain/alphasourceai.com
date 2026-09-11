@@ -1,6 +1,7 @@
+import { capacityFaq, membershipTermFaq, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, buyerVerificationFaq, scoringFaqs, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const PUBLIC_CONTENT_LAST_UPDATED = "September 1, 2026";
+export const PUBLIC_CONTENT_LAST_UPDATED = "September 11, 2026";
 
 export type PublicFaqItem = {
   question: string;
@@ -62,6 +63,8 @@ export const publicFaqSections: PublicFaqSection[] = [
     title: "Memberships & Billing",
     intro: "How public alphaScreen membership pricing works.",
     items: [
+      membershipTermFaq,
+      capacityFaq,
       {
         question: "How does pricing work?",
         answer:
@@ -80,7 +83,7 @@ export const publicFaqSections: PublicFaqSection[] = [
       {
         question: "What is first-role prepay?",
         answer:
-          "New self-serve buyers can optionally prepay the first role during signup at a one-time 10% discount. The prepaid first role is used when the first paid role is opened under the same billing account.",
+          firstRolePrepayAnswer,
       },
     ],
   },
@@ -88,6 +91,7 @@ export const publicFaqSections: PublicFaqSection[] = [
     title: "Setup & Support",
     intro: "Where buyers can get help after starting a membership.",
     items: [
+      buyerVerificationFaq,
       {
         question: "How do I get help during setup?",
         answer:
@@ -109,6 +113,8 @@ export const publicFaqSections: PublicFaqSection[] = [
     title: "Candidate Workflow",
     intro: "How candidate invitations, interviews, and reports work.",
     items: [
+      deviceCheckFaq,
+      launchRecoveryFaq,
       {
         question: "How are candidate links sent and managed?",
         answer:
@@ -174,13 +180,14 @@ export const publicFaqSections: PublicFaqSection[] = [
     ],
   },
   {
-    title: "Workflow Fit",
-    intro: "How alphaScreen fits specialized and multi-location teams.",
+    title: "Reports, Scoring & Workflow Fit",
+    intro: "How to interpret role-specific screening evidence.",
     items: [
+      ...scoringFaqs,
       {
         question: "How does alphaScreen evaluate candidates?",
         answer:
-          "alphaScreen combines role criteria, resume information, structured interview responses, and available interview signals into organized reports and scores. The output is designed to help hiring teams review candidates more consistently, not to make final hiring decisions automatically.",
+          "alphaScreen evaluates resume alignment and role-specific interview answers, then organizes the available evidence into scores and reports for human review. Interview scores average scorable questions against the role's rubric. Warm-up is excluded; insufficient evidence is not treated as a zero. Your hiring team decides next steps.",
       },
     ],
   },
@@ -189,6 +196,7 @@ export const publicFaqSections: PublicFaqSection[] = [
 export const publicFaqItems: PublicFaqItem[] = publicFaqSections.flatMap((section) => section.items);
 
 export const publicProductUpdates: PublicProductUpdate[] = [
+  ...septemberUpdates,
   {
     date: "September 2026",
     title: "Essential membership naming",
@@ -213,9 +221,10 @@ export const publicProductUpdates: PublicProductUpdate[] = [
   {
     date: "August 2026",
     title: "Optional text-message verification",
-    summary: "Candidate interview-access verification now supports another optional delivery method when it is available.",
+    summary: "Optional text verification is available in eligible candidate interview-access and buyer signup flows.",
     bullets: [
-      "Eligible candidates may choose Email or Text Message when both are offered",
+      "Eligible candidates and buyers may choose Email or Text Message when both are offered",
+      "Buyer signup includes a delayed-text email fallback and a visible resend countdown",
       "Text-message consent is optional and shown before requesting a code",
       "Email remains available if text delivery cannot be confirmed",
     ],
@@ -233,6 +242,9 @@ export const publicProductUpdates: PublicProductUpdate[] = [
 ];
 
 export const publicSupportTopics: PublicSupportTopic[] = [
+  { title: "Candidate device checks", body: deviceCheckFaq.answer },
+  { title: "Interview access and audio recovery", body: "Follow the on-screen verification recovery if launch access expires. During an interview, use Try microphone when offered before refreshing the page. Contact support if recovery fails; a refresh does not guarantee a resumed interview or retake." },
+  { title: "Scores, status, and usage", body: "A dash means unavailable, not zero. Review interview status on Candidates. Attempts explicitly identified as having no substantive response do not use role capacity; interrupted interviews with substantive responses may still count." },
   {
     title: "Setup help",
     body:
@@ -281,6 +293,12 @@ export const publicSupportTopics: PublicSupportTopic[] = [
 ];
 
 export const publicSupportQuestions: PublicFaqItem[] = [
+  { question: "Can browser AI support contact the team for me?", answer: "Talk with Support in the client dashboard provides informational voice guidance. It cannot inspect accounts, make changes, send email, create a ticket, or arrange follow-up. Email info@alphasourceai.com when the team needs to review an account-specific issue. AI Customer Support is also available at (605) 599-8008; do not assume a browser conversation sent a team message." },
+  deviceCheckFaq,
+  launchRecoveryFaq,
+  microphoneRecoveryFaq,
+  buyerVerificationFaq,
+  capacityFaq,
   {
     question: "How do I get help during alphaScreen setup?",
     answer:
