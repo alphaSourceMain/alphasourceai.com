@@ -29,7 +29,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppearance } from "@/context/AppearanceContext";
 import { useClient, type Client } from "@/context/ClientContext";
 import DashboardBrand from "@/components/DashboardBrand";
-import TawkWidget from "@/components/TawkWidget";
 import SupportVoicePopover from "@/components/SupportVoicePopover";
 import {
   DropdownMenu,
@@ -40,8 +39,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const env =
-  typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "alphasource:dashboard_sidebar_collapsed";
 
@@ -830,12 +827,6 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
           onClose={endTour}
         />
       )}
-      <TawkWidget
-        enabled={(env as Record<string, unknown>).VITE_TAWK_DASHBOARD_ENABLED === "true"}
-        propertyId={String((env as Record<string, unknown>).VITE_TAWK_DASHBOARD_PROPERTY_ID || "")}
-        widgetId={String((env as Record<string, unknown>).VITE_TAWK_DASHBOARD_WIDGET_ID || "")}
-        variant="dashboard"
-      />
     </div>
   );
 }
