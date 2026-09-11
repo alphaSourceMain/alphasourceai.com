@@ -596,7 +596,7 @@ function supportRoute() {
     sections: [
       section("Contact support", [
         `Call AI Customer Support at ${AI_SUPPORT_PHONE_DISPLAY}.`,
-        "Email info@alphasourceai.com with your company name, buyer email, role name if relevant, and a short description of the issue. Do not send passwords, setup tokens, or private candidate details unless support specifically requests them through an approved channel.",
+        "Email support@alphasourceai.com with your company name, buyer email, role name if relevant, and a short description of the issue. Do not send passwords, setup tokens, or private candidate details unless support specifically requests them through an approved channel.",
       ]),
       ...publicContent.publicSupportTopics.map((topic) => section(topic.title, [topic.body])),
       ...publicContent.publicProductUpdates.map((update) => section(`${update.date} — ${update.title}`, [update.summary, ...update.bullets])),
