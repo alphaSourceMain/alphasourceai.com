@@ -293,7 +293,7 @@ export const publicSupportTopics: PublicSupportTopic[] = [
 ];
 
 export const publicSupportQuestions: PublicFaqItem[] = [
-  { question: "Can browser AI support contact the team for me?", answer: "Talk with Support in the client dashboard provides AI guidance. When email escalation is available, it can submit a brief issue summary and reply email to support@alphasourceai.com after you explicitly approve sending them. It sends only for requested escalation, not after every conversation. It cannot inspect accounts, change records, transfer a browser call, or promise when the team will respond. If submission is not confirmed, email the support team directly. AI Customer Support is also available at (605) 599-8008." },
+  { question: "Can browser AI support contact the team for me?", answer: "Talk with Support in the client dashboard provides AI guidance. When email escalation is available, it can submit your name, reply email, and a brief issue summary to support@alphasourceai.com after you explicitly approve sending them. It sends only for requested escalation, not after every conversation. It cannot inspect accounts, change records, transfer a browser call, or promise when the team will respond. If submission is not confirmed, email the support team directly. AI Customer Support is also available at (605) 599-8008." },
   deviceCheckFaq,
   launchRecoveryFaq,
   microphoneRecoveryFaq,

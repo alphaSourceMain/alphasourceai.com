@@ -523,7 +523,7 @@ export default function SupportVoicePopover({ placement = "sidebar", collapsed =
         </div>
         <p className="mt-4 rounded-lg border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--as-border)", color: "var(--as-text)", opacity: 0.72, backgroundColor: "var(--as-surface-muted)" }}>
           Your voice is processed by our AI support provider. alphaScreen does not store recordings or transcripts in this phase. Do not share candidate information, payment details, passwords, one-time codes, or other sensitive information.
-          {emailHandoffEnabled && " If you choose email escalation, the assistant will ask you to confirm a brief issue summary and reply email before sending them to our support team."}
+          {emailHandoffEnabled && " If you choose email escalation, the assistant will ask you to confirm your name, reply email, and a brief issue summary before sending them to our support team."}
         </p>
         {!active && state !== "conflict" && (
           <button type="button" disabled={!available} onClick={() => { void startConversation(); }} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#7252C7] px-4 text-sm font-black text-white transition-colors hover:bg-[#6242B5] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7252C7]/50 focus-visible:ring-offset-2">
