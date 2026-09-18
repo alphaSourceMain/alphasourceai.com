@@ -6,6 +6,7 @@ import type {
   SalesAgreementPreview,
   SalesApi,
   SalesDeal,
+  SalesDealDetail,
   SalesDealCreateResult,
   SalesDealDraft,
   SalesPackage,
@@ -85,6 +86,11 @@ async function requestJson<T>(path: string, init: RequestInit = {}, idempotencyK
     const detail = String(record.detail || record.message || record.error || "The request could not be completed.");
     const code = String(record.code || record.error || "sales_api_error");
     const retry = Number(record.retry_after_seconds);
+    if ((response.status === 401 || response.status === 403) && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("alphasource:sales-auth-invalid", {
+        detail: { status: response.status, code },
+      }));
+    }
     throw new SalesApiError(detail, response.status, code, Number.isFinite(retry) ? retry : null);
   }
   return payload as T;
@@ -101,6 +107,7 @@ const realSalesApi: SalesApi = {
   getMe: () => requestJson<SalesRep>("/sales/me"),
   getPackages: () => requestJson<{ items: SalesPackage[] }>("/sales/packages").then((result) => result.items || []),
   listDeals: () => requestJson<{ items: SalesDeal[] }>("/sales/deals").then((result) => result.items || []),
+  getDeal: (dealId) => requestJson<SalesDealDetail>(`/sales/deals/${encodeURIComponent(dealId)}`),
   validatePromotionCode: (code, draft) => requestJson<PromotionCodeSummary>("/sales/promotion-codes/validate", {
     method: "POST",
     body: JSON.stringify({
@@ -285,6 +292,26 @@ const mockSalesApi: SalesApi = {
     await delay();
     return structuredClone(mockDeals);
   },
+  async getDeal(dealId) {
+    await delay();
+    const deal = mockDeals.find((item) => item.id === dealId);
+    if (!deal) throw new SalesApiError("Deal not found.", 404, "deal_not_found");
+    return {
+      ...structuredClone(deal),
+      buyer_phone: "720-555-0148",
+      buyer_title: "Owner",
+      candidate_assistance_name: deal.buyer_name,
+      candidate_assistance_email: deal.buyer_email,
+      ghl_contact_id: `contact_${deal.id}`,
+      sales_note: "Buyer reviewed the membership options during the discovery call.",
+      timeline: [{
+        id: `event_${deal.id}`,
+        event_type: deal.status === "activated" ? "account_activated" : "agreement_sent",
+        safe_metadata: {},
+        created_at: deal.updated_at,
+      }],
+    };
+  },
   async validatePromotionCode(code) {
     await delay();
     if (code.trim().toUpperCase() !== "DEMO10") {
@@ -355,7 +382,7 @@ const mockSalesApi: SalesApi = {
   },
   async createEnterpriseHandoff(input) {
     await delay(480);
-    return { handoff_id: `handoff-demo-${Date.now()}`, message: `${input.company_name} was sent to the executive team.` };
+    return { handoff_id: `handoff-demo-${Date.now()}`, message: `${input.company_name} was recorded for executive follow-up.` };
   },
 };
 

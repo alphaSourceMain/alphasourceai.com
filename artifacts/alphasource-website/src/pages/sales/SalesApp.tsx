@@ -10,6 +10,7 @@ import SalesSignInPage from "@/pages/sales/SalesSignInPage";
 import SalesDealsPage from "@/pages/sales/SalesDealsPage";
 import SalesNewDealPage from "@/pages/sales/SalesNewDealPage";
 import SalesEnterpriseHandoffPage from "@/pages/sales/SalesEnterpriseHandoffPage";
+import SalesDealDetailPage from "@/pages/sales/SalesDealDetailPage";
 import NotFound from "@/pages/not-found";
 
 function LoadingScreen() {
@@ -42,6 +43,17 @@ export default function SalesApp() {
   const [rep, setRep] = useState<SalesRep | null>(null);
   const [checking, setChecking] = useState(true);
   const [accessError, setAccessError] = useState("");
+
+  useEffect(() => {
+    if (salesUsesMockApi || typeof window === "undefined") return;
+    const handleInvalidSalesAuth = () => {
+      setRep(null);
+      setAccessError("");
+      void logout();
+    };
+    window.addEventListener("alphasource:sales-auth-invalid", handleInvalidSalesAuth);
+    return () => window.removeEventListener("alphasource:sales-auth-invalid", handleInvalidSalesAuth);
+  }, [logout]);
 
   useEffect(() => {
     if ((!clientAuthReady || salesLoginLoading) && !salesUsesMockApi) return;
@@ -84,12 +96,13 @@ export default function SalesApp() {
     <AppearanceProvider>
       <SalesLayout rep={rep}>
         <Switch>
-          <Route path="/sales" component={SalesDealsPage} />
-          <Route path="/sales/" component={SalesDealsPage} />
           <Route path="/sales/new" component={SalesNewDealPage} />
           <Route path="/sales/new/" component={SalesNewDealPage} />
           <Route path="/sales/enterprise" component={SalesEnterpriseHandoffPage} />
           <Route path="/sales/enterprise/" component={SalesEnterpriseHandoffPage} />
+          <Route path="/sales/deals/:id" component={SalesDealDetailPage} />
+          <Route path="/sales" component={SalesDealsPage} />
+          <Route path="/sales/" component={SalesDealsPage} />
           <Route component={NotFound} />
         </Switch>
       </SalesLayout>

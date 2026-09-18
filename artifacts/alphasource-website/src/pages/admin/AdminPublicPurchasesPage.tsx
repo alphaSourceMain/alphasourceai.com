@@ -33,6 +33,7 @@ type StatusFilter =
   | "unknown";
 type MembershipFilter = "all" | "basic" | "pro" | "enterprise";
 type CadenceFilter = "all" | "monthly" | "annual";
+type ChannelFilter = "all" | "retail" | "sales_assisted";
 
 interface PublicPurchaseItem {
   id: string;
@@ -65,7 +66,20 @@ interface PublicPurchaseItem {
     used_by_role_id?: string | null;
     used_at?: string | null;
   } | null;
-  source?: { path?: string | null };
+  source?: {
+    path?: string | null;
+    channel?: string | null;
+    representative_user_id?: string | null;
+    representative_email?: string | null;
+    ghl_contact_id?: string | null;
+    ghl_opportunity_id?: string | null;
+  };
+  sales_pricing?: {
+    promotion_code?: string | null;
+    promotion_label?: string | null;
+    promotion_discount_cents?: number | null;
+    initial_payment_cents?: number | null;
+  };
   agreement?: {
     id?: string | null;
     status?: string | null;
@@ -118,6 +132,8 @@ interface PublicPurchasesPayload {
     status?: string;
     membership?: string;
     billing_cadence?: string;
+    channel?: string;
+    representative?: string;
   };
   summary?: {
     total?: number;
@@ -411,7 +427,7 @@ function PurchaseRow({
             {membershipName} membership · {cadenceLabel} · {safeText(item.buyer?.email)}
           </p>
           <p className="mt-1 text-xs font-semibold" style={subtleTextStyle}>
-            Started {formatDateTime(item.created_at)} from {safeText(item.source?.path, "unknown source")}
+            Started {formatDateTime(item.created_at)} from {item.source?.channel === "sales_assisted" ? `sales-assisted · ${safeText(item.source?.representative_email, "unassigned representative")}` : safeText(item.source?.path, "retail signup")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -454,6 +470,12 @@ function PurchaseRow({
             <DetailRow label="Client" value={item.account_setup?.client_name || item.account_setup?.client_id} />
             <DetailRow label="Member setup" value={item.account_setup?.member_user_linked ? `Linked · ${safeText(item.account_setup?.member_role)}` : item.account_setup?.member_found ? "Member row found, user not linked" : "Not found"} />
             <DetailRow label="Welcome email" value={item.email_delivery?.welcome_email ? `${safeText(item.email_delivery.welcome_email.status)} · ${formatDateTime(item.email_delivery.welcome_email.last_event_at)}` : "Not recorded"} />
+            <DetailRow label="Sales channel" value={item.source?.channel === "sales_assisted" ? "Sales-assisted" : "Retail"} />
+            <DetailRow label="Sales representative" value={item.source?.representative_email} />
+            <DetailRow label="GHL contact" value={item.source?.ghl_contact_id} />
+            <DetailRow label="GHL opportunity" value={item.source?.ghl_opportunity_id} />
+            <DetailRow label="Promotion" value={item.sales_pricing?.promotion_label || item.sales_pricing?.promotion_code} />
+            <DetailRow label="Initial payment" value={item.sales_pricing?.initial_payment_cents == null ? "Not recorded" : formatMoneyFromCents(item.sales_pricing.initial_payment_cents)} />
           </div>
           <div className="rounded-2xl border p-4" style={fieldStyle}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -552,6 +574,8 @@ export default function AdminPublicPurchasesPage() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [membership, setMembership] = useState<MembershipFilter>("all");
   const [cadence, setCadence] = useState<CadenceFilter>("all");
+  const [channel, setChannel] = useState<ChannelFilter>("all");
+  const [representative, setRepresentative] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -586,6 +610,8 @@ export default function AdminPublicPurchasesPage() {
       if (status !== "all") params.set("status", status);
       if (membership !== "all") params.set("membership", membership);
       if (cadence !== "all") params.set("cadence", cadence);
+      if (channel !== "all") params.set("channel", channel);
+      if (representative.trim()) params.set("representative", representative.trim());
       if (search.trim()) params.set("search", search.trim());
       const response = await fetch(`${backendBase}/admin/public-purchases?${params.toString()}`, {
         method: "GET",
@@ -601,7 +627,7 @@ export default function AdminPublicPurchasesPage() {
     } finally {
       setLoading(false);
     }
-  }, [cadence, days, getToken, membership, page, search, status]);
+  }, [cadence, channel, days, getToken, membership, page, representative, search, status]);
 
   useEffect(() => {
     void loadPublicPurchases();
@@ -716,9 +742,9 @@ export default function AdminPublicPurchasesPage() {
         <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[10px] font-black uppercase tracking-[0.24em]" style={subtleTextStyle}>Admin only</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-3xl" style={primaryTextStyle}>Public Purchases</h1>
+            <h1 className="mt-2 text-2xl font-black sm:text-3xl" style={primaryTextStyle}>Membership Purchases</h1>
             <p className="mt-2 text-sm font-semibold leading-relaxed" style={mutedTextStyle}>
-              Track self-serve alphaScreen membership signups, agreement status, payment progress, and account setup.
+              Track retail and sales-assisted alphaScreen memberships through agreement, payment, and account setup.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -807,7 +833,7 @@ export default function AdminPublicPurchasesPage() {
             <Filter className="h-4 w-4" style={subtleTextStyle} aria-hidden="true" />
             <h2 className="text-sm font-black" style={primaryTextStyle}>Filters</h2>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1.5">
               <span className="text-[10px] font-black uppercase tracking-widest" style={subtleTextStyle}>Date range</span>
               <select
@@ -872,6 +898,18 @@ export default function AdminPublicPurchasesPage() {
                   className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
                 />
               </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest" style={subtleTextStyle}>Channel</span>
+              <select value={channel} onChange={(event) => { resetPage(); setChannel(event.target.value as ChannelFilter); }} className="w-full rounded-xl border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle}>
+                <option value="all">Retail and sales</option>
+                <option value="retail">Retail</option>
+                <option value="sales_assisted">Sales-assisted</option>
+              </select>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest" style={subtleTextStyle}>Sales representative</span>
+              <input value={representative} onChange={(event) => { resetPage(); setRepresentative(event.target.value); }} placeholder="Representative email" className="w-full rounded-xl border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle} />
             </label>
           </div>
         </section>

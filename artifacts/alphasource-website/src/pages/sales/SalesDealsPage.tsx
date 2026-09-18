@@ -140,10 +140,8 @@ export default function SalesDealsPage() {
         setNotice(result.message);
       } else if (action === "start_replacement") {
         setLocation("/sales/new");
-      } else if (action === "escalate") {
-        setNotice("Copy the deal details and notify the administrator in Slack. Automated escalation will be added later.");
       } else {
-        setNotice(`${deal.company_legal_name}: ${deal.status_label}.`);
+        setLocation(`/sales/deals/${encodeURIComponent(deal.id)}`);
       }
     } catch (actionError) {
       setError(actionError instanceof SalesApiError ? actionError.message : "That action could not be completed.");

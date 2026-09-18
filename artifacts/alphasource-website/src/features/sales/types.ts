@@ -111,6 +111,23 @@ export interface SalesDeal {
   ghl_opportunity_id: string | null;
 }
 
+export interface SalesDealTimelineEvent {
+  id: string;
+  event_type: string;
+  safe_metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SalesDealDetail extends SalesDeal {
+  buyer_phone: string;
+  buyer_title: string;
+  candidate_assistance_name: string;
+  candidate_assistance_email: string;
+  ghl_contact_id: string | null;
+  sales_note: string;
+  timeline: SalesDealTimelineEvent[];
+}
+
 export interface SalesDealCreateResult {
   deal: SalesDeal;
   message: string;
@@ -139,6 +156,7 @@ export interface SalesApi {
   getMe(): Promise<SalesRep>;
   getPackages(): Promise<SalesPackage[]>;
   listDeals(): Promise<SalesDeal[]>;
+  getDeal(dealId: string): Promise<SalesDealDetail>;
   validatePromotionCode(code: string, draft: SalesDealDraft): Promise<PromotionCodeSummary>;
   previewDeal(draft: SalesDealDraft): Promise<SalesAgreementPreview>;
   createDeal(draft: SalesDealDraft, previewId: string, idempotencyKey: string): Promise<SalesDealCreateResult>;
