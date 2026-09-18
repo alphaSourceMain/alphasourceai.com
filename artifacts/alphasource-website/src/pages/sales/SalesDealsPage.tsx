@@ -51,7 +51,7 @@ const actionLabel: Record<SalesDealAction, string> = {
 };
 
 function formatMoney(cents: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 === 0 ? 0 : 2 }).format(cents / 100);
 }
 
 function formatRelativeDate(value: string): string {
@@ -101,6 +101,7 @@ export default function SalesDealsPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("sent") === "1") setNotice("Agreement sent. The buyer can now review and sign from their email.");
+    if (params.get("delivery") === "failed") setError("The deal was saved, but the agreement email was not delivered. Use Resend agreement on the saved deal.");
   }, [location]);
 
   const counts = useMemo(() => ({

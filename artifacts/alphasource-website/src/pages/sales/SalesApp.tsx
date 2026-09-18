@@ -101,6 +101,7 @@ export default function SalesApp() {
           <Route path="/sales/enterprise" component={SalesEnterpriseHandoffPage} />
           <Route path="/sales/enterprise/" component={SalesEnterpriseHandoffPage} />
           <Route path="/sales/deals/:id" component={SalesDealDetailPage} />
+          <Route path="/sales/deals/:id/" component={SalesDealDetailPage} />
           <Route path="/sales" component={SalesDealsPage} />
           <Route path="/sales/" component={SalesDealsPage} />
           <Route component={NotFound} />

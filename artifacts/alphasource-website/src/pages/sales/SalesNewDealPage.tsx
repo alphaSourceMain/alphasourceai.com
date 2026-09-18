@@ -58,24 +58,39 @@ function normalizedPhone(value: string): string {
   return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
+function normalizedText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function safePreviewUrl(value: string): string | null {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.protocol === "https:") return url.href;
+    if (import.meta.env.DEV && ["http:", "blob:", "data:"].includes(url.protocol)) return url.href;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function salesDraftFingerprint(draft: SalesDealDraft): string {
   return JSON.stringify({
-    company_legal_name: draft.company_legal_name.trim(),
-    company_dba: draft.company_dba.trim(),
-    buyer_first_name: draft.buyer_first_name.trim(),
-    buyer_last_name: draft.buyer_last_name.trim(),
-    buyer_email: draft.buyer_email.trim().toLowerCase(),
-    buyer_phone: normalizedPhone(draft.buyer_phone),
-    buyer_title: draft.buyer_title.trim(),
-    candidate_assistance_name: draft.candidate_assistance_name.trim(),
-    candidate_assistance_email: draft.candidate_assistance_email.trim().toLowerCase(),
-    ghl_contact_id: draft.ghl_contact_id.trim(),
-    ghl_opportunity_id: draft.ghl_opportunity_id.trim(),
-    sales_note: draft.sales_note.trim(),
+    company_legal_name: normalizedText(draft.company_legal_name),
+    company_dba: normalizedText(draft.company_dba),
+    buyer_first_name: normalizedText(draft.buyer_first_name),
+    buyer_last_name: normalizedText(draft.buyer_last_name),
+    buyer_email: normalizedText(draft.buyer_email).toLowerCase(),
+    buyer_phone: normalizedPhone(normalizedText(draft.buyer_phone)),
+    buyer_title: normalizedText(draft.buyer_title),
+    candidate_assistance_name: normalizedText(draft.candidate_assistance_name),
+    candidate_assistance_email: normalizedText(draft.candidate_assistance_email).toLowerCase(),
+    ghl_contact_id: normalizedText(draft.ghl_contact_id),
+    ghl_opportunity_id: normalizedText(draft.ghl_opportunity_id),
+    sales_note: normalizedText(draft.sales_note),
     plan_key: draft.plan_key,
     billing_cadence: draft.billing_cadence,
     first_role_prepay_selected: draft.first_role_prepay_selected,
-    promotion_code: draft.promotion_code.trim().toUpperCase(),
+    promotion_code: normalizedText(draft.promotion_code).toUpperCase(),
   });
 }
 
@@ -139,13 +154,14 @@ export default function SalesNewDealPage() {
   useEffect(() => {
     let active = true;
     void salesApi.getPackages()
-      .then((items) => { if (active) setPackages(items); })
+      .then((items) => { if (active) setPackages(items.filter((item) => ["basic", "pro"].includes(item.plan_key))); })
       .catch((loadError) => { if (active) setError(loadError instanceof Error ? loadError.message : "Memberships could not be loaded."); })
       .finally(() => { if (active) setLoadingPackages(false); });
     return () => { active = false; };
   }, []);
 
   const selectedPackage = packages.find((item) => item.plan_key === draft.plan_key) || null;
+  const previewUrl = preview ? safePreviewUrl(preview.preview_url) : null;
 
   const setValue = <K extends keyof SalesDealDraft>(key: K, value: SalesDealDraft[K]) => {
     setDraft((current) => {
@@ -298,6 +314,11 @@ export default function SalesNewDealPage() {
       sendAttemptRef.current = null;
       setLocation("/sales?sent=1");
     } catch (sendError) {
+      if (sendError instanceof SalesApiError && sendError.dealId) {
+        sendAttemptRef.current = null;
+        setLocation(`/sales?delivery=failed&deal=${encodeURIComponent(sendError.dealId)}`);
+        return;
+      }
       setError(sendError instanceof SalesApiError ? sendError.message : "The agreement could not be sent.");
     } finally {
       sendBusyRef.current = false;
@@ -404,7 +425,7 @@ export default function SalesNewDealPage() {
               <div className="mt-6 rounded-xl border p-4" style={{ borderColor: "var(--as-border)" }}>
                 <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-[#A380F6]" /><h3 className="text-sm font-black" style={{ color: "var(--as-text)" }}>Promotion code</h3><span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--as-text-subtle)" }}>Optional</span></div>
                 <p className="mt-1 text-xs font-semibold leading-relaxed" style={{ color: "var(--as-text-muted)" }}>Use only a code created by an administrator. Need a new code? Request it through Slack.</p>
-                <div className="mt-3 flex gap-2"><input value={draft.promotion_code} onChange={(event) => setValue("promotion_code", event.target.value.toUpperCase())} className="h-10 min-w-0 flex-1 rounded-[9px] border bg-transparent px-3 text-sm font-black uppercase tracking-[0.08em] outline-none focus:border-[#A380F6] focus:ring-4 focus:ring-[#A380F6]/10" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} placeholder={salesUsesMockApi ? "Try DEMO10" : "Enter code"} /><button type="button" onClick={() => void validatePromotion()} disabled={promotionBusy || !draft.promotion_code.trim()} className="rounded-[9px] bg-[#0A1547] px-4 text-xs font-black text-white disabled:opacity-45">{promotionBusy ? "Checking…" : "Validate"}</button></div>
+                <div className="mt-3 flex gap-2"><input aria-label="Promotion code" value={draft.promotion_code} onChange={(event) => setValue("promotion_code", event.target.value.toUpperCase())} className="h-10 min-w-0 flex-1 rounded-[9px] border bg-transparent px-3 text-sm font-black uppercase tracking-[0.08em] outline-none focus:border-[#A380F6] focus:ring-4 focus:ring-[#A380F6]/10" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} placeholder={salesUsesMockApi ? "Try DEMO10" : "Enter code"} /><button type="button" onClick={() => void validatePromotion()} disabled={promotionBusy || !draft.promotion_code.trim()} className="rounded-[9px] bg-[#0A1547] px-4 text-xs font-black text-white disabled:opacity-45">{promotionBusy ? "Checking…" : "Validate"}</button></div>
                 {promotion ? <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800"><BadgeCheck className="h-4 w-4" /> {promotion.label}</div> : null}
               </div>
             </div>
@@ -422,7 +443,7 @@ export default function SalesNewDealPage() {
 
               <div className="mt-5 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--as-border)", backgroundColor: "var(--as-surface-muted)" }}>
                 <div className="flex items-center justify-between"><div><h3 className="text-sm font-black" style={{ color: "var(--as-text)" }}>Agreement preview</h3><p className="mt-1 text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>Preview must match the normalized terms used when sending.</p></div>{preview ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <FileSearch className="h-5 w-5 text-[#A380F6]" />}</div>
-                {preview ? <div className="mt-4 flex flex-col gap-3 rounded-[10px] border border-emerald-200 bg-emerald-50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black text-emerald-900">Preview ready</p><p className="mt-1 text-[11px] font-semibold text-emerald-800/70">Expires {new Date(preview.expires_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p></div><a href={preview.preview_url} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-emerald-300 bg-white px-3 py-2 text-xs font-black text-emerald-800"><FileSearch className="h-3.5 w-3.5" /> Open preview</a></div> : null}
+                {preview ? <div className="mt-4 flex flex-col gap-3 rounded-[10px] border border-emerald-200 bg-emerald-50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black text-emerald-900">Preview ready</p><p className="mt-1 text-[11px] font-semibold text-emerald-800/70">Expires {new Date(preview.expires_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p></div>{previewUrl ? <a href={previewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-emerald-300 bg-white px-3 py-2 text-xs font-black text-emerald-800"><FileSearch className="h-3.5 w-3.5" /> Open preview</a> : <span className="text-xs font-bold text-red-700">Preview link unavailable</span>}</div> : null}
                 <button type="button" onClick={() => void requestPreview()} disabled={previewBusy} className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-[9px] border px-4 text-xs font-black transition hover:border-[#A380F6] hover:text-[#A380F6] disabled:opacity-50" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }}>{previewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}{preview ? "Refresh preview" : "Generate preview"}</button>
               </div>
             </div>

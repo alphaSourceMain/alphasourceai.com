@@ -42,13 +42,15 @@ export class SalesApiError extends Error {
   status: number;
   code: string;
   retryAfterSeconds: number | null;
+  dealId: string | null;
 
-  constructor(message: string, status = 500, code = "sales_api_error", retryAfterSeconds: number | null = null) {
+  constructor(message: string, status = 500, code = "sales_api_error", retryAfterSeconds: number | null = null, dealId: string | null = null) {
     super(message);
     this.name = "SalesApiError";
     this.status = status;
     this.code = code;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.dealId = dealId;
   }
 }
 
@@ -86,12 +88,14 @@ async function requestJson<T>(path: string, init: RequestInit = {}, idempotencyK
     const detail = String(record.detail || record.message || record.error || "The request could not be completed.");
     const code = String(record.code || record.error || "sales_api_error");
     const retry = Number(record.retry_after_seconds);
+    const fields = record.fields && typeof record.fields === "object" ? record.fields as Record<string, unknown> : {};
+    const dealId = typeof fields.deal_id === "string" && fields.deal_id.trim() ? fields.deal_id.trim() : null;
     if ((response.status === 401 || response.status === 403) && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("alphasource:sales-auth-invalid", {
         detail: { status: response.status, code },
       }));
     }
-    throw new SalesApiError(detail, response.status, code, Number.isFinite(retry) ? retry : null);
+    throw new SalesApiError(detail, response.status, code, Number.isFinite(retry) ? retry : null, dealId);
   }
   return payload as T;
 }

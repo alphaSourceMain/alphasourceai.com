@@ -26,6 +26,7 @@ export default function SalesDealDetailPage() {
   const [deal, setDeal] = useState<SalesDealDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const timeline = Array.isArray(deal?.timeline) ? deal.timeline : [];
 
   const load = async () => {
     if (!dealId) return;
@@ -74,7 +75,7 @@ export default function SalesDealDetailPage() {
 
             <section className="rounded-2xl border p-5 sm:p-6" style={{ borderColor: "var(--as-border)", backgroundColor: "var(--as-surface)", boxShadow: "var(--as-shadow)" }}>
               <div className="flex items-center gap-3"><CalendarClock className="h-5 w-5 text-[#A380F6]" /><h2 className="text-lg font-black" style={{ color: "var(--as-text)" }}>Transaction timeline</h2></div>
-              {deal.timeline.length ? <ol className="mt-5 space-y-4">{deal.timeline.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-[#A380F6]" /><div><p className="text-sm font-black" style={{ color: "var(--as-text)" }}>{labelEvent(event.event_type)}</p><p className="mt-1 text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>{displayDate(event.created_at)}</p></div></li>)}</ol> : <p className="mt-4 text-sm font-semibold" style={{ color: "var(--as-text-muted)" }}>No timeline events have been recorded yet.</p>}
+              {timeline.length ? <ol className="mt-5 space-y-4">{timeline.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-[#A380F6]" /><div><p className="text-sm font-black" style={{ color: "var(--as-text)" }}>{labelEvent(event.event_type)}</p><p className="mt-1 text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>{displayDate(event.created_at)}</p></div></li>)}</ol> : <p className="mt-4 text-sm font-semibold" style={{ color: "var(--as-text-muted)" }}>No timeline events have been recorded yet.</p>}
             </section>
           </div>
 
