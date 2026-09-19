@@ -47,6 +47,7 @@ interface PayrollSale {
   gross_membership_cents: number;
   discount_cents: number;
   net_membership_cents: number;
+  commission_eligible: boolean;
   commission_cents: number;
 }
 
@@ -511,7 +512,7 @@ export default function AdminSalesPayrollPage() {
             <div className="divide-y" style={{ borderColor: "var(--as-border)" }}>
               {(payload?.sales || []).map((sale) => (
                 <article key={sale.id} className="p-5">
-                  <div className="flex items-start justify-between gap-4"><div><p className="font-black" style={primaryTextStyle}>{sale.label}</p><p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>{sale.representative.display_name} · {titleCase(sale.plan_key)} {titleCase(sale.billing_cadence)} · {formatDate(sale.activated_at)}</p></div><p className="text-right font-black text-emerald-700 dark:text-emerald-300">{formatMoney(sale.commission_cents)}</p></div>
+                  <div className="flex items-start justify-between gap-4"><div><p className="font-black" style={primaryTextStyle}>{sale.label}</p><p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>{sale.representative.display_name} · {titleCase(sale.plan_key)} {titleCase(sale.billing_cadence)} · {formatDate(sale.activated_at)}</p></div><div className="text-right"><p className="font-black text-emerald-700 dark:text-emerald-300">{formatMoney(sale.commission_cents)}</p>{!sale.commission_eligible ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em]" style={subtleTextStyle}>Not commissionable</p> : null}</div></div>
                   <p className="mt-3 text-xs font-semibold" style={mutedTextStyle}>{formatMoney(sale.gross_membership_cents)} gross − {formatMoney(sale.discount_cents)} discount = {formatMoney(sale.net_membership_cents)} net</p>
                 </article>
               ))}

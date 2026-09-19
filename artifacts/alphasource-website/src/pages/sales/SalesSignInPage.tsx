@@ -22,7 +22,7 @@ export default function SalesSignInPage() {
             <LockKeyhole className="h-3.5 w-3.5" /> Sales workspace
           </div>
           <h1 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[#0A1547]">Sign in to continue</h1>
-          <p className="mt-2 text-sm font-semibold leading-relaxed text-[#0A1547]/50">Use the Google Workspace email assigned to your sales account.</p>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-[#0A1547]/50">Use your authorized alphaSource work email and password.</p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
             <label className="block text-xs font-black text-[#0A1547]">
