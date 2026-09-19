@@ -327,11 +327,19 @@ const mockSalesApi: SalesApi = {
     await delay(420);
     const promotion = draft.promotion_code.trim().toUpperCase() === "DEMO10" ? mockPromotion : null;
     const pricing = mockPricing(draft, promotion);
-    const agreementText = `alphaScreen membership agreement preview\n\nCompany: ${draft.company_legal_name}\nMembership: ${packageForDraft(draft).display_name}\nBilling: ${draft.billing_cadence}\nMembership begins: successful initial payment date\n\nPrototype preview only.`;
+    const effectiveDate = new Date().toISOString().slice(0, 10);
+    const renewal = new Date(`${effectiveDate}T12:00:00`);
+    renewal.setFullYear(renewal.getFullYear() + 1);
+    const renewalDate = renewal.toISOString().slice(0, 10);
+    const agreementExpiresAt = new Date(`${effectiveDate}T23:59:59.999`).toISOString();
+    const agreementText = `alphaScreen membership agreement preview\n\nCompany: ${draft.company_legal_name}\nMembership: ${packageForDraft(draft).display_name}\nBilling: ${draft.billing_cadence}\nMembership begins: ${effectiveDate}\nInitial renewal date: ${renewalDate}\n\nPrototype preview only.`;
     return {
       preview_id: `preview-${Date.now()}`,
       preview_url: `data:text/plain;charset=utf-8,${encodeURIComponent(agreementText)}`,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      agreement_effective_date: effectiveDate,
+      agreement_renewal_date: renewalDate,
+      agreement_expires_at: agreementExpiresAt,
       normalized_draft: structuredClone(draft),
       pricing,
     };
