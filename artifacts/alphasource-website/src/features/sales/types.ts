@@ -88,6 +88,9 @@ export interface SalesAgreementPreview {
   preview_id: string;
   preview_url: string;
   expires_at: string;
+  agreement_effective_date: string;
+  agreement_renewal_date: string;
+  agreement_expires_at: string;
   normalized_draft: SalesDealDraft;
   pricing: SalesPricingSummary;
 }
