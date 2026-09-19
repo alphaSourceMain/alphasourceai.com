@@ -45,6 +45,7 @@ const navItems: NavItem[] = [
   { label: "Leads & Public Analytics", href: "/admin/public-analytics",   icon: MousePointerClick },
   { label: "Public Purchases",      href: "/admin/public-purchases",      icon: ShoppingCart },
   { label: "Sales Payroll",         href: "/admin/sales-payroll",         icon: WalletCards },
+  { label: "Sales Workspace",       href: "/sales",                       icon: Briefcase },
   { label: "Clients",               href: "/admin/clients",              icon: Building2 },
   { label: "Roles",                 href: "/admin/roles",                icon: Briefcase },
   { label: "Candidates",            href: "/admin/candidates",           icon: Users },

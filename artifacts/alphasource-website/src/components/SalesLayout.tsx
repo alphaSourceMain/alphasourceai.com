@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronRight,
   Handshake,
+  LayoutDashboard,
   LayoutList,
   LogOut,
   Menu,
@@ -100,6 +101,16 @@ export default function SalesLayout({ children, rep }: SalesLayoutProps) {
               </Link>
             );
           })}
+          {rep.access_role === "global_admin" ? (
+            <Link
+              href="/admin"
+              className="group mt-3 flex items-center gap-3 border-t border-white/[0.07] px-3 py-3 text-sm font-bold text-white/62 transition-colors hover:bg-white/[0.07] hover:text-white"
+            >
+              <LayoutDashboard className="h-[18px] w-[18px]" />
+              <span className="flex-1">Admin console</span>
+              <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-50" />
+            </Link>
+          ) : null}
         </nav>
 
         <div className="border-t border-white/[0.07] p-4">
@@ -110,6 +121,7 @@ export default function SalesLayout({ children, rep }: SalesLayoutProps) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-black text-white">{rep.display_name}</p>
               <p className="truncate text-[10px] font-semibold text-white/42">{rep.email}</p>
+              {rep.access_role === "global_admin" ? <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-300">Global admin access</p> : null}
             </div>
             {!salesUsesMockApi ? (
               <button type="button" onClick={handleSignOut} className="rounded-lg p-2 text-white/45 hover:bg-white/10 hover:text-white" title="Sign out" aria-label="Sign out of the sales workspace">

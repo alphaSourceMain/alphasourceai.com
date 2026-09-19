@@ -286,7 +286,7 @@ const mockPromotion: PromotionCodeSummary = {
 const mockSalesApi: SalesApi = {
   async getMe() {
     await delay(120);
-    return { user_id: "sales-rep-demo", email: "michael@alphasourceai.com", display_name: "Michael Afesi" };
+    return { user_id: "sales-rep-demo", email: "michael@alphasourceai.com", display_name: "Michael Afesi", access_role: "sales_rep" };
   },
   async getPackages() {
     await delay();

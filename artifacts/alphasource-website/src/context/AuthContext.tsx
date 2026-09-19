@@ -204,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       }
       if (response.status === 401 || response.status === 403) {
-        return { ok: false, error: "Your account is not assigned to the alphaScreen sales team." };
+        return { ok: false, error: "Your account is not enabled for the alphaScreen sales workspace." };
       }
       const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
       const detail = record.detail ?? record.message ?? record.error;

@@ -23,6 +23,7 @@ export interface SalesRep {
   user_id: string;
   email: string;
   display_name: string;
+  access_role: "sales_rep" | "global_admin";
 }
 
 export interface SalesPackage {
