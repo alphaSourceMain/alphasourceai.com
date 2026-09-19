@@ -75,12 +75,14 @@ interface PayrollPayload {
     excluded: string[];
     adjustment_period_basis: string;
     time_zone: string;
+    rounding_basis: string;
   };
   filters: { date_from: string; date_to: string; representative_user_id: string | null };
   summary: PayrollTotals;
   representatives: Representative[];
   by_representative: Array<PayrollTotals & { representative: Representative }>;
   sales: PayrollSale[];
+  related_sales: Array<{ id: string; label: string; activated_at: string | null; representative: Representative }>;
   adjustments: PayrollAdjustment[];
 }
 
@@ -101,6 +103,7 @@ const backendBase = firstBase(
   (env as Record<string, unknown>).PUBLIC_BACKEND_URL,
   (env as Record<string, unknown>).BACKEND_URL,
 );
+const PAYROLL_TIME_ZONE = "America/Denver";
 
 const surfaceCardStyle = {
   backgroundColor: "var(--as-surface)",
@@ -116,16 +119,19 @@ const fieldStyle = {
   color: "var(--as-text)",
 };
 
-function localDateString(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function localDateString(date = new Date(), timeZone = PAYROLL_TIME_ZONE): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
 }
 
 function currentMonthStart(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+  return `${localDateString().slice(0, 8)}01`;
 }
 
 function formatMoney(cents: unknown): string {
@@ -134,10 +140,10 @@ function formatMoney(cents: unknown): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(numeric / 100);
 }
 
-function formatDate(value: unknown): string {
+function formatDate(value: unknown, timeZone = PAYROLL_TIME_ZONE): string {
   const date = new Date(String(value || ""));
   if (!Number.isFinite(date.getTime())) return "Not available";
-  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { timeZone, year: "numeric", month: "short", day: "numeric" });
 }
 
 function titleCase(value: unknown): string {
@@ -252,8 +258,8 @@ export default function AdminSalesPayrollPage() {
   }, [loadPayroll]);
 
   const relatedSales = useMemo(
-    () => (payload?.sales || []).filter((sale) => !adjustmentRepId || sale.representative.user_id === adjustmentRepId),
-    [adjustmentRepId, payload?.sales],
+    () => (payload?.related_sales || []).filter((sale) => !adjustmentRepId || sale.representative.user_id === adjustmentRepId),
+    [adjustmentRepId, payload?.related_sales],
   );
 
   const resetAdjustmentForm = useCallback(() => {
@@ -336,10 +342,10 @@ export default function AdminSalesPayrollPage() {
     const header = ["Record type", "Effective date", "Representative", "Company or reason", "Plan", "Cadence", "Gross membership", "Discount", "Credit", "Deduction", "Net membership", "Commission"];
     const rows: unknown[][] = [];
     for (const sale of payload.sales) {
-      rows.push(["Sale", sale.activated_at?.slice(0, 10) || "", sale.representative.display_name, sale.label, titleCase(sale.plan_key), titleCase(sale.billing_cadence), sale.gross_membership_cents / 100, sale.discount_cents / 100, 0, 0, sale.net_membership_cents / 100, sale.commission_cents / 100]);
+      rows.push(["Sale", sale.activated_at ? localDateString(new Date(sale.activated_at), payload.policy.time_zone) : "", sale.representative.display_name, sale.label, titleCase(sale.plan_key), titleCase(sale.billing_cadence), sale.gross_membership_cents / 100, sale.discount_cents / 100, 0, 0, sale.net_membership_cents / 100, sale.commission_cents / 100]);
     }
     for (const adjustment of payload.adjustments) {
-      rows.push([titleCase(adjustment.adjustment_type), adjustment.effective_at?.slice(0, 10) || "", adjustment.representative.display_name, adjustment.reason, "", "", 0, 0, adjustment.direction === "credit" ? adjustment.amount_cents / 100 : 0, adjustment.direction === "deduction" ? adjustment.amount_cents / 100 : 0, adjustment.signed_membership_cents / 100, adjustment.commission_impact_cents / 100]);
+      rows.push([titleCase(adjustment.adjustment_type), adjustment.effective_at ? localDateString(new Date(adjustment.effective_at), payload.policy.time_zone) : "", adjustment.representative.display_name, adjustment.reason, "", "", 0, 0, adjustment.direction === "credit" ? adjustment.amount_cents / 100 : 0, adjustment.direction === "deduction" ? adjustment.amount_cents / 100 : 0, adjustment.signed_membership_cents / 100, adjustment.commission_impact_cents / 100]);
     }
     const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -439,7 +445,7 @@ export default function AdminSalesPayrollPage() {
               <label className="text-xs font-black" style={primaryTextStyle}>Effective date
                 <input required type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle} />
               </label>
-              <label className="text-xs font-black md:col-span-1 xl:col-span-2" style={primaryTextStyle}>Related sale in this report <span className="font-semibold" style={mutedTextStyle}>(optional)</span>
+              <label className="text-xs font-black md:col-span-1 xl:col-span-2" style={primaryTextStyle}>Related sale <span className="font-semibold" style={mutedTextStyle}>(optional, 500 most recent)</span>
                 <select value={relatedSaleId} onChange={(event) => setRelatedSaleId(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle}>
                   <option value="">No linked sale</option>
                   {relatedSales.map((sale) => <option key={sale.id} value={sale.id}>{sale.label} · {formatDate(sale.activated_at)}</option>)}
@@ -462,12 +468,14 @@ export default function AdminSalesPayrollPage() {
           </form>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <SummaryCard label="Closed memberships" value={String(summary?.closed_won_count || 0)} detail="Activated in this period" icon={CheckCircle2} tone="#02A77E" />
-          <SummaryCard label="Annual membership" value={formatMoney(summary?.gross_membership_cents || 0)} detail="Platform fees before discounts" icon={WalletCards} tone="#0A1547" />
-          <SummaryCard label="Discounts" value={formatMoney(summary?.discounts_cents || 0)} detail="Annualized membership discounts" icon={Percent} tone="#D97706" />
-          <SummaryCard label="Net adjustments" value={formatMoney((summary?.credits_cents || 0) - (summary?.deductions_cents || 0))} detail={`${formatMoney(summary?.credits_cents || 0)} credits · ${formatMoney(summary?.deductions_cents || 0)} deductions`} icon={(summary?.credits_cents || 0) >= (summary?.deductions_cents || 0) ? ArrowUpRight : ArrowDownRight} tone="#7C5FCC" />
-          <SummaryCard label="Commission due" value={formatMoney(summary?.commission_cents || 0)} detail="50% of adjusted net membership" icon={WalletCards} tone="#02A77E" />
+        {loading && !payload ? <p className="flex items-center gap-2 text-sm font-bold" style={mutedTextStyle} role="status"><RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />Loading payroll report…</p> : null}
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-busy={loading && !payload}>
+          <SummaryCard label="Closed memberships" value={loading && !payload ? "—" : String(summary?.closed_won_count || 0)} detail={loading && !payload ? "Loading report…" : "Activated in this period"} icon={CheckCircle2} tone="#02A77E" />
+          <SummaryCard label="Annual membership" value={loading && !payload ? "—" : formatMoney(summary?.gross_membership_cents || 0)} detail={loading && !payload ? "Loading report…" : "Platform fees before discounts"} icon={WalletCards} tone="#0A1547" />
+          <SummaryCard label="Discounts" value={loading && !payload ? "—" : formatMoney(summary?.discounts_cents || 0)} detail={loading && !payload ? "Loading report…" : "Annualized membership discounts"} icon={Percent} tone="#D97706" />
+          <SummaryCard label="Net adjustments" value={loading && !payload ? "—" : formatMoney((summary?.credits_cents || 0) - (summary?.deductions_cents || 0))} detail={loading && !payload ? "Loading report…" : `${formatMoney(summary?.credits_cents || 0)} credits · ${formatMoney(summary?.deductions_cents || 0)} deductions`} icon={(summary?.credits_cents || 0) >= (summary?.deductions_cents || 0) ? ArrowUpRight : ArrowDownRight} tone="#7C5FCC" />
+          <SummaryCard label="Commission due" value={loading && !payload ? "—" : formatMoney(summary?.commission_cents || 0)} detail={loading && !payload ? "Loading report…" : "50% of adjusted net membership"} icon={WalletCards} tone="#02A77E" />
         </div>
 
         <section className="overflow-hidden rounded-2xl border" style={surfaceCardStyle}>
