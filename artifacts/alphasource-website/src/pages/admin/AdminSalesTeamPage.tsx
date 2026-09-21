@@ -49,6 +49,8 @@ interface PhoneNumber {
   ghl_notification_workflow_id: string | null;
   ghl_mobile_custom_value_id: string | null;
   ghl_mobile_custom_value_name: string | null;
+  ghl_user_custom_value_id: string | null;
+  ghl_user_custom_value_name: string | null;
   xai_setup_status: "pending" | "verified" | "failed";
   ghl_setup_status: "pending" | "verified" | "failed";
   xai_verified_at: string | null;
@@ -132,6 +134,8 @@ interface FormState {
   ghl_routing_workflow_id: string;
   ghl_mobile_custom_value_id: string;
   ghl_mobile_custom_value_name: string;
+  ghl_user_custom_value_id: string;
+  ghl_user_custom_value_name: string;
   xai_setup_status: "pending" | "verified" | "failed";
   ghl_setup_status: "pending" | "verified" | "failed";
   xai_verification_reference: string;
@@ -165,6 +169,8 @@ const emptyForm: FormState = {
   ghl_routing_workflow_id: "",
   ghl_mobile_custom_value_id: "",
   ghl_mobile_custom_value_name: "",
+  ghl_user_custom_value_id: "",
+  ghl_user_custom_value_name: "",
   xai_setup_status: "pending",
   ghl_setup_status: "pending",
   xai_verification_reference: "",
@@ -206,6 +212,8 @@ function formFor(record: TeamRecord): FormState {
     ghl_routing_workflow_id: record.phone?.ghl_routing_workflow_id || "",
     ghl_mobile_custom_value_id: record.phone?.ghl_mobile_custom_value_id || "",
     ghl_mobile_custom_value_name: record.phone?.ghl_mobile_custom_value_name || "",
+    ghl_user_custom_value_id: record.phone?.ghl_user_custom_value_id || "",
+    ghl_user_custom_value_name: record.phone?.ghl_user_custom_value_name || "",
     xai_setup_status: record.phone?.xai_setup_status || "pending",
     ghl_setup_status: record.phone?.ghl_setup_status || "pending",
     xai_verification_reference: record.phone?.xai_verification_reference || "",
@@ -222,6 +230,25 @@ function formFor(record: TeamRecord): FormState {
     notify_slack: record.config?.notify_slack !== false,
     notify_sms: record.config?.notify_sms !== false,
     notify_email: record.config?.notify_email !== false,
+  };
+}
+
+function formWithPhone(current: FormState, phone: PhoneNumber | null): FormState {
+  return {
+    ...current,
+    phone_number_id: phone?.id || "",
+    xai_agent_id: phone?.xai_agent_id || "",
+    xai_phone_number_e164: phone?.xai_phone_number_e164 || "",
+    ghl_location_id: phone?.ghl_location_id || "",
+    ghl_routing_workflow_id: phone?.ghl_routing_workflow_id || "",
+    ghl_notification_workflow_id: phone?.ghl_notification_workflow_id || "",
+    ghl_mobile_custom_value_id: phone?.ghl_mobile_custom_value_id || "",
+    ghl_mobile_custom_value_name: phone?.ghl_mobile_custom_value_name || "",
+    ghl_user_custom_value_id: phone?.ghl_user_custom_value_id || "",
+    ghl_user_custom_value_name: phone?.ghl_user_custom_value_name || "",
+    xai_setup_status: phone?.xai_setup_status || "pending",
+    ghl_setup_status: phone?.ghl_setup_status || "pending",
+    xai_verification_reference: phone?.xai_verification_reference || "",
   };
 }
 
@@ -342,6 +369,11 @@ export default function AdminSalesTeamPage() {
 
   const selected = useMemo(() => payload.items.find((item) => item.member.id === selectedId) || null, [payload.items, selectedId]);
   const selectedLine = useMemo(() => payload.phone_numbers.find((phone) => phone.id === form.phone_number_id) || null, [payload.phone_numbers, form.phone_number_id]);
+  const activeOccupants = useMemo(() => new Map(payload.items
+    .filter((item) => item.member.status === "active" && item.applied_phone?.id)
+    .map((item) => [item.applied_phone!.id, item])), [payload.items]);
+  const selectedLineOccupant = selectedLine ? activeOccupants.get(selectedLine.id) || null : null;
+  const replacement = selectedLineOccupant && selectedLineOccupant.member.id !== selectedId ? selectedLineOccupant : null;
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return payload.items;
@@ -352,6 +384,20 @@ export default function AdminSalesTeamPage() {
     setSelectedId(record.member.id);
     setForm(formFor(record));
     setCreating(false);
+    setError("");
+    setNotice("");
+    setOneTimeToken("");
+  };
+
+  const chooseSlot = (phone: PhoneNumber) => {
+    const occupant = activeOccupants.get(phone.id);
+    if (occupant) {
+      choose(occupant);
+      return;
+    }
+    setCreating(true);
+    setSelectedId("");
+    setForm(formWithPhone(emptyForm, phone));
     setError("");
     setNotice("");
     setOneTimeToken("");
@@ -385,6 +431,7 @@ export default function AdminSalesTeamPage() {
   const action = async (name: "apply" | "deactivate" | "reactivate" | "rotate-agent-token" | "sync") => {
     if (!selectedId) return;
     if (name === "deactivate" && !window.confirm(`Deactivate ${selected?.member.display_name || "this salesperson"}? Their historical sales and commissions will be preserved.`)) return;
+    if (name === "apply" && replacement && !window.confirm(`Replace ${replacement.member.display_name} on ${formatPhone(selectedLine?.e164)} with ${form.display_name}? The former salesperson will become inactive and stop receiving calls and messages. Their account and history will remain intact.`)) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -396,7 +443,12 @@ export default function AdminSalesTeamPage() {
           body: JSON.stringify({ ...form, business_hours: { summary: form.business_hours_summary } }),
         });
       }
-      const result = await request<{ item: TeamRecord; token?: string }>(`/admin/sales-team/members/${selectedId}/${name}`, { method: "POST", body: JSON.stringify(name === "rotate-agent-token" ? { phone_id: selectedLine?.id || null } : {}) });
+      const actionBody = name === "rotate-agent-token"
+        ? { phone_id: selectedLine?.id || null }
+        : name === "apply" && replacement
+          ? { replace_team_member_id: replacement.member.id }
+          : {};
+      const result = await request<{ item: TeamRecord; token?: string }>(`/admin/sales-team/members/${selectedId}/${name}`, { method: "POST", body: JSON.stringify(actionBody) });
       if (result.token) setOneTimeToken(result.token);
       setNotice(name === "apply" ? "Configuration applied and provider synchronization checked." : name === "sync" ? "Provider synchronization checked. Review the current statuses below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : "New one-time line token created. Copy it into both fixed Grok tools now; it will not be shown again.");
       await load(result.item.member.id);
@@ -428,6 +480,8 @@ export default function AdminSalesTeamPage() {
           ghl_notification_workflow_id: form.ghl_notification_workflow_id,
           ghl_mobile_custom_value_id: form.ghl_mobile_custom_value_id,
           ghl_mobile_custom_value_name: form.ghl_mobile_custom_value_name,
+          ghl_user_custom_value_id: form.ghl_user_custom_value_id,
+          ghl_user_custom_value_name: form.ghl_user_custom_value_name,
           xai_setup_status: form.xai_setup_status,
           ghl_setup_status: form.ghl_setup_status,
           xai_verification_reference: form.xai_verification_reference,
@@ -465,6 +519,26 @@ export default function AdminSalesTeamPage() {
           </section>
         )}
 
+        <section aria-labelledby="sales-line-slots-title">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">The GHL number, workflows, Grok agent, and secure tools stay with each slot when personnel change.</p></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {payload.phone_numbers.filter((phone) => phone.active).slice(0, 4).map((phone, index) => {
+              const occupant = activeOccupants.get(phone.id);
+              const selectedSlot = form.phone_number_id === phone.id;
+              const ready = phone.ghl_setup_status === "verified" && phone.xai_setup_status === "verified";
+              return (
+                <button key={phone.id} type="button" onClick={() => chooseSlot(phone)} className={`rounded-xl border p-4 text-left transition ${selectedSlot ? "border-[#A380F6] bg-[#A380F6]/10" : "border-[var(--as-border)] bg-[var(--as-surface)] hover:border-[#A380F6]/50"}`}>
+                  <div className="flex items-start justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Line {index + 1}</p><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{ready ? "Prepared" : "Setup pending"}</span></div>
+                  <p className="mt-2 text-sm font-black text-[var(--as-text)]">{formatPhone(phone.e164)}</p>
+                  <p className="mt-1 truncate text-xs font-semibold text-[var(--as-muted)]">{occupant?.member.display_name || "Available for a new salesperson"}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
           <aside className="overflow-hidden rounded-xl border" style={cardStyle}>
             <div className="border-b border-[var(--as-border)] p-4">
@@ -483,29 +557,30 @@ export default function AdminSalesTeamPage() {
           </aside>
 
           <form onSubmit={save} className="space-y-5">
-            <section className="rounded-xl border border-[#A380F6]/30 bg-[#A380F6]/8 p-4 text-xs font-semibold leading-relaxed text-[var(--as-text)]"><strong className="font-black">Normal onboarding:</strong> enter the person’s name, Workspace email, mobile, sales dashboard user ID, GHL user ID, Slack member ID, and choose a prepared company line. Then use Save &amp; apply changes. Open the reusable line sections only when setting up or replacing company-owned infrastructure.</section>
+            <section className="rounded-xl border border-[#A380F6]/30 bg-[#A380F6]/8 p-4 text-xs font-semibold leading-relaxed text-[var(--as-text)]"><strong className="font-black">Normal onboarding:</strong> enter the person’s name, Workspace email, mobile, sales dashboard user ID, GHL user ID, Slack member ID, and choose a prepared company line. Then use Apply routing. Open the reusable line sections only when setting up or replacing company-owned infrastructure.</section>
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A380F6]">{creating ? "New salesperson" : "Team member"}</p><h2 className="mt-1 text-xl font-black text-[var(--as-text)]">{creating ? "Create a sales team record" : selected?.member.display_name}</h2></div>{selected && !creating && <StatusPill status={selected.member.status} />}</div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="Name"><input className={inputClass} value={form.display_name} onChange={(e) => update("display_name", e.target.value)} required /></Field>
-                <Field label="Workspace email"><input className={inputClass} type="email" value={form.workspace_email} onChange={(e) => update("workspace_email", e.target.value)} placeholder="name@alphasourceai.com" /></Field>
-                <Field label="Mobile number" hint="Use +1XXXXXXXXXX"><input className={inputClass} value={form.mobile_phone_e164} onChange={(e) => update("mobile_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>
-                <Field label="Sales dashboard user ID" hint="Supabase auth UUID"><input className={inputClass} value={form.sales_rep_user_id} onChange={(e) => update("sales_rep_user_id", e.target.value)} /></Field>
-                <Field label="GHL user ID"><input className={inputClass} value={form.ghl_user_id} onChange={(e) => update("ghl_user_id", e.target.value)} /></Field>
-                <Field label="Slack member ID"><input className={inputClass} value={form.slack_user_id} onChange={(e) => update("slack_user_id", e.target.value)} placeholder="U…" /></Field>
+                <Field label="Workspace email" hint="Required to activate"><input className={inputClass} type="email" value={form.workspace_email} onChange={(e) => update("workspace_email", e.target.value)} placeholder="name@alphasourceai.com" /></Field>
+                <Field label="Mobile number" hint="Required · use +1XXXXXXXXXX"><input className={inputClass} value={form.mobile_phone_e164} onChange={(e) => update("mobile_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>
+                <Field label="Sales dashboard user ID" hint="Required · Supabase auth UUID"><input className={inputClass} value={form.sales_rep_user_id} onChange={(e) => update("sales_rep_user_id", e.target.value)} /></Field>
+                <Field label="GHL user ID" hint="Required to activate"><input className={inputClass} value={form.ghl_user_id} onChange={(e) => update("ghl_user_id", e.target.value)} /></Field>
+                <Field label="Slack member ID" hint="Required to activate"><input className={inputClass} value={form.slack_user_id} onChange={(e) => update("slack_user_id", e.target.value)} placeholder="U…" /></Field>
               </div>
             </section>
 
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p>{selected?.pending_draft && selected.applied_phone && <p className="mt-1 text-[11px] font-bold text-amber-700">Active number: {formatPhone(selected.applied_phone.e164)} · draft changes are not live</p>}</div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="GHL phone number"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value); setForm((current) => ({ ...current, phone_number_id: e.target.value, xai_agent_id: phone?.xai_agent_id || "", xai_phone_number_e164: phone?.xai_phone_number_e164 || "", ghl_location_id: phone?.ghl_location_id || "", ghl_routing_workflow_id: phone?.ghl_routing_workflow_id || "", ghl_notification_workflow_id: phone?.ghl_notification_workflow_id || "", ghl_mobile_custom_value_id: phone?.ghl_mobile_custom_value_id || "", ghl_mobile_custom_value_name: phone?.ghl_mobile_custom_value_name || "", xai_setup_status: phone?.xai_setup_status || "pending", ghl_setup_status: phone?.ghl_setup_status || "pending", xai_verification_reference: phone?.xai_verification_reference || "" })); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {phone.a2p_status}</option>)}</select></Field>
+                <Field label="GHL phone number" hint="Required to activate"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value) || null; setForm((current) => formWithPhone(current, phone)); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {activeOccupants.get(phone.id)?.member.display_name || "available"}</option>)}</select></Field>
                 <Field label="Mobile ring time" hint="10-25 seconds"><input className={inputClass} type="number" min={10} max={25} value={form.ring_seconds} onChange={(e) => update("ring_seconds", Number(e.target.value))} /></Field>
                 <Field label="GHL line setup" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_setup_status === "verified" ? "Verified and reusable" : "Setup pending"}</div></Field>
                 <Field label="GHL workflow" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_routing_workflow_id || "Not configured"}</div></Field>
               </div>
+              {replacement && <div role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold leading-relaxed text-amber-950">This line is currently assigned to {replacement.member.display_name}. Applying will atomically move calls and notifications to {form.display_name || "this salesperson"}, deactivate the former routing assignment, and preserve the former account, sales, and commission history.</div>}
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><ShieldCheck className="mr-2 inline h-4 w-4" />Call Connect is locked on. GHL must time out before the mobile carrier’s voicemail answers, then route to the assigned Grok Voice number.</div>
-              {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable company-line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Configure these once for the company number. Changing an identifier returns that provider to pending until it is tested again.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="GHL routing workflow ID"><input className={inputClass} value={form.ghl_routing_workflow_id} onChange={(e) => update("ghl_routing_workflow_id", e.target.value)} /></Field><Field label="GHL notification workflow ID"><input className={inputClass} value={form.ghl_notification_workflow_id} onChange={(e) => update("ghl_notification_workflow_id", e.target.value)} /></Field><Field label="GHL mobile custom value ID"><input className={inputClass} value={form.ghl_mobile_custom_value_id} onChange={(e) => update("ghl_mobile_custom_value_id", e.target.value)} /></Field><Field label="GHL mobile custom value name"><input className={inputClass} value={form.ghl_mobile_custom_value_name} onChange={(e) => update("ghl_mobile_custom_value_name", e.target.value)} /></Field><Field label="GHL setup status"><select className={inputClass} value={form.ghl_setup_status} onChange={(e) => update("ghl_setup_status", e.target.value as FormState["ghl_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div><button type="button" aria-label="Save GHL company-line setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save GHL line setup</button></details>}
+              {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable company-line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Configure these once for the company number. Changing an identifier returns that provider to pending until it is tested again.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="GHL routing workflow ID"><input className={inputClass} value={form.ghl_routing_workflow_id} onChange={(e) => update("ghl_routing_workflow_id", e.target.value)} /></Field><Field label="GHL notification workflow ID"><input className={inputClass} value={form.ghl_notification_workflow_id} onChange={(e) => update("ghl_notification_workflow_id", e.target.value)} /></Field><Field label="GHL mobile custom value ID"><input className={inputClass} value={form.ghl_mobile_custom_value_id} onChange={(e) => update("ghl_mobile_custom_value_id", e.target.value)} /></Field><Field label="GHL mobile custom value name"><input className={inputClass} value={form.ghl_mobile_custom_value_name} onChange={(e) => update("ghl_mobile_custom_value_name", e.target.value)} /></Field><Field label="GHL user custom value ID"><input className={inputClass} value={form.ghl_user_custom_value_id} onChange={(e) => update("ghl_user_custom_value_id", e.target.value)} /></Field><Field label="GHL user custom value name"><input className={inputClass} value={form.ghl_user_custom_value_name} onChange={(e) => update("ghl_user_custom_value_name", e.target.value)} /></Field><Field label="GHL setup status"><select className={inputClass} value={form.ghl_setup_status} onChange={(e) => update("ghl_setup_status", e.target.value as FormState["ghl_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div><button type="button" aria-label="Save GHL company-line setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save GHL line setup</button></details>}
             </section>
 
             <section className="rounded-xl border p-5" style={cardStyle}>
@@ -525,11 +600,7 @@ export default function AdminSalesTeamPage() {
                 <Toggle checked={form.transfer_enabled} onChange={(value) => update("transfer_enabled", value)} label="Allow live transfer" detail="The destination must be separate from this salesperson’s mobile." />
                 {form.transfer_enabled && <Field label="Backup transfer number"><input className={inputClass} value={form.backup_transfer_phone_e164} onChange={(e) => update("backup_transfer_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>}
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <Toggle checked={form.notify_slack} onChange={(value) => update("notify_slack", value)} label="Slack notification" />
-                <Toggle checked={form.notify_sms} onChange={(value) => update("notify_sms", value)} label="GHL SMS notification" />
-                <Toggle checked={form.notify_email} onChange={(value) => update("notify_email", value)} label="Email notification" />
-              </div>
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><Check className="mr-2 inline h-4 w-4" />Caller-approved follow-up messages always go to this salesperson by Slack DM, GHL text, and Workspace email.</div>
               {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable Grok line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Use the same stable line token for the context and message tools. Record the completed QA call before marking the line verified.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field><Field label="Grok phone number"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} placeholder="+17205551212" /></Field><Field label="Grok QA call reference"><input className={inputClass} value={form.xai_verification_reference} onChange={(e) => update("xai_verification_reference", e.target.value)} placeholder="Call or test reference" /></Field><Field label="Grok setup status"><select className={inputClass} value={form.xai_setup_status} onChange={(e) => update("xai_setup_status", e.target.value as FormState["xai_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div>{payload.agent_bootstrap_prompt && <div className="mt-4"><p className="text-xs font-black text-[var(--as-text)]">Fixed agent instructions</p><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--as-soft)] p-3 text-xs leading-relaxed text-[var(--as-text)]">{payload.agent_bootstrap_prompt}</pre><button type="button" onClick={() => void copy(payload.agent_bootstrap_prompt, "Fixed Grok instructions copied.")} className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]"><Clipboard className="h-3.5 w-3.5" /> Copy fixed instructions</button></div>}<button type="button" aria-label="Save Grok company-line setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save Grok line setup</button></details>}
             </section>
 
@@ -551,7 +622,7 @@ export default function AdminSalesTeamPage() {
               {selected && !creating && selected.member.status === "active" && <button type="button" disabled={saving} onClick={() => void action("sync")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Sync providers</button>}
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || !selected.phone?.id} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> {selected.phone?.handoff_token_rotated_at ? "Rotate line token" : "Prepare line token"}</button>}
               <button type="submit" disabled={saving || selected?.member.status === "inactive"} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-4 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><UserRound className="h-4 w-4" /> {saving ? "Saving…" : "Save draft"}</button>
-              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Save & apply changes</button>}
+              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> {replacement ? `Replace ${replacement.member.display_name} & apply routing` : "Apply routing"}</button>}
             </div>
           </form>
         </div>
