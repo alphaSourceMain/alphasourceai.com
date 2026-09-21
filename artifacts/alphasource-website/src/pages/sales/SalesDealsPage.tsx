@@ -4,6 +4,9 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   Clock3,
   FileSignature,
   Mail,
@@ -29,6 +32,17 @@ import { SalesApiError, salesApi } from "@/features/sales/salesApi";
 import type { SalesDeal, SalesDealAction, SalesDealStatus } from "@/features/sales/types";
 
 type FilterKey = "all" | "open" | "payment" | "activated" | "attention";
+type SortKey = "client" | "membership" | "status" | "payment" | "activity";
+type SortDirection = "asc" | "desc";
+
+const dealGridClass = "grid gap-4 lg:grid-cols-[minmax(250px,1.35fr)_minmax(145px,.72fr)_minmax(170px,.85fr)_minmax(130px,.62fr)_minmax(135px,.62fr)_minmax(190px,.9fr)]";
+const sortableColumns: Array<{ key: SortKey; label: string }> = [
+  { key: "client", label: "Client" },
+  { key: "membership", label: "Membership" },
+  { key: "status", label: "Status" },
+  { key: "payment", label: "Initial payment" },
+  { key: "activity", label: "Last activity" },
+];
 
 const statusTone: Record<SalesDealStatus, string> = {
   agreement_sent: "border-sky-200 bg-sky-50 text-sky-700",
@@ -54,15 +68,19 @@ function formatMoney(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 === 0 ? 0 : 2 }).format(cents / 100);
 }
 
-function formatRelativeDate(value: string): string {
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) return "Unknown";
-  const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60000));
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
+function formatActivityDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Denver",
+  }).format(date);
+}
+
+function activityDateValue(deal: SalesDeal): string {
+  return deal.last_activity_at || deal.updated_at;
 }
 
 function matchesFilter(deal: SalesDeal, filter: FilterKey): boolean {
@@ -73,6 +91,21 @@ function matchesFilter(deal: SalesDeal, filter: FilterKey): boolean {
   return ["needs_attention", "expired"].includes(deal.status);
 }
 
+function dealSortValue(deal: SalesDeal, key: SortKey): string | number {
+  if (key === "client") return `${deal.company_dba || deal.company_legal_name} ${deal.buyer_name}`.toLowerCase();
+  if (key === "membership") return `${deal.plan_name} ${deal.billing_cadence}`.toLowerCase();
+  if (key === "status") return deal.status_label.toLowerCase();
+  if (key === "payment") return deal.initial_payment_cents;
+  return new Date(activityDateValue(deal)).getTime() || 0;
+}
+
+function SortIndicator({ active, direction }: { active: boolean; direction: SortDirection }) {
+  if (!active) return <ChevronsUpDown className="h-3.5 w-3.5" aria-hidden="true" />;
+  return direction === "asc"
+    ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+    : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />;
+}
+
 export default function SalesDealsPage() {
   const [location, setLocation] = useLocation();
   const [deals, setDeals] = useState<SalesDeal[]>([]);
@@ -81,6 +114,8 @@ export default function SalesDealsPage() {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("activity");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [busyAction, setBusyAction] = useState("");
 
   const loadDeals = async () => {
@@ -116,12 +151,26 @@ export default function SalesDealsPage() {
     return deals.filter((deal) => {
       if (!matchesFilter(deal, filter)) return false;
       if (!term) return true;
-      return [deal.company_legal_name, deal.company_dba, deal.buyer_name, deal.buyer_email, deal.plan_name]
+      return [deal.company_legal_name, deal.company_dba, deal.buyer_name, deal.buyer_email, deal.plan_name, deal.billing_cadence, deal.status_label, formatMoney(deal.initial_payment_cents), formatActivityDate(activityDateValue(deal))]
         .join(" ")
         .toLowerCase()
         .includes(term);
+    }).sort((a, b) => {
+      const left = dealSortValue(a, sortKey);
+      const right = dealSortValue(b, sortKey);
+      const comparison = typeof left === "number" ? left - (right as number) : left.localeCompare(right as string);
+      return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [deals, filter, search]);
+  }, [deals, filter, search, sortDirection, sortKey]);
+
+  const changeSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortKey(key);
+    setSortDirection(key === "activity" ? "desc" : "asc");
+  };
 
   const runAction = async (deal: SalesDeal, action: SalesDealAction) => {
     const key = `${deal.id}:${action}`;
@@ -132,6 +181,7 @@ export default function SalesDealsPage() {
       if (action === "resend_agreement") {
         const result = await salesApi.resendAgreement(deal.id);
         setNotice(result.message);
+        await loadDeals();
       } else if (action === "send_payment_reminder") {
         const result = await salesApi.sendPaymentReminder(deal.id);
         setNotice(result.message);
@@ -207,7 +257,7 @@ export default function SalesDealsPage() {
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--as-border)" }}>
           <div className="relative w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--as-text-subtle)" }} />
-            <input aria-label="Search deals by company or buyer" value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-full rounded-[10px] border bg-transparent pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#A380F6] focus:ring-4 focus:ring-[#A380F6]/10" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} placeholder="Search company or buyer" />
+            <input aria-label="Search deals" value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-full rounded-[10px] border bg-transparent pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#A380F6] focus:ring-4 focus:ring-[#A380F6]/10" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} placeholder="Search company, buyer, plan, status, or amount" />
           </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             {(["all", "open", "payment", "activated", "attention"] as FilterKey[]).map((key) => (
@@ -228,10 +278,23 @@ export default function SalesDealsPage() {
         ) : visibleDeals.length === 0 ? (
           <div className="p-4"><SalesEmptyPanel title="No deals match this view" detail="Adjust the search or filter, or start a new Essential or Pro sale." /></div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "var(--as-border)" }}>
+          <div className="overflow-x-auto">
+            <div className={`${dealGridClass} hidden min-w-[1080px] border-b px-5 py-3 lg:grid`} style={{ borderColor: "var(--as-border)" }} role="row">
+              {sortableColumns.map((column) => (
+                <div key={column.key} role="columnheader" aria-sort={sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => changeSort(column.key)} className="inline-flex items-center gap-1.5 text-left text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--as-text-subtle)" }}>
+                    {column.label}
+                    <SortIndicator active={sortKey === column.key} direction={sortDirection} />
+                  </button>
+                </div>
+              ))}
+              <div role="columnheader" className="text-right text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--as-text-subtle)" }}>Actions</div>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--as-border)" }}>
             {visibleDeals.map((deal) => (
-              <article key={deal.id} className="grid gap-4 p-4 transition hover:bg-[#0A1547]/[0.018] sm:p-5 lg:grid-cols-[minmax(260px,1.3fr)_minmax(150px,.65fr)_minmax(180px,.75fr)_minmax(150px,.65fr)_auto] lg:items-center">
+              <article key={deal.id} className={`${dealGridClass} p-4 transition hover:bg-[#0A1547]/[0.018] sm:p-5 lg:min-w-[1080px] lg:items-center`}>
                 <div className="min-w-0">
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Client</p>
                   <div className="flex items-start gap-3">
                     <div className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-[#0A1547]/[0.055] text-[#0A1547]"><span className="text-xs font-black">{deal.company_legal_name.slice(0, 2).toUpperCase()}</span></div>
                     <div className="min-w-0">
@@ -243,16 +306,22 @@ export default function SalesDealsPage() {
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Membership</p>
                   <p className="text-sm font-black" style={{ color: "var(--as-text)" }}>{deal.plan_name}</p>
-                  <p className="mt-0.5 text-xs font-semibold capitalize" style={{ color: "var(--as-text-muted)" }}>{deal.billing_cadence} · {formatMoney(deal.initial_payment_cents)} initial</p>
+                  <p className="mt-0.5 text-xs font-semibold capitalize" style={{ color: "var(--as-text-muted)" }}>{deal.billing_cadence}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Status</p>
+                  <span className={`inline-flex max-w-full whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-[11px] font-black ${statusTone[deal.status]}`}>{deal.status_label}</span>
                 </div>
                 <div>
-                  <span className={`inline-flex rounded-lg border px-2.5 py-1.5 text-[11px] font-black ${statusTone[deal.status]}`}>{deal.status_label}</span>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Initial payment</p>
+                  <p className="text-sm font-black tabular-nums" style={{ color: "var(--as-text)" }}>{formatMoney(deal.initial_payment_cents)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Last activity</p>
-                  <p className="text-xs font-bold" style={{ color: "var(--as-text-muted)" }}>{formatRelativeDate(deal.updated_at)}</p>
+                  <p className="text-xs font-bold tabular-nums" style={{ color: "var(--as-text-muted)" }}>{formatActivityDate(activityDateValue(deal))}</p>
                 </div>
-                <div className="flex items-center gap-2 lg:justify-end">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+                  <p className="w-full text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Actions</p>
                   {deal.next_action !== "cancel" ? (
                     <button type="button" onClick={() => void runAction(deal, deal.next_action)} disabled={Boolean(busyAction)} className="inline-flex min-h-9 items-center gap-1.5 rounded-[9px] bg-[#0A1547] px-3 text-xs font-black text-white transition hover:bg-[#142365] disabled:opacity-50">
                       {busyAction === `${deal.id}:${deal.next_action}` ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : deal.next_action === "resend_agreement" ? <Send className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
@@ -283,6 +352,7 @@ export default function SalesDealsPage() {
                 </div>
               </article>
             ))}
+            </div>
           </div>
         )}
       </section>

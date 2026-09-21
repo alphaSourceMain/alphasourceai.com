@@ -352,6 +352,7 @@ export default function RolesPage() {
   const [roleStatusFilter, setRoleStatusFilter] = useState<RoleStatusFilter>("active");
   const [entityFilter, setEntityFilter] = useState<EntityFilterValue>("parent");
   const [roles, setRoles] = useState<Role[]>([]);
+  const [firstRolePrepayAvailable, setFirstRolePrepayAvailable] = useState(false);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesError, setRolesError] = useState("");
   const [rolesReloadNonce, setRolesReloadNonce] = useState(0);
@@ -760,6 +761,7 @@ export default function RolesPage() {
       if (clientError) {
         if (!alive) return;
         setRoles([]);
+        setFirstRolePrepayAvailable(false);
         setRolesError(clientError);
         setRolesLoading(false);
         return;
@@ -767,6 +769,7 @@ export default function RolesPage() {
       if (!selectedClientId) {
         if (!alive) return;
         setRoles([]);
+        setFirstRolePrepayAvailable(false);
         setRolesError("");
         setRolesLoading(false);
         return;
@@ -774,6 +777,7 @@ export default function RolesPage() {
       if (!backendBase) {
         if (!alive) return;
         setRoles([]);
+        setFirstRolePrepayAvailable(false);
         setRolesError("Missing backend base URL configuration.");
         setRolesLoading(false);
         return;
@@ -817,6 +821,9 @@ export default function RolesPage() {
         const items = payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)
           ? ((payload as { items: unknown[] }).items)
           : [];
+        const firstRoleCredit = payload && typeof payload === "object"
+          ? (payload as { first_role_prepay_credit?: { unused?: unknown } | null }).first_role_prepay_credit
+          : null;
 
         const mappedRoles: Role[] = items
           .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
@@ -860,9 +867,11 @@ export default function RolesPage() {
 
         if (!alive) return;
         setRoles(mappedRoles);
+        setFirstRolePrepayAvailable(firstRoleCredit?.unused === true);
       } catch (error) {
         if (!alive) return;
         setRoles([]);
+        setFirstRolePrepayAvailable(false);
         setRolesError(error instanceof Error ? error.message : "Failed to load roles.");
       } finally {
         if (alive) setRolesLoading(false);
@@ -1101,6 +1110,14 @@ export default function RolesPage() {
           style={surfaceCardStyle}
         >
           <h2 className="text-base font-black mb-4" style={primaryTextStyle}>Create Role</h2>
+
+          {firstRolePrepayAvailable ? (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#02D99D]/25 bg-[#02D99D]/10 px-3.5 py-2.5 text-sm font-semibold text-[#008863]" role="status">
+              <span className="font-black">First role prepaid</span>
+              <span aria-hidden="true">·</span>
+              <span>Your next role fee is covered.</span>
+            </div>
+          ) : null}
 
           <form onSubmit={handleCreate}>
             <div className="flex flex-col gap-3 items-start sm:flex-row sm:flex-wrap sm:items-end">

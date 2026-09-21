@@ -415,7 +415,7 @@ export default function AdminSalesPayrollPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-black" style={primaryTextStyle}>Add payroll adjustment</h2>
-                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>Enter membership value. The report applies the 50% commission impact automatically. Records remain in the audit history; correct an error with an offsetting entry.</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>Enter the adjustment amount. The report applies the 50% commission impact automatically. Records remain in the audit history; correct an error with an offsetting entry.</p>
               </div>
               <button type="button" onClick={() => setShowAdjustment(false)} className="self-start text-xs font-black text-[#7C5FCC]">Close</button>
             </div>
@@ -440,7 +440,7 @@ export default function AdminSalesPayrollPage() {
                   <option value="credit">Credit</option>
                 </select>
               </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Membership amount
+              <label className="text-xs font-black" style={primaryTextStyle}>Adjustment amount
                 <div className="mt-1.5 flex rounded-xl border" style={fieldStyle}><span className="px-3 py-2.5 text-sm font-black" style={mutedTextStyle}>$</span><input required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" className="min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-sm font-semibold outline-none" /></div>
               </label>
               <label className="text-xs font-black" style={primaryTextStyle}>Effective date

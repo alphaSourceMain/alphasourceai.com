@@ -88,6 +88,9 @@ export interface SalesAgreementPreview {
   preview_id: string;
   preview_url: string;
   expires_at: string;
+  agreement_effective_date: string;
+  agreement_renewal_date: string;
+  agreement_expires_at: string;
   normalized_draft: SalesDealDraft;
   pricing: SalesPricingSummary;
 }
@@ -107,6 +110,7 @@ export interface SalesDeal {
   promotion_label: string | null;
   created_at: string;
   updated_at: string;
+  last_activity_at?: string;
   next_action: SalesDealAction;
   available_actions: SalesDealAction[];
   ghl_opportunity_id: string | null;

@@ -185,6 +185,7 @@ const mockDeals: SalesDeal[] = [
     promotion_label: null,
     created_at: "2026-09-16T16:20:00.000Z",
     updated_at: "2026-09-17T14:05:00.000Z",
+    last_activity_at: "2026-09-17T14:05:00.000Z",
     next_action: "send_payment_reminder",
     available_actions: ["send_payment_reminder", "cancel"],
     ghl_opportunity_id: "opportunity_demo_1048",
@@ -204,6 +205,7 @@ const mockDeals: SalesDeal[] = [
     promotion_label: null,
     created_at: "2026-09-16T15:10:00.000Z",
     updated_at: "2026-09-16T15:10:00.000Z",
+    last_activity_at: "2026-09-16T15:10:00.000Z",
     next_action: "resend_agreement",
     available_actions: ["resend_agreement", "cancel"],
     ghl_opportunity_id: "opportunity_demo_1047",
@@ -223,6 +225,7 @@ const mockDeals: SalesDeal[] = [
     promotion_label: null,
     created_at: "2026-09-12T17:45:00.000Z",
     updated_at: "2026-09-13T19:22:00.000Z",
+    last_activity_at: "2026-09-13T19:22:00.000Z",
     next_action: "view",
     available_actions: ["view"],
     ghl_opportunity_id: "opportunity_demo_1046",
@@ -242,6 +245,7 @@ const mockDeals: SalesDeal[] = [
     promotion_label: null,
     created_at: "2026-09-11T14:25:00.000Z",
     updated_at: "2026-09-11T14:40:00.000Z",
+    last_activity_at: "2026-09-11T14:40:00.000Z",
     next_action: "escalate",
     available_actions: ["escalate"],
     ghl_opportunity_id: "opportunity_demo_1045",
@@ -308,12 +312,26 @@ const mockSalesApi: SalesApi = {
       candidate_assistance_email: deal.buyer_email,
       ghl_contact_id: `contact_${deal.id}`,
       sales_note: "Buyer reviewed the membership options during the discovery call.",
-      timeline: [{
-        id: `event_${deal.id}`,
-        event_type: deal.status === "activated" ? "account_activated" : "agreement_sent",
-        safe_metadata: {},
-        created_at: deal.updated_at,
-      }],
+      timeline: [
+        {
+          id: `event_sent_${deal.id}`,
+          event_type: "agreement_sent",
+          safe_metadata: {},
+          created_at: deal.created_at,
+        },
+        ...(["signed_payment_needed", "checkout_in_progress", "setup_in_progress", "activated"].includes(deal.status) ? [{
+          id: `event_signed_${deal.id}`,
+          event_type: "agreement_signed",
+          safe_metadata: {},
+          created_at: deal.last_activity_at || deal.updated_at,
+        }] : []),
+        ...(deal.status === "activated" ? [{
+          id: `event_activated_${deal.id}`,
+          event_type: "account_activated",
+          safe_metadata: {},
+          created_at: deal.last_activity_at || deal.updated_at,
+        }] : []),
+      ],
     };
   },
   async validatePromotionCode(code) {
@@ -327,11 +345,19 @@ const mockSalesApi: SalesApi = {
     await delay(420);
     const promotion = draft.promotion_code.trim().toUpperCase() === "DEMO10" ? mockPromotion : null;
     const pricing = mockPricing(draft, promotion);
-    const agreementText = `alphaScreen membership agreement preview\n\nCompany: ${draft.company_legal_name}\nMembership: ${packageForDraft(draft).display_name}\nBilling: ${draft.billing_cadence}\nMembership begins: successful initial payment date\n\nPrototype preview only.`;
+    const effectiveDate = new Date().toISOString().slice(0, 10);
+    const renewal = new Date(`${effectiveDate}T12:00:00`);
+    renewal.setFullYear(renewal.getFullYear() + 1);
+    const renewalDate = renewal.toISOString().slice(0, 10);
+    const agreementExpiresAt = new Date(`${effectiveDate}T23:59:59.999`).toISOString();
+    const agreementText = `alphaScreen membership agreement preview\n\nCompany: ${draft.company_legal_name}\nMembership: ${packageForDraft(draft).display_name}\nBilling: ${draft.billing_cadence}\nMembership begins: ${effectiveDate}\nInitial renewal date: ${renewalDate}\n\nPrototype preview only.`;
     return {
       preview_id: `preview-${Date.now()}`,
       preview_url: `data:text/plain;charset=utf-8,${encodeURIComponent(agreementText)}`,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      agreement_effective_date: effectiveDate,
+      agreement_renewal_date: renewalDate,
+      agreement_expires_at: agreementExpiresAt,
       normalized_draft: structuredClone(draft),
       pricing,
     };
@@ -357,6 +383,7 @@ const mockSalesApi: SalesApi = {
       promotion_label: promotion?.label || null,
       created_at: now,
       updated_at: now,
+      last_activity_at: now,
       next_action: "resend_agreement",
       available_actions: ["resend_agreement", "cancel"],
       ghl_opportunity_id: draft.ghl_opportunity_id || null,
@@ -382,6 +409,7 @@ const mockSalesApi: SalesApi = {
     deal.next_action = "view";
     deal.available_actions = ["view"];
     deal.updated_at = new Date().toISOString();
+    deal.last_activity_at = deal.updated_at;
     return { deal: structuredClone(deal), message: "The unpaid transaction was canceled." };
   },
   async createEnterpriseHandoff(input) {
