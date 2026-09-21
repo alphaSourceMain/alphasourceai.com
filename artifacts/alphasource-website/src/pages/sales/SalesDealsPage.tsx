@@ -68,15 +68,19 @@ function formatMoney(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 === 0 ? 0 : 2 }).format(cents / 100);
 }
 
-function formatRelativeDate(value: string): string {
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) return "Unknown";
-  const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60000));
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
+function formatActivityDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Denver",
+  }).format(date);
+}
+
+function activityDateValue(deal: SalesDeal): string {
+  return deal.last_activity_at || deal.updated_at;
 }
 
 function matchesFilter(deal: SalesDeal, filter: FilterKey): boolean {
@@ -92,7 +96,7 @@ function dealSortValue(deal: SalesDeal, key: SortKey): string | number {
   if (key === "membership") return `${deal.plan_name} ${deal.billing_cadence}`.toLowerCase();
   if (key === "status") return deal.status_label.toLowerCase();
   if (key === "payment") return deal.initial_payment_cents;
-  return new Date(deal.updated_at).getTime() || 0;
+  return new Date(activityDateValue(deal)).getTime() || 0;
 }
 
 function SortIndicator({ active, direction }: { active: boolean; direction: SortDirection }) {
@@ -147,7 +151,7 @@ export default function SalesDealsPage() {
     return deals.filter((deal) => {
       if (!matchesFilter(deal, filter)) return false;
       if (!term) return true;
-      return [deal.company_legal_name, deal.company_dba, deal.buyer_name, deal.buyer_email, deal.plan_name, deal.billing_cadence, deal.status_label, formatMoney(deal.initial_payment_cents)]
+      return [deal.company_legal_name, deal.company_dba, deal.buyer_name, deal.buyer_email, deal.plan_name, deal.billing_cadence, deal.status_label, formatMoney(deal.initial_payment_cents), formatActivityDate(activityDateValue(deal))]
         .join(" ")
         .toLowerCase()
         .includes(term);
@@ -314,7 +318,7 @@ export default function SalesDealsPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Last activity</p>
-                  <p className="text-xs font-bold" style={{ color: "var(--as-text-muted)" }}>{formatRelativeDate(deal.updated_at)}</p>
+                  <p className="text-xs font-bold tabular-nums" style={{ color: "var(--as-text-muted)" }}>{formatActivityDate(activityDateValue(deal))}</p>
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
                   <p className="w-full text-[10px] font-black uppercase tracking-[0.14em] lg:hidden" style={{ color: "var(--as-text-subtle)" }}>Actions</p>

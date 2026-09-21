@@ -110,6 +110,7 @@ export interface SalesDeal {
   promotion_label: string | null;
   created_at: string;
   updated_at: string;
+  last_activity_at?: string;
   next_action: SalesDealAction;
   available_actions: SalesDealAction[];
   ghl_opportunity_id: string | null;

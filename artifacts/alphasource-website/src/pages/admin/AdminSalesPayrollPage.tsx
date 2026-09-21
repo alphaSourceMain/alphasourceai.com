@@ -440,7 +440,7 @@ export default function AdminSalesPayrollPage() {
                   <option value="credit">Credit</option>
                 </select>
               </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Membership amount
+              <label className="text-xs font-black" style={primaryTextStyle}>Adjustment amount
                 <div className="mt-1.5 flex rounded-xl border" style={fieldStyle}><span className="px-3 py-2.5 text-sm font-black" style={mutedTextStyle}>$</span><input required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" className="min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-sm font-semibold outline-none" /></div>
               </label>
               <label className="text-xs font-black" style={primaryTextStyle}>Effective date
