@@ -93,6 +93,7 @@ interface TeamRecord {
   config: VoiceConfig | null;
   readiness: { ready: boolean; missing: string[] };
   sync_jobs: SyncJob[];
+  pending_draft?: { updated_at: string } | null;
 }
 
 interface TeamPayload {
@@ -337,7 +338,7 @@ export default function AdminSalesTeamPage() {
         method: creating ? "POST" : "PATCH",
         body: JSON.stringify(body),
       });
-      setNotice("Draft saved. Review readiness before applying provider changes.");
+      setNotice("Draft saved. The active call route has not changed.");
       await load(result.item.member.id);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save this salesperson.");
@@ -346,16 +347,23 @@ export default function AdminSalesTeamPage() {
     }
   };
 
-  const action = async (name: "apply" | "deactivate" | "rotate-agent-token") => {
+  const action = async (name: "apply" | "deactivate" | "reactivate" | "rotate-agent-token") => {
     if (!selectedId) return;
+    if (name === "deactivate" && !window.confirm(`Deactivate ${selected?.member.display_name || "this salesperson"}? Their historical sales and commissions will be preserved.`)) return;
     setSaving(true);
     setError("");
     setNotice("");
     setOneTimeToken("");
     try {
+      if (name === "apply") {
+        await request(`/admin/sales-team/members/${selectedId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...form, business_hours: { summary: form.business_hours_summary } }),
+        });
+      }
       const result = await request<{ item: TeamRecord; token?: string }>(`/admin/sales-team/members/${selectedId}/${name}`, { method: "POST", body: "{}" });
       if (result.token) setOneTimeToken(result.token);
-      setNotice(name === "apply" ? "Configuration applied. Complete the provider actions shown below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : "New one-time Grok agent token created. Copy it now; it will not be shown again.");
+      setNotice(name === "apply" ? "Configuration applied. Complete the provider actions shown below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : "New one-time Grok agent token created. Copy it now; it will not be shown again.");
       await load(result.item.member.id);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The action could not be completed.");
@@ -388,7 +396,7 @@ export default function AdminSalesTeamPage() {
           <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
             <p className="text-sm font-black">One-time Grok agent token</p>
             <p className="mt-1 text-xs font-semibold">Paste this into the agent’s fixed message tool. It cannot be recovered after leaving this page.</p>
-            <div className="mt-3 flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">{oneTimeToken}</code><button type="button" onClick={() => void copy(oneTimeToken, "Agent token copied.")} className="rounded-lg bg-amber-900 px-3 text-white"><Clipboard className="h-4 w-4" /></button></div>
+            <div className="mt-3 flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">{oneTimeToken}</code><button type="button" aria-label="Copy one-time Grok agent token" onClick={() => void copy(oneTimeToken, "Agent token copied.")} className="rounded-lg bg-amber-900 px-3 text-white"><Clipboard className="h-4 w-4" /></button></div>
           </section>
         )}
 
@@ -471,9 +479,10 @@ export default function AdminSalesTeamPage() {
 
             <div className="sticky bottom-3 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--as-border)] bg-[var(--as-surface)]/95 p-3 shadow-lg backdrop-blur">
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("deactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-xs font-black text-red-700 disabled:opacity-50"><UserRoundX className="h-4 w-4" /> Deactivate</button>}
+              {selected && !creating && selected.member.status === "inactive" && <button type="button" disabled={saving} onClick={() => void action("reactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2.5 text-xs font-black text-emerald-700 disabled:opacity-50"><UserRound className="h-4 w-4" /> Reactivate as draft</button>}
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || !selected.assignment} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Rotate agent token</button>}
-              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-4 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><UserRound className="h-4 w-4" /> {saving ? "Saving…" : "Save draft"}</button>
-              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || !selected.readiness.ready} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Apply changes</button>}
+              <button type="submit" disabled={saving || selected?.member.status === "inactive"} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-4 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><UserRound className="h-4 w-4" /> {saving ? "Saving…" : "Save draft"}</button>
+              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Save & apply changes</button>}
             </div>
           </form>
         </div>
