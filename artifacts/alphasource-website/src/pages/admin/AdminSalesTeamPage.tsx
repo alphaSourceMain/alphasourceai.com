@@ -42,6 +42,16 @@ interface PhoneNumber {
   label: string | null;
   a2p_status: string;
   active: boolean;
+  xai_agent_id: string | null;
+  xai_phone_number_e164: string | null;
+  ghl_location_id: string | null;
+  ghl_routing_workflow_id: string | null;
+  ghl_notification_workflow_id: string | null;
+  ghl_mobile_custom_value_id: string | null;
+  ghl_mobile_custom_value_name: string | null;
+  xai_setup_status: "pending" | "verified" | "failed";
+  ghl_setup_status: "pending" | "verified" | "failed";
+  handoff_token_rotated_at: string | null;
 }
 
 interface Assignment {
@@ -115,6 +125,11 @@ interface FormState {
   xai_phone_number_e164: string;
   ghl_location_id: string;
   ghl_notification_workflow_id: string;
+  ghl_routing_workflow_id: string;
+  ghl_mobile_custom_value_id: string;
+  ghl_mobile_custom_value_name: string;
+  xai_setup_status: "pending" | "verified" | "failed";
+  ghl_setup_status: "pending" | "verified" | "failed";
   ring_seconds: number;
   transfer_enabled: boolean;
   backup_transfer_phone_e164: string;
@@ -142,6 +157,11 @@ const emptyForm: FormState = {
   xai_phone_number_e164: "",
   ghl_location_id: "",
   ghl_notification_workflow_id: "",
+  ghl_routing_workflow_id: "",
+  ghl_mobile_custom_value_id: "",
+  ghl_mobile_custom_value_name: "",
+  xai_setup_status: "pending",
+  ghl_setup_status: "pending",
   ring_seconds: 20,
   transfer_enabled: false,
   backup_transfer_phone_e164: "",
@@ -173,10 +193,15 @@ function formFor(record: TeamRecord): FormState {
     ghl_user_id: record.member.ghl_user_id || "",
     slack_user_id: record.member.slack_user_id || "",
     phone_number_id: record.assignment?.phone_number_id || "",
-    xai_agent_id: record.assignment?.xai_agent_id || "",
-    xai_phone_number_e164: record.assignment?.xai_phone_number_e164 || "",
-    ghl_location_id: record.assignment?.ghl_location_id || "",
-    ghl_notification_workflow_id: record.assignment?.ghl_notification_workflow_id || "",
+    xai_agent_id: record.phone?.xai_agent_id || record.assignment?.xai_agent_id || "",
+    xai_phone_number_e164: record.phone?.xai_phone_number_e164 || record.assignment?.xai_phone_number_e164 || "",
+    ghl_location_id: record.phone?.ghl_location_id || record.assignment?.ghl_location_id || "",
+    ghl_notification_workflow_id: record.phone?.ghl_notification_workflow_id || record.assignment?.ghl_notification_workflow_id || "",
+    ghl_routing_workflow_id: record.phone?.ghl_routing_workflow_id || "",
+    ghl_mobile_custom_value_id: record.phone?.ghl_mobile_custom_value_id || "",
+    ghl_mobile_custom_value_name: record.phone?.ghl_mobile_custom_value_name || "",
+    xai_setup_status: record.phone?.xai_setup_status || "pending",
+    ghl_setup_status: record.phone?.ghl_setup_status || "pending",
     ring_seconds: record.assignment?.ring_seconds || 20,
     transfer_enabled: record.assignment?.transfer_enabled === true,
     backup_transfer_phone_e164: record.assignment?.backup_transfer_phone_e164 || "",
@@ -309,6 +334,7 @@ export default function AdminSalesTeamPage() {
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = useMemo(() => payload.items.find((item) => item.member.id === selectedId) || null, [payload.items, selectedId]);
+  const selectedLine = useMemo(() => payload.phone_numbers.find((phone) => phone.id === form.phone_number_id) || null, [payload.phone_numbers, form.phone_number_id]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return payload.items;
@@ -349,7 +375,7 @@ export default function AdminSalesTeamPage() {
     }
   };
 
-  const action = async (name: "apply" | "deactivate" | "reactivate" | "rotate-agent-token") => {
+  const action = async (name: "apply" | "deactivate" | "reactivate" | "rotate-agent-token" | "sync") => {
     if (!selectedId) return;
     if (name === "deactivate" && !window.confirm(`Deactivate ${selected?.member.display_name || "this salesperson"}? Their historical sales and commissions will be preserved.`)) return;
     setSaving(true);
@@ -365,7 +391,7 @@ export default function AdminSalesTeamPage() {
       }
       const result = await request<{ item: TeamRecord; token?: string }>(`/admin/sales-team/members/${selectedId}/${name}`, { method: "POST", body: "{}" });
       if (result.token) setOneTimeToken(result.token);
-      setNotice(name === "apply" ? "Configuration applied. Complete the provider actions shown below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : "New one-time Grok agent token created. Copy it now; it will not be shown again.");
+      setNotice(name === "apply" ? "Configuration applied and provider synchronization checked." : name === "sync" ? "Provider synchronization checked. Review the current statuses below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : "New one-time line token created. Copy it into both fixed Grok tools now; it will not be shown again.");
       await load(result.item.member.id);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The action could not be completed.");
@@ -377,6 +403,35 @@ export default function AdminSalesTeamPage() {
   const copy = async (value: string, message: string) => {
     await navigator.clipboard.writeText(value);
     setNotice(message);
+  };
+
+  const saveLineSetup = async () => {
+    if (!selectedLine) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      await request(`/admin/sales-team/lines/${selectedLine.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          xai_agent_id: form.xai_agent_id,
+          xai_phone_number_e164: form.xai_phone_number_e164,
+          ghl_location_id: form.ghl_location_id,
+          ghl_routing_workflow_id: form.ghl_routing_workflow_id,
+          ghl_notification_workflow_id: form.ghl_notification_workflow_id,
+          ghl_mobile_custom_value_id: form.ghl_mobile_custom_value_id,
+          ghl_mobile_custom_value_name: form.ghl_mobile_custom_value_name,
+          xai_setup_status: form.xai_setup_status,
+          ghl_setup_status: form.ghl_setup_status,
+        }),
+      });
+      setNotice("Reusable company-line setup saved.");
+      await load(selectedId);
+    } catch (lineError) {
+      setError(lineError instanceof Error ? lineError.message : "Could not save the company-line setup.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -396,8 +451,8 @@ export default function AdminSalesTeamPage() {
         {(error || notice) && <div role={error ? "alert" : "status"} className={`rounded-lg border px-4 py-3 text-sm font-bold ${error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{error || notice}</div>}
         {oneTimeToken && (
           <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
-            <p className="text-sm font-black">One-time Grok agent token</p>
-            <p className="mt-1 text-xs font-semibold">Paste this into the agent’s fixed message tool. It cannot be recovered after leaving this page.</p>
+            <p className="text-sm font-black">One-time Grok line token</p>
+            <p className="mt-1 text-xs font-semibold">Paste this into the line’s fixed context and message tools. The token stays with the company phone line when personnel change.</p>
             <div className="mt-3 flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">{oneTimeToken}</code><button type="button" aria-label="Copy one-time Grok agent token" onClick={() => void copy(oneTimeToken, "Agent token copied.")} className="rounded-lg bg-amber-900 px-3 text-white"><Clipboard className="h-4 w-4" /></button></div>
           </section>
         )}
@@ -435,19 +490,20 @@ export default function AdminSalesTeamPage() {
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p>{selected?.pending_draft && selected.applied_phone && <p className="mt-1 text-[11px] font-bold text-amber-700">Active number: {formatPhone(selected.applied_phone.e164)} · draft changes are not live</p>}</div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="GHL phone number"><select className={inputClass} value={form.phone_number_id} onChange={(e) => update("phone_number_id", e.target.value)}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {phone.a2p_status}</option>)}</select></Field>
+                <Field label="GHL phone number"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value); setForm((current) => ({ ...current, phone_number_id: e.target.value, xai_agent_id: phone?.xai_agent_id || "", xai_phone_number_e164: phone?.xai_phone_number_e164 || "", ghl_location_id: phone?.ghl_location_id || "", ghl_routing_workflow_id: phone?.ghl_routing_workflow_id || "", ghl_notification_workflow_id: phone?.ghl_notification_workflow_id || "", ghl_mobile_custom_value_id: phone?.ghl_mobile_custom_value_id || "", ghl_mobile_custom_value_name: phone?.ghl_mobile_custom_value_name || "", xai_setup_status: phone?.xai_setup_status || "pending", ghl_setup_status: phone?.ghl_setup_status || "pending" })); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {phone.a2p_status}</option>)}</select></Field>
                 <Field label="Mobile ring time" hint="10-25 seconds"><input className={inputClass} type="number" min={10} max={25} value={form.ring_seconds} onChange={(e) => update("ring_seconds", Number(e.target.value))} /></Field>
-                <Field label="GHL location ID"><input className={inputClass} value={form.ghl_location_id} onChange={(e) => update("ghl_location_id", e.target.value)} /></Field>
-                <Field label="GHL notification workflow ID"><input className={inputClass} value={form.ghl_notification_workflow_id} onChange={(e) => update("ghl_notification_workflow_id", e.target.value)} /></Field>
+                <Field label="GHL line setup" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selected?.phone?.ghl_setup_status === "verified" ? "Verified and reusable" : "Setup pending"}</div></Field>
+                <Field label="GHL workflow" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selected?.phone?.ghl_routing_workflow_id || "Not configured"}</div></Field>
               </div>
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><ShieldCheck className="mr-2 inline h-4 w-4" />Call Connect is locked on. GHL must time out before the mobile carrier’s voicemail answers, then route to the assigned Grok Voice number.</div>
+              {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable company-line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Configure these once for the company number. Normal hires only need the person fields above.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="GHL routing workflow ID"><input className={inputClass} value={form.ghl_routing_workflow_id} onChange={(e) => update("ghl_routing_workflow_id", e.target.value)} /></Field><Field label="GHL notification workflow ID"><input className={inputClass} value={form.ghl_notification_workflow_id} onChange={(e) => update("ghl_notification_workflow_id", e.target.value)} /></Field><Field label="GHL mobile custom value ID"><input className={inputClass} value={form.ghl_mobile_custom_value_id} onChange={(e) => update("ghl_mobile_custom_value_id", e.target.value)} /></Field><Field label="GHL mobile custom value name"><input className={inputClass} value={form.ghl_mobile_custom_value_name} onChange={(e) => update("ghl_mobile_custom_value_name", e.target.value)} /></Field><Field label="GHL setup status"><select className={inputClass} value={form.ghl_setup_status} onChange={(e) => update("ghl_setup_status", e.target.value as FormState["ghl_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div><button type="button" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save company-line setup</button></details>}
             </section>
 
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A380F6]/15 text-[#7655CC]"><Bot className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">Grok Voice agent</h2><p className="text-xs font-semibold text-[var(--as-muted)]">Edit approved context and capabilities while the consent and data-safety rules stay locked.</p></div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field>
-                <Field label="Grok fallback number" hint="Use +1XXXXXXXXXX"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} /></Field>
+                <Field label="Grok agent" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{form.xai_agent_id || "Not configured"}</div></Field>
+                <Field label="Grok fallback number" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{formatPhone(form.xai_phone_number_e164)}</div></Field>
                 <Field label="Voice"><input className={inputClass} value={form.voice_id} onChange={(e) => update("voice_id", e.target.value)} /></Field>
                 <Field label="Timezone"><input className={inputClass} value={form.timezone} onChange={(e) => update("timezone", e.target.value)} /></Field>
                 <Field label="Business hours"><input className={inputClass} value={form.business_hours_summary} onChange={(e) => update("business_hours_summary", e.target.value)} /></Field>
@@ -465,6 +521,7 @@ export default function AdminSalesTeamPage() {
                 <Toggle checked={form.notify_sms} onChange={(value) => update("notify_sms", value)} label="GHL SMS notification" />
                 <Toggle checked={form.notify_email} onChange={(value) => update("notify_email", value)} label="Email notification" />
               </div>
+              {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable Grok line setup</summary><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field><Field label="Grok phone number"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} placeholder="+17205551212" /></Field><Field label="Grok setup status"><select className={inputClass} value={form.xai_setup_status} onChange={(e) => update("xai_setup_status", e.target.value as FormState["xai_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div><button type="button" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save company-line setup</button></details>}
             </section>
 
             {selected && !creating && (
@@ -482,7 +539,8 @@ export default function AdminSalesTeamPage() {
             <div className="sticky bottom-3 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--as-border)] bg-[var(--as-surface)]/95 p-3 shadow-lg backdrop-blur">
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("deactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-xs font-black text-red-700 disabled:opacity-50"><UserRoundX className="h-4 w-4" /> Deactivate</button>}
               {selected && !creating && selected.member.status === "inactive" && <button type="button" disabled={saving} onClick={() => void action("reactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2.5 text-xs font-black text-emerald-700 disabled:opacity-50"><UserRound className="h-4 w-4" /> Reactivate as draft</button>}
-              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || selected.member.status !== "active" || selected.applied_assignment?.status !== "active"} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Rotate agent token</button>}
+              {selected && !creating && selected.member.status === "active" && <button type="button" disabled={saving} onClick={() => void action("sync")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Sync providers</button>}
+              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || !selected.phone?.id} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> {selected.phone?.handoff_token_rotated_at ? "Rotate line token" : "Prepare line token"}</button>}
               <button type="submit" disabled={saving || selected?.member.status === "inactive"} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-4 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><UserRound className="h-4 w-4" /> {saving ? "Saving…" : "Save draft"}</button>
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Save & apply changes</button>}
             </div>
