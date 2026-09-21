@@ -91,6 +91,8 @@ interface TeamRecord {
   assignment: Assignment | null;
   phone: PhoneNumber | null;
   config: VoiceConfig | null;
+  applied_assignment?: Assignment | null;
+  applied_phone?: PhoneNumber | null;
   readiness: { ready: boolean; missing: string[] };
   sync_jobs: SyncJob[];
   pending_draft?: { updated_at: string } | null;
@@ -411,7 +413,7 @@ export default function AdminSalesTeamPage() {
               {filtered.map((record) => (
                 <button key={record.member.id} type="button" onClick={() => choose(record)} className={`w-full p-4 text-left transition ${selectedId === record.member.id && !creating ? "bg-[#A380F6]/10" : "hover:bg-[var(--as-soft)]"}`}>
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-[var(--as-text)]">{record.member.display_name}</p><p className="mt-1 truncate text-xs font-semibold text-[var(--as-muted)]">{record.member.workspace_email || "Workspace email needed"}</p></div><StatusPill status={record.member.status} /></div>
-                  <div className="mt-3 flex items-center justify-between text-xs font-bold text-[var(--as-muted)]"><span>{formatPhone(record.phone?.e164)}</span><span className={record.readiness.ready ? "text-emerald-700" : "text-amber-700"}>{record.readiness.ready ? "Ready" : `${record.readiness.missing.length} needed`}</span></div>
+                  <div className="mt-3 flex items-center justify-between text-xs font-bold text-[var(--as-muted)]"><span>{formatPhone(record.applied_phone?.e164 || record.phone?.e164)}</span><span className={record.readiness.ready ? "text-emerald-700" : "text-amber-700"}>{record.pending_draft ? "Draft changes" : record.readiness.ready ? "Ready" : `${record.readiness.missing.length} needed`}</span></div>
                 </button>
               ))}
             </div>
@@ -431,7 +433,7 @@ export default function AdminSalesTeamPage() {
             </section>
 
             <section className="rounded-xl border p-5" style={cardStyle}>
-              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p></div></div>
+              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p>{selected?.pending_draft && selected.applied_phone && <p className="mt-1 text-[11px] font-bold text-amber-700">Active number: {formatPhone(selected.applied_phone.e164)} · draft changes are not live</p>}</div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="GHL phone number"><select className={inputClass} value={form.phone_number_id} onChange={(e) => update("phone_number_id", e.target.value)}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {phone.a2p_status}</option>)}</select></Field>
                 <Field label="Mobile ring time" hint="10-25 seconds"><input className={inputClass} type="number" min={10} max={25} value={form.ring_seconds} onChange={(e) => update("ring_seconds", Number(e.target.value))} /></Field>
@@ -480,7 +482,7 @@ export default function AdminSalesTeamPage() {
             <div className="sticky bottom-3 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--as-border)] bg-[var(--as-surface)]/95 p-3 shadow-lg backdrop-blur">
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("deactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-xs font-black text-red-700 disabled:opacity-50"><UserRoundX className="h-4 w-4" /> Deactivate</button>}
               {selected && !creating && selected.member.status === "inactive" && <button type="button" disabled={saving} onClick={() => void action("reactivate")} className="mr-auto inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2.5 text-xs font-black text-emerald-700 disabled:opacity-50"><UserRound className="h-4 w-4" /> Reactivate as draft</button>}
-              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || !selected.assignment} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Rotate agent token</button>}
+              {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving || selected.member.status !== "active" || selected.applied_assignment?.status !== "active"} onClick={() => void action("rotate-agent-token")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Rotate agent token</button>}
               <button type="submit" disabled={saving || selected?.member.status === "inactive"} className="inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-4 py-2.5 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><UserRound className="h-4 w-4" /> {saving ? "Saving…" : "Save draft"}</button>
               {selected && !creating && selected.member.status !== "inactive" && <button type="button" disabled={saving} onClick={() => void action("apply")} className="inline-flex items-center gap-2 rounded-lg bg-[#0A1547] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Save & apply changes</button>}
             </div>
