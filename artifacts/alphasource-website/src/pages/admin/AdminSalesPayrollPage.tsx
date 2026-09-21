@@ -415,7 +415,7 @@ export default function AdminSalesPayrollPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-black" style={primaryTextStyle}>Add payroll adjustment</h2>
-                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>Enter membership value. The report applies the 50% commission impact automatically. Records remain in the audit history; correct an error with an offsetting entry.</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>Enter the adjustment amount. The report applies the 50% commission impact automatically. Records remain in the audit history; correct an error with an offsetting entry.</p>
               </div>
               <button type="button" onClick={() => setShowAdjustment(false)} className="self-start text-xs font-black text-[#7C5FCC]">Close</button>
             </div>
