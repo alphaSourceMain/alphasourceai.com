@@ -42,6 +42,7 @@ interface PhoneNumber {
   label: string | null;
   a2p_status: string;
   active: boolean;
+  shared_voice_entrypoint: boolean;
   xai_agent_id: string | null;
   xai_phone_number_e164: string | null;
   ghl_location_id: string | null;
@@ -105,6 +106,7 @@ interface TeamRecord {
   member: TeamMember;
   assignment: Assignment | null;
   phone: PhoneNumber | null;
+  shared_voice_phone?: PhoneNumber | null;
   config: VoiceConfig | null;
   applied_assignment?: Assignment | null;
   applied_phone?: PhoneNumber | null;
@@ -116,6 +118,7 @@ interface TeamRecord {
 interface TeamPayload {
   items: TeamRecord[];
   phone_numbers: PhoneNumber[];
+  shared_voice_phone: PhoneNumber | null;
   agent_bootstrap_prompt: string;
 }
 
@@ -197,6 +200,7 @@ const cardStyle = {
 
 function formFor(record: TeamRecord): FormState {
   const hours = record.config?.business_hours?.summary;
+  const sharedVoice = record.shared_voice_phone || record.phone;
   return {
     display_name: record.member.display_name || "",
     workspace_email: record.member.workspace_email || "",
@@ -205,8 +209,8 @@ function formFor(record: TeamRecord): FormState {
     ghl_user_id: record.member.ghl_user_id || "",
     slack_user_id: record.member.slack_user_id || "",
     phone_number_id: record.assignment?.phone_number_id || "",
-    xai_agent_id: record.phone?.xai_agent_id || record.assignment?.xai_agent_id || "",
-    xai_phone_number_e164: record.phone?.xai_phone_number_e164 || record.assignment?.xai_phone_number_e164 || "",
+    xai_agent_id: sharedVoice?.xai_agent_id || record.assignment?.xai_agent_id || "",
+    xai_phone_number_e164: sharedVoice?.xai_phone_number_e164 || record.assignment?.xai_phone_number_e164 || "",
     ghl_location_id: record.phone?.ghl_location_id || record.assignment?.ghl_location_id || "",
     ghl_notification_workflow_id: record.phone?.ghl_notification_workflow_id || record.assignment?.ghl_notification_workflow_id || "",
     ghl_routing_workflow_id: record.phone?.ghl_routing_workflow_id || "",
@@ -214,9 +218,9 @@ function formFor(record: TeamRecord): FormState {
     ghl_mobile_custom_value_name: record.phone?.ghl_mobile_custom_value_name || "",
     ghl_user_custom_value_id: record.phone?.ghl_user_custom_value_id || "",
     ghl_user_custom_value_name: record.phone?.ghl_user_custom_value_name || "",
-    xai_setup_status: record.phone?.xai_setup_status || "pending",
+    xai_setup_status: sharedVoice?.xai_setup_status || "pending",
     ghl_setup_status: record.phone?.ghl_setup_status || "pending",
-    xai_verification_reference: record.phone?.xai_verification_reference || "",
+    xai_verification_reference: sharedVoice?.xai_verification_reference || "",
     ring_seconds: record.assignment?.ring_seconds || 20,
     transfer_enabled: record.assignment?.transfer_enabled === true,
     backup_transfer_phone_e164: record.assignment?.backup_transfer_phone_e164 || "",
@@ -233,12 +237,13 @@ function formFor(record: TeamRecord): FormState {
   };
 }
 
-function formWithPhone(current: FormState, phone: PhoneNumber | null): FormState {
+function formWithPhone(current: FormState, phone: PhoneNumber | null, sharedVoice?: PhoneNumber | null): FormState {
+  const voice = sharedVoice || phone;
   return {
     ...current,
     phone_number_id: phone?.id || "",
-    xai_agent_id: phone?.xai_agent_id || "",
-    xai_phone_number_e164: phone?.xai_phone_number_e164 || "",
+    xai_agent_id: voice?.xai_agent_id || "",
+    xai_phone_number_e164: voice?.xai_phone_number_e164 || "",
     ghl_location_id: phone?.ghl_location_id || "",
     ghl_routing_workflow_id: phone?.ghl_routing_workflow_id || "",
     ghl_notification_workflow_id: phone?.ghl_notification_workflow_id || "",
@@ -246,9 +251,9 @@ function formWithPhone(current: FormState, phone: PhoneNumber | null): FormState
     ghl_mobile_custom_value_name: phone?.ghl_mobile_custom_value_name || "",
     ghl_user_custom_value_id: phone?.ghl_user_custom_value_id || "",
     ghl_user_custom_value_name: phone?.ghl_user_custom_value_name || "",
-    xai_setup_status: phone?.xai_setup_status || "pending",
+    xai_setup_status: voice?.xai_setup_status || "pending",
     ghl_setup_status: phone?.ghl_setup_status || "pending",
-    xai_verification_reference: phone?.xai_verification_reference || "",
+    xai_verification_reference: voice?.xai_verification_reference || "",
   };
 }
 
@@ -334,7 +339,7 @@ function Toggle({ checked, onChange, label, detail }: { checked: boolean; onChan
 }
 
 export default function AdminSalesTeamPage() {
-  const [payload, setPayload] = useState<TeamPayload>({ items: [], phone_numbers: [], agent_bootstrap_prompt: "" });
+  const [payload, setPayload] = useState<TeamPayload>({ items: [], phone_numbers: [], shared_voice_phone: null, agent_bootstrap_prompt: "" });
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [creating, setCreating] = useState(false);
@@ -396,7 +401,7 @@ export default function AdminSalesTeamPage() {
       return;
     }
     if (selected && !creating) {
-      setForm((current) => formWithPhone(current, phone));
+      setForm((current) => formWithPhone(current, phone, payload.shared_voice_phone));
       setError("");
       setNotice("Line selected. Save the draft, then apply routing when all required details are ready.");
       setOneTimeToken("");
@@ -404,7 +409,7 @@ export default function AdminSalesTeamPage() {
     }
     setCreating(true);
     setSelectedId("");
-    setForm(formWithPhone(emptyForm, phone));
+    setForm(formWithPhone(emptyForm, phone, payload.shared_voice_phone));
     setError("");
     setNotice("");
     setOneTimeToken("");
@@ -457,7 +462,7 @@ export default function AdminSalesTeamPage() {
           : {};
       const result = await request<{ item: TeamRecord; token?: string }>(`/admin/sales-team/members/${selectedId}/${name}`, { method: "POST", body: JSON.stringify(actionBody) });
       if (result.token) setOneTimeToken(result.token);
-      setNotice(name === "apply" ? "Configuration applied and provider synchronization checked." : name === "sync" ? "Provider synchronization checked. Review the current statuses below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : "New one-time line token created. Copy it into both fixed Grok tools now; it will not be shown again.");
+      setNotice(name === "apply" ? "Configuration applied and provider synchronization checked." : name === "sync" ? "Provider synchronization checked. Review the current statuses below." : name === "deactivate" ? "Salesperson deactivated and historical attribution preserved." : name === "reactivate" ? "Salesperson restored as a draft. Review and apply the routing configuration before use." : selectedLine?.shared_voice_entrypoint ? "New one-time line token created. Copy it into the shared Grok context and message tools and this line’s GHL route webhook; it will not be shown again." : "New one-time line token created. Copy it into this line’s GHL route webhook; it will not be shown again.");
       await load(result.item.member.id);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The action could not be completed.");
@@ -480,8 +485,8 @@ export default function AdminSalesTeamPage() {
       await request(`/admin/sales-team/lines/${selectedLine.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          xai_agent_id: form.xai_agent_id,
-          xai_phone_number_e164: form.xai_phone_number_e164,
+          xai_agent_id: selectedLine.shared_voice_entrypoint ? form.xai_agent_id : selectedLine.xai_agent_id,
+          xai_phone_number_e164: selectedLine.shared_voice_entrypoint ? form.xai_phone_number_e164 : selectedLine.xai_phone_number_e164,
           ghl_location_id: form.ghl_location_id,
           ghl_routing_workflow_id: form.ghl_routing_workflow_id,
           ghl_notification_workflow_id: form.ghl_notification_workflow_id,
@@ -489,9 +494,9 @@ export default function AdminSalesTeamPage() {
           ghl_mobile_custom_value_name: form.ghl_mobile_custom_value_name,
           ghl_user_custom_value_id: form.ghl_user_custom_value_id,
           ghl_user_custom_value_name: form.ghl_user_custom_value_name,
-          xai_setup_status: form.xai_setup_status,
+          xai_setup_status: selectedLine.shared_voice_entrypoint ? form.xai_setup_status : selectedLine.xai_setup_status,
           ghl_setup_status: form.ghl_setup_status,
-          xai_verification_reference: form.xai_verification_reference,
+          xai_verification_reference: selectedLine.shared_voice_entrypoint ? form.xai_verification_reference : selectedLine.xai_verification_reference,
         }),
       });
       setNotice("Reusable company-line setup saved.");
@@ -520,23 +525,24 @@ export default function AdminSalesTeamPage() {
         {(error || notice) && <div role={error ? "alert" : "status"} className={`rounded-lg border px-4 py-3 text-sm font-bold ${error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{error || notice}</div>}
         {oneTimeToken && (
           <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
-            <p className="text-sm font-black">One-time Grok line token</p>
-            <p className="mt-1 text-xs font-semibold">Paste this into the line’s fixed context and message tools. The token stays with the company phone line when personnel change.</p>
+            <p className="text-sm font-black">One-time secure line token</p>
+            <p className="mt-1 text-xs font-semibold">{selectedLine?.shared_voice_entrypoint ? "Paste this into the shared Grok context and message tools and this line’s GHL route webhook." : "Paste this into this line’s GHL route webhook."} The token stays with the company phone line when personnel change.</p>
             <div className="mt-3 flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">{oneTimeToken}</code><button type="button" aria-label="Copy one-time Grok line token" onClick={() => void copy(oneTimeToken, "Line token copied.")} className="rounded-lg bg-amber-900 px-3 text-white"><Clipboard className="h-4 w-4" /></button></div>
           </section>
         )}
 
         <section aria-labelledby="sales-line-slots-title">
           <div className="mb-3 flex items-end justify-between gap-3">
-            <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">The GHL number, workflows, Grok agent, and secure tools stay with each slot when personnel change.</p></div>
+            <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">Each GHL number keeps its workflow and secure route. All four share one verified Grok Voice agent and fallback number.</p></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {payload.phone_numbers.slice(0, 4).map((phone, index) => {
               const occupant = activeOccupants.get(phone.id);
               const selectedSlot = form.phone_number_id === phone.id;
+              const sharedVoice = payload.shared_voice_phone;
               const ready = phone.active
                 && phone.ghl_setup_status === "verified"
-                && phone.xai_setup_status === "verified"
+                && sharedVoice?.xai_setup_status === "verified"
                 && Boolean(phone.ghl_location_id)
                 && Boolean(phone.ghl_routing_workflow_id)
                 && Boolean(phone.ghl_notification_workflow_id)
@@ -544,11 +550,12 @@ export default function AdminSalesTeamPage() {
                 && Boolean(phone.ghl_mobile_custom_value_name)
                 && Boolean(phone.ghl_user_custom_value_id)
                 && Boolean(phone.ghl_user_custom_value_name)
-                && Boolean(phone.xai_agent_id)
-                && Boolean(phone.xai_phone_number_e164)
+                && Boolean(sharedVoice?.xai_agent_id)
+                && Boolean(sharedVoice?.xai_phone_number_e164)
                 && Boolean(phone.handoff_token_rotated_at)
-                && Boolean(phone.xai_verification_reference)
-                && Boolean(phone.xai_verified_at);
+                && Boolean(sharedVoice?.handoff_token_rotated_at)
+                && Boolean(sharedVoice?.xai_verification_reference)
+                && Boolean(sharedVoice?.xai_verified_at);
               return (
                 <button key={phone.id} type="button" disabled={!phone.active} onClick={() => chooseSlot(phone)} className={`rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${selectedSlot ? "border-[#A380F6] bg-[#A380F6]/10" : "border-[var(--as-border)] bg-[var(--as-surface)] hover:border-[#A380F6]/50"}`}>
                   <div className="flex items-start justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Line {index + 1}</p><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${ready ? "bg-emerald-100 text-emerald-800" : phone.active ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{ready ? "Prepared" : phone.active ? "Setup pending" : "Disabled"}</span></div>
@@ -594,21 +601,21 @@ export default function AdminSalesTeamPage() {
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p>{selected?.pending_draft && selected.applied_phone && <p className="mt-1 text-[11px] font-bold text-amber-700">Active number: {formatPhone(selected.applied_phone.e164)} · draft changes are not live</p>}</div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="GHL phone number" hint="Required to activate"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value) || null; setForm((current) => formWithPhone(current, phone)); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {activeOccupants.get(phone.id)?.member.display_name || "available"}</option>)}</select></Field>
+                <Field label="GHL phone number" hint="Required to activate"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value) || null; setForm((current) => formWithPhone(current, phone, payload.shared_voice_phone)); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {activeOccupants.get(phone.id)?.member.display_name || "available"}</option>)}</select></Field>
                 <Field label="Mobile ring time" hint="Fixed in the reusable GHL workflow"><div className={`${inputClass} bg-[var(--as-soft)]`}>20 seconds</div></Field>
                 <Field label="GHL line setup" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_setup_status === "verified" ? "Verified and reusable" : "Setup pending"}</div></Field>
                 <Field label="GHL workflow" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_routing_workflow_id || "Not configured"}</div></Field>
               </div>
               {replacement && <div role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-bold leading-relaxed text-amber-950">This line is currently assigned to {replacement.member.display_name}. Applying will atomically move calls and notifications to {form.display_name || "this salesperson"}, deactivate the former routing assignment, and preserve the former account, sales, and commission history.</div>}
-              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><ShieldCheck className="mr-2 inline h-4 w-4" />Call Connect is locked on. GHL must time out before the mobile carrier’s voicemail answers, then route to the assigned Grok Voice number.</div>
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><ShieldCheck className="mr-2 inline h-4 w-4" />Call Connect is locked on. GHL rings the assigned mobile for 20 seconds, intercepts carrier voicemail, records the intended line, and sends unanswered calls to the shared Grok Voice agent.</div>
               {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable company-line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Configure these once for the company number. Changing an identifier returns that provider to pending until it is tested again.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="GHL routing workflow ID"><input className={inputClass} value={form.ghl_routing_workflow_id} onChange={(e) => update("ghl_routing_workflow_id", e.target.value)} /></Field><Field label="GHL notification workflow ID"><input className={inputClass} value={form.ghl_notification_workflow_id} onChange={(e) => update("ghl_notification_workflow_id", e.target.value)} /></Field><Field label="GHL mobile custom value ID"><input className={inputClass} value={form.ghl_mobile_custom_value_id} onChange={(e) => update("ghl_mobile_custom_value_id", e.target.value)} /></Field><Field label="GHL mobile custom value name"><input className={inputClass} value={form.ghl_mobile_custom_value_name} onChange={(e) => update("ghl_mobile_custom_value_name", e.target.value)} /></Field><Field label="GHL user custom value ID"><input className={inputClass} value={form.ghl_user_custom_value_id} onChange={(e) => update("ghl_user_custom_value_id", e.target.value)} /></Field><Field label="GHL user custom value name"><input className={inputClass} value={form.ghl_user_custom_value_name} onChange={(e) => update("ghl_user_custom_value_name", e.target.value)} /></Field><Field label="GHL setup status"><select className={inputClass} value={form.ghl_setup_status} onChange={(e) => update("ghl_setup_status", e.target.value as FormState["ghl_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div><button type="button" aria-label="Save GHL company-line setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save GHL line setup</button></details>}
             </section>
 
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A380F6]/15 text-[#7655CC]"><Bot className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">Grok Voice agent</h2><p className="text-xs font-semibold text-[var(--as-muted)]">Edit approved context and capabilities while the consent and data-safety rules stay locked.</p></div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Grok agent" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{form.xai_agent_id || "Not configured"}</div></Field>
-                <Field label="Grok fallback number" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{formatPhone(form.xai_phone_number_e164)}</div></Field>
+                <Field label="Shared Grok agent" hint="Used by all four sales lines"><div className={`${inputClass} bg-[var(--as-soft)]`}>{payload.shared_voice_phone?.xai_agent_id || "Not configured"}</div></Field>
+                <Field label="Shared fallback number" hint="Used by all four sales lines"><div className={`${inputClass} bg-[var(--as-soft)]`}>{formatPhone(payload.shared_voice_phone?.xai_phone_number_e164)}</div></Field>
                 <Field label="Voice"><input className={inputClass} value={form.voice_id} onChange={(e) => update("voice_id", e.target.value)} /></Field>
                 <Field label="Timezone"><input className={inputClass} value={form.timezone} onChange={(e) => update("timezone", e.target.value)} /></Field>
                 <Field label="Business hours"><input className={inputClass} value={form.business_hours_summary} onChange={(e) => update("business_hours_summary", e.target.value)} /></Field>
@@ -622,7 +629,7 @@ export default function AdminSalesTeamPage() {
                 {form.transfer_enabled && <Field label="Backup transfer number"><input className={inputClass} value={form.backup_transfer_phone_e164} onChange={(e) => update("backup_transfer_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>}
               </div>
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><Check className="mr-2 inline h-4 w-4" />Caller-approved follow-up messages always go to this salesperson by Slack DM, GHL text, and Workspace email.</div>
-              {selectedLine && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Reusable Grok line setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">Use the same stable line token for the context and message tools. Record the completed QA call before marking the line verified.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field><Field label="Grok phone number"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} placeholder="+17205551212" /></Field><Field label="Grok QA call reference"><input className={inputClass} value={form.xai_verification_reference} onChange={(e) => update("xai_verification_reference", e.target.value)} placeholder="Call or test reference" /></Field><Field label="Grok setup status"><select className={inputClass} value={form.xai_setup_status} onChange={(e) => update("xai_setup_status", e.target.value as FormState["xai_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after line test</option><option value="failed">Failed</option></select></Field></div>{payload.agent_bootstrap_prompt && <div className="mt-4"><p className="text-xs font-black text-[var(--as-text)]">Fixed agent instructions</p><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--as-soft)] p-3 text-xs leading-relaxed text-[var(--as-text)]">{payload.agent_bootstrap_prompt}</pre><button type="button" onClick={() => void copy(payload.agent_bootstrap_prompt, "Fixed Grok instructions copied.")} className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]"><Clipboard className="h-3.5 w-3.5" /> Copy fixed instructions</button></div>}<button type="button" aria-label="Save Grok company-line setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save Grok line setup</button></details>}
+              {selectedLine?.shared_voice_entrypoint && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Shared Grok Voice setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">This one agent and number receive unanswered calls from all four GHL lines. Record the completed four-line QA test before marking it verified.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field><Field label="Grok phone number"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} placeholder="+17205551212" /></Field><Field label="Grok QA call reference"><input className={inputClass} value={form.xai_verification_reference} onChange={(e) => update("xai_verification_reference", e.target.value)} placeholder="Four-line call test reference" /></Field><Field label="Grok setup status"><select className={inputClass} value={form.xai_setup_status} onChange={(e) => update("xai_setup_status", e.target.value as FormState["xai_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after four-line test</option><option value="failed">Failed</option></select></Field></div>{payload.agent_bootstrap_prompt && <div className="mt-4"><p className="text-xs font-black text-[var(--as-text)]">Fixed shared-agent instructions</p><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--as-soft)] p-3 text-xs leading-relaxed text-[var(--as-text)]">{payload.agent_bootstrap_prompt}</pre><button type="button" onClick={() => void copy(payload.agent_bootstrap_prompt, "Fixed Grok instructions copied.")} className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]"><Clipboard className="h-3.5 w-3.5" /> Copy fixed instructions</button></div>}<button type="button" aria-label="Save shared Grok Voice setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save shared Grok setup</button></details>}
             </section>
 
             {selected && !creating && (
