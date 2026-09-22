@@ -395,6 +395,13 @@ export default function AdminSalesTeamPage() {
       choose(occupant);
       return;
     }
+    if (selected && !creating) {
+      setForm((current) => formWithPhone(current, phone));
+      setError("");
+      setNotice("Line selected. Save the draft, then apply routing when all required details are ready.");
+      setOneTimeToken("");
+      return;
+    }
     setCreating(true);
     setSelectedId("");
     setForm(formWithPhone(emptyForm, phone));
@@ -588,7 +595,7 @@ export default function AdminSalesTeamPage() {
               <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A1547]/8 text-[#0A1547]"><Phone className="h-5 w-5" /></span><div><h2 className="text-base font-black text-[var(--as-text)]">GHL call routing</h2><p className="text-xs font-semibold text-[var(--as-muted)]">One active number per salesperson, with Call Connect always required.</p>{selected?.pending_draft && selected.applied_phone && <p className="mt-1 text-[11px] font-bold text-amber-700">Active number: {formatPhone(selected.applied_phone.e164)} · draft changes are not live</p>}</div></div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="GHL phone number" hint="Required to activate"><select className={inputClass} value={form.phone_number_id} onChange={(e) => { const phone = payload.phone_numbers.find((item) => item.id === e.target.value) || null; setForm((current) => formWithPhone(current, phone)); }}><option value="">Select a number</option>{payload.phone_numbers.filter((phone) => phone.active).map((phone) => <option key={phone.id} value={phone.id}>{formatPhone(phone.e164)} · {activeOccupants.get(phone.id)?.member.display_name || "available"}</option>)}</select></Field>
-                <Field label="Mobile ring time" hint="10-25 seconds"><input className={inputClass} type="number" min={10} max={25} value={form.ring_seconds} onChange={(e) => update("ring_seconds", Number(e.target.value))} /></Field>
+                <Field label="Mobile ring time" hint="Fixed in the reusable GHL workflow"><div className={`${inputClass} bg-[var(--as-soft)]`}>20 seconds</div></Field>
                 <Field label="GHL line setup" hint="Managed once per company number"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_setup_status === "verified" ? "Verified and reusable" : "Setup pending"}</div></Field>
                 <Field label="GHL workflow" hint="Managed line resource"><div className={`${inputClass} bg-[var(--as-soft)]`}>{selectedLine?.ghl_routing_workflow_id || "Not configured"}</div></Field>
               </div>
