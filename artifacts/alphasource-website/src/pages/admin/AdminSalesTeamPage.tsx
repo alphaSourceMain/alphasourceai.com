@@ -227,9 +227,9 @@ function formFor(record: TeamRecord): FormState {
     business_hours_summary: typeof hours === "string" ? hours : "Monday-Friday, 8:00 AM-5:00 PM",
     answer_approved_faqs: record.config?.answer_approved_faqs !== false,
     schedule_demos: record.config?.schedule_demos !== false,
-    notify_slack: record.config?.notify_slack !== false,
-    notify_sms: record.config?.notify_sms !== false,
-    notify_email: record.config?.notify_email !== false,
+    notify_slack: true,
+    notify_sms: true,
+    notify_email: true,
   };
 }
 
@@ -524,13 +524,27 @@ export default function AdminSalesTeamPage() {
             <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">The GHL number, workflows, Grok agent, and secure tools stay with each slot when personnel change.</p></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {payload.phone_numbers.filter((phone) => phone.active).slice(0, 4).map((phone, index) => {
+            {payload.phone_numbers.slice(0, 4).map((phone, index) => {
               const occupant = activeOccupants.get(phone.id);
               const selectedSlot = form.phone_number_id === phone.id;
-              const ready = phone.ghl_setup_status === "verified" && phone.xai_setup_status === "verified";
+              const ready = phone.active
+                && phone.ghl_setup_status === "verified"
+                && phone.xai_setup_status === "verified"
+                && Boolean(phone.ghl_location_id)
+                && Boolean(phone.ghl_routing_workflow_id)
+                && Boolean(phone.ghl_notification_workflow_id)
+                && Boolean(phone.ghl_mobile_custom_value_id)
+                && Boolean(phone.ghl_mobile_custom_value_name)
+                && Boolean(phone.ghl_user_custom_value_id)
+                && Boolean(phone.ghl_user_custom_value_name)
+                && Boolean(phone.xai_agent_id)
+                && Boolean(phone.xai_phone_number_e164)
+                && Boolean(phone.handoff_token_rotated_at)
+                && Boolean(phone.xai_verification_reference)
+                && Boolean(phone.xai_verified_at);
               return (
-                <button key={phone.id} type="button" onClick={() => chooseSlot(phone)} className={`rounded-xl border p-4 text-left transition ${selectedSlot ? "border-[#A380F6] bg-[#A380F6]/10" : "border-[var(--as-border)] bg-[var(--as-surface)] hover:border-[#A380F6]/50"}`}>
-                  <div className="flex items-start justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Line {index + 1}</p><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{ready ? "Prepared" : "Setup pending"}</span></div>
+                <button key={phone.id} type="button" disabled={!phone.active} onClick={() => chooseSlot(phone)} className={`rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${selectedSlot ? "border-[#A380F6] bg-[#A380F6]/10" : "border-[var(--as-border)] bg-[var(--as-surface)] hover:border-[#A380F6]/50"}`}>
+                  <div className="flex items-start justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Line {index + 1}</p><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${ready ? "bg-emerald-100 text-emerald-800" : phone.active ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{ready ? "Prepared" : phone.active ? "Setup pending" : "Disabled"}</span></div>
                   <p className="mt-2 text-sm font-black text-[var(--as-text)]">{formatPhone(phone.e164)}</p>
                   <p className="mt-1 truncate text-xs font-semibold text-[var(--as-muted)]">{occupant?.member.display_name || "Available for a new salesperson"}</p>
                 </button>
