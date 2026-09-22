@@ -53,9 +53,30 @@ export interface SalesCustomerInput {
   buyer_title: string;
   candidate_assistance_name: string;
   candidate_assistance_email: string;
+  ghl_import_id: string;
   ghl_contact_id: string;
   ghl_opportunity_id: string;
   sales_note: string;
+}
+
+export interface GhlSalesImport {
+  id: string;
+  status: "ready" | "linked" | "won_pending" | "won" | "exception" | "detached";
+  sync_state: string;
+  company_name: string;
+  buyer_first_name: string;
+  buyer_last_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  buyer_title: string;
+  opportunity_name: string;
+  opportunity_source: string;
+  ghl_contact_id: string;
+  ghl_opportunity_id: string;
+  purchase_intent_id: string | null;
+  imported_at: string;
+  updated_at: string;
+  provider_url: string;
 }
 
 export interface PromotionCodeSummary {
@@ -161,6 +182,8 @@ export interface SalesApi {
   getMe(): Promise<SalesRep>;
   getPackages(): Promise<SalesPackage[]>;
   listDeals(): Promise<SalesDeal[]>;
+  listImports(): Promise<GhlSalesImport[]>;
+  getImport(importId: string): Promise<GhlSalesImport>;
   getDeal(dealId: string): Promise<SalesDealDetail>;
   validatePromotionCode(code: string, draft: SalesDealDraft): Promise<PromotionCodeSummary>;
   previewDeal(draft: SalesDealDraft): Promise<SalesAgreementPreview>;

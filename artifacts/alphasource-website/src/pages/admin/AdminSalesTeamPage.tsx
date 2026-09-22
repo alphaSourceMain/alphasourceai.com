@@ -115,11 +115,34 @@ interface TeamRecord {
   pending_draft?: { updated_at: string } | null;
 }
 
+interface GhlSalesSyncRecord {
+  id: string;
+  company_name: string | null;
+  opportunity_name: string | null;
+  purchase_intent_id: string | null;
+  status: string;
+  last_sync_at: string | null;
+  last_error_code: string | null;
+  last_error_detail: string | null;
+  manual_review_required: boolean;
+  updated_at: string;
+  delivery: null | {
+    id: string;
+    status: "pending" | "processing" | "retry" | "delivered" | "failed";
+    attempt_count: number;
+    max_attempts: number;
+    next_attempt_at: string;
+    last_error: string | null;
+    manual_review_required: boolean;
+  };
+}
+
 interface TeamPayload {
   items: TeamRecord[];
   phone_numbers: PhoneNumber[];
   shared_voice_phone: PhoneNumber | null;
   agent_bootstrap_prompt: string;
+  ghl_sales_sync: GhlSalesSyncRecord[];
 }
 
 interface FormState {
@@ -339,7 +362,7 @@ function Toggle({ checked, onChange, label, detail }: { checked: boolean; onChan
 }
 
 export default function AdminSalesTeamPage() {
-  const [payload, setPayload] = useState<TeamPayload>({ items: [], phone_numbers: [], shared_voice_phone: null, agent_bootstrap_prompt: "" });
+  const [payload, setPayload] = useState<TeamPayload>({ items: [], phone_numbers: [], shared_voice_phone: null, agent_bootstrap_prompt: "", ghl_sales_sync: [] });
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [creating, setCreating] = useState(false);
@@ -508,6 +531,28 @@ export default function AdminSalesTeamPage() {
     }
   };
 
+  const reconcileGhlSales = async () => {
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const result = await request<{ summary: { scanned: number; enqueued: number; failed: number } }>("/admin/sales-team/ghl-sales-sync/reconcile", { method: "POST", body: "{}" });
+      setNotice(`GHL reconciliation checked ${result.summary.scanned} sale(s) and queued ${result.summary.enqueued}.`);
+      await load(selectedId);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "GHL reconciliation could not be completed.");
+    } finally { setSaving(false); }
+  };
+
+  const retryGhlDelivery = async (deliveryId: string) => {
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await request(`/admin/sales-team/ghl-sales-sync/${encodeURIComponent(deliveryId)}/retry`, { method: "POST", body: "{}" });
+      setNotice("The GHL Won update was queued for a safe retry.");
+      await load(selectedId);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "The GHL delivery could not be retried.");
+    } finally { setSaving(false); }
+  };
+
   return (
     <AdminLayout title="Sales Team & Call Routing">
       <div className="mx-auto max-w-[1500px] space-y-5 pb-12">
@@ -530,6 +575,18 @@ export default function AdminSalesTeamPage() {
             <div className="mt-3 flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">{oneTimeToken}</code><button type="button" aria-label="Copy one-time Grok line token" onClick={() => void copy(oneTimeToken, "Line token copied.")} className="rounded-lg bg-amber-900 px-3 text-white"><Clipboard className="h-4 w-4" /></button></div>
           </section>
         )}
+
+        <section className="rounded-xl border p-5" style={cardStyle} aria-labelledby="ghl-sales-sync-title">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 id="ghl-sales-sync-title" className="text-base font-black text-[var(--as-text)]">GHL sales close synchronization</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">Only signed, paid, active alphaScreen sales can move the linked GHL opportunity to Won.</p></div><button type="button" disabled={saving} onClick={() => void reconcileGhlSales()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)] disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> Reconcile</button></div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {payload.ghl_sales_sync.slice(0, 12).map((item) => {
+              const state = item.delivery?.status || item.status;
+              const attention = item.manual_review_required || item.delivery?.manual_review_required || item.delivery?.status === "failed";
+              return <article key={item.id} className={`rounded-lg border p-3 ${attention ? "border-red-200 bg-red-50" : "border-[var(--as-border)]"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-[var(--as-text)]">{item.company_name || item.opportunity_name || "GHL opportunity"}</p><p className="mt-1 text-[11px] font-semibold text-[var(--as-muted)]">Updated {formatDateTime(item.updated_at)}</p></div><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${attention ? "bg-red-100 text-red-800" : state === "delivered" || state === "won" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{state.replaceAll("_", " ")}</span></div>{(item.last_error_detail || item.delivery?.last_error) && <p className="mt-2 text-xs font-semibold leading-relaxed text-red-800">{item.last_error_detail || item.delivery?.last_error}</p>}{item.delivery?.status === "failed" && <button type="button" disabled={saving} onClick={() => void retryGhlDelivery(item.delivery!.id)} className="mt-3 rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50">Retry Won update</button>}</article>;
+            })}
+            {!loading && payload.ghl_sales_sync.length === 0 && <p className="text-xs font-semibold text-[var(--as-muted)]">No imported GHL sales opportunities yet.</p>}
+          </div>
+        </section>
 
         <section aria-labelledby="sales-line-slots-title">
           <div className="mb-3 flex items-end justify-between gap-3">

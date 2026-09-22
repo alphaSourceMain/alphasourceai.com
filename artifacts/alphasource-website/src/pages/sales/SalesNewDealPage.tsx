@@ -10,6 +10,7 @@ import {
   FileSearch,
   Gift,
   Info,
+  ExternalLink,
   Loader2,
   Mail,
   ShieldCheck,
@@ -21,6 +22,7 @@ import { SalesPageHeading } from "@/components/SalesLayout";
 import { SalesApiError, salesApi, salesUsesMockApi } from "@/features/sales/salesApi";
 import type {
   PromotionCodeSummary,
+  GhlSalesImport,
   SalesAgreementPreview,
   SalesDealDraft,
   SalesPackage,
@@ -36,6 +38,7 @@ const emptyDraft: SalesDealDraft = {
   buyer_title: "",
   candidate_assistance_name: "",
   candidate_assistance_email: "",
+  ghl_import_id: "",
   ghl_contact_id: "",
   ghl_opportunity_id: "",
   sales_note: "",
@@ -90,6 +93,7 @@ function salesDraftFingerprint(draft: SalesDealDraft): string {
     buyer_title: normalizedText(draft.buyer_title),
     candidate_assistance_name: normalizedText(draft.candidate_assistance_name),
     candidate_assistance_email: normalizedText(draft.candidate_assistance_email).toLowerCase(),
+    ghl_import_id: normalizedText(draft.ghl_import_id),
     ghl_contact_id: normalizedText(draft.ghl_contact_id),
     ghl_opportunity_id: normalizedText(draft.ghl_opportunity_id),
     sales_note: normalizedText(draft.sales_note),
@@ -143,6 +147,8 @@ export default function SalesNewDealPage() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<SalesDealDraft>(emptyDraft);
+  const [ghlImport, setGhlImport] = useState<GhlSalesImport | null>(null);
+  const [loadingGhlImport, setLoadingGhlImport] = useState(false);
   const [sameAssistanceContact, setSameAssistanceContact] = useState(true);
   const [packages, setPackages] = useState<SalesPackage[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
@@ -163,6 +169,43 @@ export default function SalesNewDealPage() {
       .then((items) => { if (active) setPackages(items.filter((item) => ["basic", "pro"].includes(item.plan_key))); })
       .catch((loadError) => { if (active) setError(loadError instanceof Error ? loadError.message : "Memberships could not be loaded."); })
       .finally(() => { if (active) setLoadingPackages(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const importId = new URLSearchParams(window.location.search).get("ghl_import")?.trim() || "";
+    if (!importId) return;
+    let active = true;
+    setLoadingGhlImport(true);
+    void salesApi.getImport(importId)
+      .then((item) => {
+        if (!active) return;
+        if (item.status !== "ready" || item.purchase_intent_id) {
+          throw new SalesApiError("This GHL opportunity is already linked or requires administrator review.", 409, "ghl_import_not_ready");
+        }
+        const next: SalesDealDraft = {
+          ...emptyDraft,
+          ghl_import_id: item.id,
+          ghl_contact_id: item.ghl_contact_id,
+          ghl_opportunity_id: item.ghl_opportunity_id,
+          company_legal_name: item.company_name,
+          buyer_first_name: item.buyer_first_name,
+          buyer_last_name: item.buyer_last_name,
+          buyer_email: item.buyer_email,
+          buyer_phone: item.buyer_phone,
+          buyer_title: item.buyer_title,
+          candidate_assistance_name: `${item.buyer_first_name} ${item.buyer_last_name}`.trim(),
+          candidate_assistance_email: item.buyer_email,
+        };
+        setGhlImport(item);
+        setDraft(next);
+        draftFingerprintRef.current = salesDraftFingerprint(next);
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : "The GHL sales draft could not be loaded.");
+      })
+      .finally(() => { if (active) setLoadingGhlImport(false); });
     return () => { active = false; };
   }, []);
 
@@ -369,6 +412,12 @@ export default function SalesNewDealPage() {
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#A380F6]/10 text-[#A380F6]"><Building2 className="h-5 w-5" /></div>
                 <div><h2 className="text-lg font-black" style={{ color: "var(--as-text)" }}>Customer details</h2><p className="text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>Use the legal information that belongs in the agreement.</p></div>
               </div>
+              {loadingGhlImport ? <div className="mt-5 h-20 animate-pulse rounded-xl bg-[#0A1547]/[0.045]" /> : ghlImport ? (
+                <div className="mt-5 flex flex-col gap-3 rounded-xl border border-[#02ABE0]/25 bg-[#02ABE0]/[0.055] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="text-xs font-black text-[#0A1547]">Imported from GHL · Agreement/Checkout</p><p className="mt-1 text-xs font-semibold text-[#0A1547]/60">{ghlImport.opportunity_name || ghlImport.company_name} · CRM linkage is server-controlled.</p></div>
+                  <a href={ghlImport.provider_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-black text-[#02ABE0]">Open in GHL <ExternalLink className="h-3.5 w-3.5" /></a>
+                </div>
+              ) : null}
               <div className="mt-6 grid gap-5 sm:grid-cols-2">
                 <Field label="Legal business name" required><input className={fieldClass} style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} value={draft.company_legal_name} onChange={(event) => setValue("company_legal_name", event.target.value)} placeholder="Company LLC" /></Field>
                 <Field label="DBA or trade name"><input className={fieldClass} style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} value={draft.company_dba} onChange={(event) => setValue("company_dba", event.target.value)} placeholder="Optional" /></Field>
@@ -394,8 +443,7 @@ export default function SalesNewDealPage() {
               <details className="mt-6 rounded-xl border px-4 py-3" style={{ borderColor: "var(--as-border)" }}>
                 <summary className="cursor-pointer text-xs font-black" style={{ color: "var(--as-text)" }}>CRM attribution and internal note</summary>
                 <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                  <Field label="GoHighLevel contact ID"><input className={fieldClass} style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} value={draft.ghl_contact_id} onChange={(event) => setValue("ghl_contact_id", event.target.value)} placeholder="Optional until integration" /></Field>
-                  <Field label="GoHighLevel opportunity ID"><input className={fieldClass} style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} value={draft.ghl_opportunity_id} onChange={(event) => setValue("ghl_opportunity_id", event.target.value)} placeholder="Optional until integration" /></Field>
+                  <div className="sm:col-span-2 rounded-[10px] bg-[#0A1547]/[0.04] px-3.5 py-3 text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>{ghlImport ? `Linked to ${ghlImport.opportunity_name || "the imported GHL opportunity"}. Contact and opportunity identifiers cannot be edited here.` : "This sale is not linked to a GHL opportunity. Start it from a Ready from GHL card to create an immutable CRM linkage."}</div>
                   <label className="block sm:col-span-2"><span className="text-xs font-black" style={{ color: "var(--as-text)" }}>Internal note</span><textarea rows={3} value={draft.sales_note} onChange={(event) => setValue("sales_note", event.target.value)} className="mt-2 w-full rounded-[10px] border bg-transparent px-3.5 py-3 text-sm font-semibold outline-none transition focus:border-[#A380F6] focus:ring-4 focus:ring-[#A380F6]/10" style={{ borderColor: "var(--as-border)", color: "var(--as-text)" }} placeholder="Keep notes brief and non-sensitive." /></label>
                 </div>
               </details>

@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type {
   EnterpriseHandoffInput,
   EnterpriseHandoffResult,
+  GhlSalesImport,
   PromotionCodeSummary,
   SalesAgreementPreview,
   SalesApi,
@@ -111,6 +112,8 @@ const realSalesApi: SalesApi = {
   getMe: () => requestJson<SalesRep>("/sales/me"),
   getPackages: () => requestJson<{ items: SalesPackage[] }>("/sales/packages").then((result) => result.items || []),
   listDeals: () => requestJson<{ items: SalesDeal[] }>("/sales/deals").then((result) => result.items || []),
+  listImports: () => requestJson<{ items: GhlSalesImport[] }>("/sales/imports").then((result) => result.items || []),
+  getImport: (importId) => requestJson<GhlSalesImport>(`/sales/imports/${encodeURIComponent(importId)}`),
   getDeal: (dealId) => requestJson<SalesDealDetail>(`/sales/deals/${encodeURIComponent(dealId)}`),
   validatePromotionCode: (code, draft) => requestJson<PromotionCodeSummary>("/sales/promotion-codes/validate", {
     method: "POST",
@@ -252,6 +255,26 @@ const mockDeals: SalesDeal[] = [
   },
 ];
 
+const mockImports: GhlSalesImport[] = [{
+  id: "31000000-0000-4000-8000-000000000001",
+  status: "ready",
+  sync_state: "ready",
+  company_name: "Canyon View Dental LLC",
+  buyer_first_name: "Avery",
+  buyer_last_name: "Stone",
+  buyer_email: "avery@example.com",
+  buyer_phone: "+17205550199",
+  buyer_title: "Owner",
+  opportunity_name: "Canyon View Dental - alphaScreen",
+  opportunity_source: "Outbound",
+  ghl_contact_id: "contact_demo_ready",
+  ghl_opportunity_id: "opportunity_demo_ready",
+  purchase_intent_id: null,
+  imported_at: "2026-09-22T16:00:00.000Z",
+  updated_at: "2026-09-22T16:00:00.000Z",
+  provider_url: "https://app.gohighlevel.com/v2/location/demo/opportunities/list",
+}];
+
 function delay(ms = 260): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -299,6 +322,16 @@ const mockSalesApi: SalesApi = {
   async listDeals() {
     await delay();
     return structuredClone(mockDeals);
+  },
+  async listImports() {
+    await delay();
+    return structuredClone(mockImports);
+  },
+  async getImport(importId) {
+    await delay();
+    const item = mockImports.find((candidate) => candidate.id === importId);
+    if (!item) throw new SalesApiError("GHL sales draft not found.", 404, "ghl_import_not_found");
+    return structuredClone(item);
   },
   async getDeal(dealId) {
     await delay();

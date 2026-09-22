@@ -29,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { SalesApiError, salesApi } from "@/features/sales/salesApi";
-import type { SalesDeal, SalesDealAction, SalesDealStatus } from "@/features/sales/types";
+import type { GhlSalesImport, SalesDeal, SalesDealAction, SalesDealStatus } from "@/features/sales/types";
 
 type FilterKey = "all" | "open" | "payment" | "activated" | "attention";
 type SortKey = "client" | "membership" | "status" | "payment" | "activity";
@@ -109,6 +109,7 @@ function SortIndicator({ active, direction }: { active: boolean; direction: Sort
 export default function SalesDealsPage() {
   const [location, setLocation] = useLocation();
   const [deals, setDeals] = useState<SalesDeal[]>([]);
+  const [ghlImports, setGhlImports] = useState<GhlSalesImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -122,7 +123,9 @@ export default function SalesDealsPage() {
     setLoading(true);
     setError("");
     try {
-      setDeals(await salesApi.listDeals());
+      const [nextDeals, nextImports] = await Promise.all([salesApi.listDeals(), salesApi.listImports()]);
+      setDeals(nextDeals);
+      setGhlImports(nextImports);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Deals could not be loaded.");
     } finally {
@@ -145,6 +148,8 @@ export default function SalesDealsPage() {
     payment: deals.filter((deal) => matchesFilter(deal, "payment")).length,
     activated: deals.filter((deal) => deal.status === "activated").length,
   }), [deals]);
+
+  const readyImports = useMemo(() => ghlImports.filter((item) => item.status === "ready" && !item.purchase_intent_id), [ghlImports]);
 
   const visibleDeals = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -234,6 +239,20 @@ export default function SalesDealsPage() {
           <span className="flex-1">{error}</span>
           <button type="button" onClick={() => setError("")} aria-label="Dismiss"><XCircle className="h-4 w-4 opacity-60" /></button>
         </div>
+      ) : null}
+
+      {readyImports.length ? (
+        <section className="mb-5 rounded-2xl border border-[#02ABE0]/25 bg-[#02ABE0]/[0.04] p-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#02ABE0]">Ready from GHL</p><h2 className="mt-1 text-base font-black" style={{ color: "var(--as-text)" }}>{readyImports.length} {readyImports.length === 1 ? "opportunity" : "opportunities"} waiting for agreement</h2><p className="mt-1 text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>Customer and CRM attribution are already imported from the Agreement/Checkout stage.</p></div></div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {readyImports.map((item) => (
+              <article key={item.id} className="rounded-xl border bg-white p-4" style={{ borderColor: "var(--as-border)" }}>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black" style={{ color: "var(--as-text)" }}>{item.company_name || item.opportunity_name}</h3><p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--as-text-muted)" }}>{item.buyer_first_name} {item.buyer_last_name} · {item.buyer_email}</p></div><span className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-black text-sky-700">Agreement/Checkout</span></div>
+                <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[11px] font-semibold" style={{ color: "var(--as-text-subtle)" }}>Imported {formatActivityDate(item.imported_at)}</p><Link href={`/sales/new?ghl_import=${encodeURIComponent(item.id)}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-[9px] bg-[#0A1547] px-3 text-xs font-black text-white">Complete sale <ArrowUpRight className="h-3.5 w-3.5" /></Link></div>
+              </article>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
