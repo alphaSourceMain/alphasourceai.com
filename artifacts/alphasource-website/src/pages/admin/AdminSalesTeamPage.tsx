@@ -635,7 +635,7 @@ export default function AdminSalesTeamPage() {
               {filtered.map((record) => (
                 <button key={record.member.id} type="button" onClick={() => choose(record)} className={`w-full p-4 text-left transition ${selectedId === record.member.id && !creating ? "bg-[#A380F6]/10" : "hover:bg-[var(--as-soft)]"}`}>
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-[var(--as-text)]">{record.member.display_name}</p><p className="mt-1 truncate text-xs font-semibold text-[var(--as-muted)]">{record.member.workspace_email || "Workspace email needed"}</p></div><StatusPill status={record.member.status} /></div>
-                  <div className="mt-3 flex items-center justify-between text-xs font-bold text-[var(--as-muted)]"><span>{formatPhone(record.applied_phone?.e164 || record.phone?.e164)}</span><span className={record.readiness.ready ? "text-emerald-700" : "text-amber-700"}>{record.pending_draft ? "Draft changes" : record.readiness.ready ? "Ready" : `${record.readiness.missing.length} needed`}</span></div>
+                  <div className="mt-3 flex items-center justify-between text-xs font-bold text-[var(--as-muted)]"><span>{formatPhone(record.applied_phone?.e164 || record.phone?.e164)}</span><span className={record.readiness.ready && !record.readiness.qa_staged ? "text-emerald-700" : "text-amber-700"}>{record.pending_draft ? record.readiness.qa_staged ? "QA staging draft" : "Draft changes" : record.readiness.ready ? record.readiness.qa_staged ? "QA staging" : "Ready" : `${record.readiness.missing.length} needed`}</span></div>
                 </button>
               ))}
             </div>
