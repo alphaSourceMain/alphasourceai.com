@@ -110,7 +110,7 @@ interface TeamRecord {
   config: VoiceConfig | null;
   applied_assignment?: Assignment | null;
   applied_phone?: PhoneNumber | null;
-  readiness: { ready: boolean; missing: string[] };
+  readiness: { ready: boolean; missing: string[]; qa_staged?: boolean };
   sync_jobs: SyncJob[];
   pending_draft?: { updated_at: string } | null;
 }
@@ -590,7 +590,7 @@ export default function AdminSalesTeamPage() {
 
         <section aria-labelledby="sales-line-slots-title">
           <div className="mb-3 flex items-end justify-between gap-3">
-            <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">Each GHL number keeps its workflow and secure route. All four share one verified Grok Voice agent and fallback number.</p></div>
+            <div><h2 id="sales-line-slots-title" className="text-sm font-black text-[var(--as-text)]">Four permanent sales line slots</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">Each GHL number keeps its workflow and secure route. All four share one Grok Voice agent and fallback number.</p></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {payload.phone_numbers.slice(0, 4).map((phone, index) => {
@@ -691,7 +691,8 @@ export default function AdminSalesTeamPage() {
 
             {selected && !creating && (
               <section className="rounded-xl border p-5" style={cardStyle}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-base font-black text-[var(--as-text)]">Readiness and provider status</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">The page reports a provider as synchronized only after its configured step completes.</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-black ${selected.readiness.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{selected.readiness.ready ? "Ready to apply" : `${selected.readiness.missing.length} items needed`}</span></div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-base font-black text-[var(--as-text)]">Readiness and provider status</h2><p className="mt-1 text-xs font-semibold text-[var(--as-muted)]">The page reports a provider as synchronized only after its configured step completes.</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-black ${selected.readiness.ready && !selected.readiness.qa_staged ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{selected.readiness.ready ? selected.readiness.qa_staged ? "Ready for QA staging" : "Ready to apply" : `${selected.readiness.missing.length} items needed`}</span></div>
+                {selected.readiness.qa_staged && <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">QA staging only: the shared Grok entrypoint and GHL line remain unverified until the controlled call test. Do not treat this as a live sales route.</p>}
                 {!selected.readiness.ready && <div className="mt-4 flex flex-wrap gap-2">{selected.readiness.missing.map((item) => <span key={item} className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900">{item}</span>)}</div>}
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {latestJobs(selected.sync_jobs).map((job) => <div key={job.provider} className="rounded-lg border border-[var(--as-border)] p-3"><p className="text-xs font-black text-[var(--as-text)]">{labelProvider(job.provider)}</p><p className={`mt-1 text-[11px] font-black uppercase tracking-wide ${job.status === "synced" ? "text-emerald-700" : job.status === "not_applicable" ? "text-[var(--as-muted)]" : job.status === "failed" ? "text-red-700" : "text-amber-700"}`}>{job.status.replaceAll("_", " ")}</p>{job.provider_reference && <p className="mt-1 break-all text-[10px] font-semibold text-[var(--as-muted)]">{job.provider_reference}</p>}{job.last_error_detail && <p className="mt-2 text-[11px] font-semibold leading-relaxed text-[var(--as-muted)]">{job.last_error_detail}</p>}</div>)}
