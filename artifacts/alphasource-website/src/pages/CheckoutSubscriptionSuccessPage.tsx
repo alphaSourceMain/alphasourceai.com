@@ -12,7 +12,6 @@ type CheckoutLookup = {
 
 type CheckoutStatusResponse = {
   status?: unknown;
-  set_password_url?: unknown;
   first_role_prepay_selected?: unknown;
   first_role_prepay?: unknown;
   selected_package?: unknown;
@@ -22,17 +21,8 @@ type CheckoutStatusResponse = {
 const POLLABLE_STATUSES = new Set<ReturnStatus>(["payment_pending", "activation_pending", "setup_pending"]);
 const MAX_STATUS_POLLS = 12;
 const STATUS_POLL_INTERVAL_MS = 4000;
-const PASSWORD_SETUP_PREVIEW_PATH = "/checkout/password-setup-preview";
 const CHECKOUT_BACK_LINK_CLASS =
   "inline-flex text-sm font-semibold text-[#A380F6] transition-colors hover:text-[#0A1547]";
-
-function envText(key: string): string {
-  const env = typeof import.meta !== "undefined" && import.meta.env
-    ? import.meta.env as Record<string, unknown>
-    : {};
-  const value = env[key];
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function readStatus(): ReturnStatus {
   if (typeof window === "undefined") return "setup_pending";
@@ -73,12 +63,6 @@ function checkoutStatusEndpoint(lookup: CheckoutLookup): string {
   const query = params.toString();
   if (!query) return "";
   return `${joinUrl(getPublicBackendBase(), "/api/alphascreen/checkout-status")}?${query}`;
-}
-
-function readSetPasswordUrl(): string {
-  if (typeof window === "undefined") return "";
-  const raw = String(new URLSearchParams(window.location.search || "").get("set_password_url") || "").trim();
-  return normalizeSetPasswordUrl(raw);
 }
 
 function readInitialFirstRolePrepaySelected(): boolean | null {
@@ -123,87 +107,6 @@ function firstRoleCheckoutSuccessCopy(selected: boolean | null): string {
   return "";
 }
 
-function normalizeSetPasswordUrl(rawValue: unknown): string {
-  if (typeof window === "undefined") return "";
-  const raw = String(rawValue || "").trim();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw, window.location.origin);
-    if (!["http:", "https:"].includes(parsed.protocol)) return "";
-    if (isPlaceholderSetupUrl(parsed)) return passwordSetupPreviewUrl();
-    return isTrustedSetupUrl(parsed) ? parsed.href : "";
-  } catch (_) {
-    return "";
-  }
-}
-
-function isLocalDevelopmentHost(host: string): boolean {
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
-}
-
-function isAlphaSourceHost(host: string): boolean {
-  return host === "alphasourceai.com" || host.endsWith(".alphasourceai.com");
-}
-
-function isPasswordSetupPath(pathname: string): boolean {
-  return pathname === "/pwreset" || pathname.startsWith("/pwreset/");
-}
-
-function configuredSupabaseAuthHost(): string {
-  const configuredUrl = envText("VITE_SUPABASE_URL");
-  if (!configuredUrl) return "";
-  try {
-    return new URL(configuredUrl).hostname.toLowerCase();
-  } catch (_) {
-    return "";
-  }
-}
-
-function isTrustedPasswordSetupDestination(url: URL): boolean {
-  const host = url.hostname.toLowerCase();
-  return isPasswordSetupPath(url.pathname) && (
-    host === window.location.hostname.toLowerCase() ||
-    isAlphaSourceHost(host) ||
-    isLocalDevelopmentHost(host)
-  );
-}
-
-function isTrustedSupabaseAuthActionUrl(url: URL): boolean {
-  const supabaseHost = configuredSupabaseAuthHost();
-  if (!supabaseHost || url.hostname.toLowerCase() !== supabaseHost) return false;
-  if (!url.pathname.startsWith("/auth/v1/")) return false;
-
-  const redirectTo = url.searchParams.get("redirect_to");
-  if (!redirectTo) return true;
-  try {
-    return isTrustedPasswordSetupDestination(new URL(redirectTo, window.location.origin));
-  } catch (_) {
-    return false;
-  }
-}
-
-function isTrustedSetupUrl(url: URL): boolean {
-  return isTrustedPasswordSetupDestination(url) || isTrustedSupabaseAuthActionUrl(url);
-}
-
-function isPlaceholderSetupUrl(url: URL): boolean {
-  const host = url.hostname.toLowerCase();
-  return host === "example.com" ||
-    host === "www.example.com" ||
-    host === "example.org" ||
-    host === "example.net" ||
-    host.includes("placeholder") ||
-    host.endsWith(".invalid");
-}
-
-function passwordSetupPreviewUrl(): string {
-  if (typeof window === "undefined") return PASSWORD_SETUP_PREVIEW_PATH;
-  const currentPath = `${window.location.pathname}${window.location.search}`;
-  const params = new URLSearchParams();
-  params.set("return_to", currentPath || "/checkout/subscription-success?status=password_required");
-  return `${PASSWORD_SETUP_PREVIEW_PATH}?${params.toString()}`;
-}
-
 const STATUS_COPY: Record<ReturnStatus, {
   eyebrow: string;
   title: string;
@@ -224,18 +127,20 @@ const STATUS_COPY: Record<ReturnStatus, {
   },
   password_required: {
     eyebrow: "Payment confirmed",
-    title: "Set your password to continue.",
-    body: "Your payment is confirmed. Set your password to finish account setup and access your alphaScreen dashboard.",
+    title: "Check your email to set your password.",
+    body: "Your payment is confirmed. Use the secure setup link sent to your email. If it has expired or is missing, select Sign In on the home page, enter your email, and choose Forgot password?",
     tone: "success",
-    primaryLabel: "Set your password",
+    primaryLabel: "Go to sign in",
+    primaryHref: "/",
     secondaryLabel: "Refresh status",
   },
   setup_email_sent: {
     eyebrow: "Payment confirmed",
     title: "Check your email to set your password.",
-    body: "Check your email to set your password. If it does not arrive, refresh this page or contact alphaSource support.",
+    body: "Use the secure setup link sent to your email. If it has expired or is missing, select Sign In on the home page, enter your email, and choose Forgot password?",
     tone: "success",
-    primaryLabel: "Check your email to set password",
+    primaryLabel: "Go to sign in",
+    primaryHref: "/",
     secondaryLabel: "Refresh status",
   },
   setup_pending: {
@@ -280,15 +185,22 @@ export default function CheckoutSubscriptionSuccessPage() {
   const [status, setStatus] = useState<ReturnStatus>(initialStatus);
   const [statusError, setStatusError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [setPasswordUrl, setSetPasswordUrl] = useState(() => readSetPasswordUrl());
   const [firstRolePrepaySelected, setFirstRolePrepaySelected] = useState<boolean | null>(() => readInitialFirstRolePrepaySelected());
   const copy = STATUS_COPY[status];
   const Icon = copy.tone === "success" ? CheckCircle : copy.tone === "cancelled" ? AlertCircle : Clock3;
   const firstRoleCopy = firstRoleCheckoutSuccessCopy(firstRolePrepaySelected);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("set_password_url")) return;
+    url.searchParams.delete("set_password_url");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   const shouldPoll = useCallback((nextStatus: ReturnStatus) => {
-    return POLLABLE_STATUSES.has(nextStatus) || (nextStatus === "password_required" && !setPasswordUrl);
-  }, [setPasswordUrl]);
+    return POLLABLE_STATUSES.has(nextStatus);
+  }, []);
 
   const loadCheckoutStatus = useCallback(async (manual = false): Promise<ReturnStatus | null> => {
     if (!statusEndpoint) {
@@ -307,9 +219,7 @@ export default function CheckoutSubscriptionSuccessPage() {
       const data = await response.json().catch(() => null) as CheckoutStatusResponse | null;
       if (!response.ok) throw new Error("Status refresh failed.");
       const nextStatus = normalizeStatus(data?.status);
-      const nextSetPasswordUrl = normalizeSetPasswordUrl(data?.set_password_url);
       const nextFirstRolePrepaySelected = data && typeof data === "object" ? resolveFirstRolePrepaySelected(data as Record<string, unknown>) : null;
-      if (nextSetPasswordUrl) setSetPasswordUrl(nextSetPasswordUrl);
       if (nextFirstRolePrepaySelected !== null) setFirstRolePrepaySelected(nextFirstRolePrepaySelected);
       setStatus(nextStatus);
       setStatusError("");
@@ -351,7 +261,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   };
 
   const isPasswordSetupStatus = status === "password_required" || status === "setup_email_sent";
-  const primaryHref = status === "password_required" && setPasswordUrl ? setPasswordUrl : copy.primaryHref;
+  const primaryHref = copy.primaryHref;
   const primaryIsGuidance = isPasswordSetupStatus && !primaryHref;
   const primaryIsRefresh = !primaryHref && !primaryIsGuidance;
   const secondaryHref = status === "cancelled"
@@ -364,9 +274,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   const backHref = status === "ready" ? "/dashboard" : "/alphascreen/pricing#pricing-demo";
   const backLabel = status === "ready" ? "Back to dashboard" : "Back to pricing";
   const nextStepCopy = isPasswordSetupStatus
-    ? status === "password_required" && setPasswordUrl
-      ? "Set your password to continue to account access."
-      : "Check your email for the secure setup link, or refresh this page."
+    ? "Use the emailed setup link, or select Sign In and Forgot password? if the link expired."
     : status === "ready"
       ? "Open the dashboard or sign in when you are ready."
       : statusEndpoint && POLLABLE_STATUSES.has(status)
