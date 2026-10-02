@@ -51,7 +51,7 @@ export default function SalesSmsConsentPage() {
               <h2 className="text-lg font-black text-[#0A1547]">Your choice and our records</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm font-medium leading-relaxed text-[#0A1547]/70">
-              <p>Texting is optional. If you say no, your answer is unclear, or you withdraw consent, we will not text you. You can also reply STOP at any time to opt out, or HELP for help.</p>
+              <p>Texting is optional. If you say no, your answer is unclear, or you withdraw consent, we will not text you. You can reply STOP at any time to opt out; we honor STOP requests immediately. Reply HELP for help.</p>
               <p>After a clear yes, we confirm your mobile number. We document the consent date, time, representative, number, verbal source, and call recording reference in our contact record. The recorded call supports that record. HELP requests go to our sales or support team.</p>
             </div>
           </div>
@@ -62,8 +62,8 @@ export default function SalesSmsConsentPage() {
               <h2 className="text-lg font-black text-[#0A1547]">Messages you can expect</h2>
             </div>
             <ul className="mt-5 list-disc space-y-3 pl-5 text-sm font-medium leading-relaxed text-[#0A1547]/70">
-              <li>Product information requested during the call.</li>
-              <li>Demo booking links, confirmations, reminders, and rescheduling.</li>
+              <li>Information you requested about alphaScreen.</li>
+              <li>Demo scheduling and reminders.</li>
               <li>Occasional promotional follow-ups about alphaScreen.</li>
               <li>Message frequency varies. Message and data rates may apply.</li>
               <li>Consent is optional and is not a condition of purchase.</li>

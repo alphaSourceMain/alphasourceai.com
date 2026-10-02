@@ -751,11 +751,11 @@ function salesSmsConsentRoute() {
         "Before I text you, do you agree to receive text messages from alphaSource Network LLC about alphaScreen, including the information you requested, demo scheduling and reminders, and occasional promotional follow-ups? Message frequency varies. Message and data rates may apply. Consent is not a condition of purchase. Reply STOP to opt out or HELP for help. Do I have your permission to text this number?",
       ]),
       section("Your choice and our records", [
-        "Texting is optional. If you say no, your answer is unclear, or you withdraw consent, we will not text you. You can also reply STOP at any time to opt out, or HELP for help.",
+        "Texting is optional. If you say no, your answer is unclear, or you withdraw consent, we will not text you. You can reply STOP at any time to opt out; we honor STOP requests immediately. Reply HELP for help.",
         "After a clear yes, we confirm your mobile number. We document the consent date, time, representative, number, verbal source, and call recording reference in our contact record. The recorded call supports that record. HELP requests go to our sales or support team.",
       ]),
       section("Messages you can expect", [
-        "Product information requested during the call, demo booking links and reminders, and occasional promotional follow-ups about alphaScreen. Message frequency varies. Message and data rates may apply. Consent is optional and is not a condition of purchase.",
+        "Information you requested about alphaScreen, demo scheduling and reminders, and occasional promotional follow-ups about alphaScreen. Message frequency varies. Message and data rates may apply. Consent is optional and is not a condition of purchase.",
       ]),
       section("Consent records and privacy", [
         "We may retain the recorded call and contact-record details to document and honor the prospect's choice.",
