@@ -211,7 +211,7 @@ const emptyForm: FormState = {
   answer_approved_faqs: true,
   schedule_demos: true,
   notify_slack: true,
-  notify_sms: true,
+  notify_sms: false,
   notify_email: true,
 };
 
@@ -255,7 +255,7 @@ function formFor(record: TeamRecord): FormState {
     answer_approved_faqs: record.config?.answer_approved_faqs !== false,
     schedule_demos: record.config?.schedule_demos !== false,
     notify_slack: true,
-    notify_sms: true,
+    notify_sms: record.config?.notify_sms === true,
     notify_email: true,
   };
 }
@@ -642,13 +642,13 @@ export default function AdminSalesTeamPage() {
           </aside>
 
           <form onSubmit={save} className="space-y-5">
-            <section className="rounded-xl border border-[#A380F6]/30 bg-[#A380F6]/8 p-4 text-xs font-semibold leading-relaxed text-[var(--as-text)]"><strong className="font-black">Normal onboarding:</strong> enter the person’s name, Workspace email, SMS recipient number, sales dashboard user ID, GHL user ID, Slack member ID, and choose a prepared company line. Apply routing manages only the line’s GHL SMS recipient and assigned-user values; it does not change the GHL user’s profile phone or voice-device settings. Configure and verify app calling separately in GHL. Open the reusable line sections only when setting up or replacing company-owned infrastructure.</section>
+            <section className="rounded-xl border border-[#A380F6]/30 bg-[#A380F6]/8 p-4 text-xs font-semibold leading-relaxed text-[var(--as-text)]"><strong className="font-black">Normal onboarding:</strong> enter the person’s name, Workspace email, roster mobile, sales dashboard user ID, GHL user ID, Slack member ID, and choose a prepared company line. Apply routing manages the line’s GHL assigned-user value and a legacy mobile value; Web App calls do not forward to that mobile. Configure and verify app calling separately in GHL. Open the reusable line sections only when setting up or replacing company-owned infrastructure.</section>
             <section className="rounded-xl border p-5" style={cardStyle}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A380F6]">{creating ? "New salesperson" : "Team member"}</p><h2 className="mt-1 text-xl font-black text-[var(--as-text)]">{creating ? "Create a sales team record" : selected?.member.display_name}</h2></div>{selected && !creating && <StatusPill status={selected.member.status} />}</div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="Name"><input className={inputClass} value={form.display_name} onChange={(e) => update("display_name", e.target.value)} required /></Field>
                 <Field label="Workspace email" hint="Required to activate"><input className={inputClass} type="email" value={form.workspace_email} onChange={(e) => update("workspace_email", e.target.value)} placeholder="name@alphasourceai.com" /></Field>
-                <Field label="SMS recipient mobile" hint="Required for follow-up texts · use +1XXXXXXXXXX"><input className={inputClass} value={form.mobile_phone_e164} onChange={(e) => update("mobile_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>
+                <Field label="Roster mobile" hint="Required by the current GHL roster mapping; Web App calls do not forward here · use +1XXXXXXXXXX"><input className={inputClass} value={form.mobile_phone_e164} onChange={(e) => update("mobile_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>
                 <Field label="Sales dashboard user ID" hint="Required · Supabase auth UUID"><input className={inputClass} value={form.sales_rep_user_id} onChange={(e) => update("sales_rep_user_id", e.target.value)} /></Field>
                 <Field label="GHL user ID" hint="Required to activate"><input className={inputClass} value={form.ghl_user_id} onChange={(e) => update("ghl_user_id", e.target.value)} /></Field>
                 <Field label="Slack member ID" hint="Required to activate"><input className={inputClass} value={form.slack_user_id} onChange={(e) => update("slack_user_id", e.target.value)} placeholder="U…" /></Field>
@@ -685,7 +685,10 @@ export default function AdminSalesTeamPage() {
                 <Toggle checked={form.transfer_enabled} onChange={(value) => update("transfer_enabled", value)} label="Allow live transfer" detail="The destination must be separate from this salesperson’s mobile." />
                 {form.transfer_enabled && <Field label="Backup transfer number"><input className={inputClass} value={form.backup_transfer_phone_e164} onChange={(e) => update("backup_transfer_phone_e164", e.target.value)} placeholder="+17205551212" /></Field>}
               </div>
-              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><Check className="mr-2 inline h-4 w-4" />Caller-approved follow-up messages always go to this salesperson by Slack DM, GHL text, and Workspace email.</div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <Toggle checked={form.notify_sms} onChange={(value) => update("notify_sms", value)} label="Also request a GHL text" detail="Optional. A webhook acknowledgment alone does not confirm SMS delivery." />
+              </div>
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-relaxed text-emerald-900"><Check className="mr-2 inline h-4 w-4" />Caller-approved follow-up messages require Slack DM and Workspace email. GHL text is optional and is not counted as delivered from webhook acknowledgment alone.</div>
               {selectedLine?.shared_voice_entrypoint && <details className="mt-4 rounded-lg border border-[var(--as-border)] p-4"><summary className="cursor-pointer text-xs font-black text-[var(--as-text)]">Shared Grok Voice setup</summary><p className="mt-2 text-xs font-semibold text-[var(--as-muted)]">This one agent and number receive unanswered calls from all four GHL lines. Record the completed four-line QA test before marking it verified.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Grok agent ID"><input className={inputClass} value={form.xai_agent_id} onChange={(e) => update("xai_agent_id", e.target.value)} /></Field><Field label="Grok phone number"><input className={inputClass} value={form.xai_phone_number_e164} onChange={(e) => update("xai_phone_number_e164", e.target.value)} placeholder="+17205551212" /></Field><Field label="Grok QA call reference"><input className={inputClass} value={form.xai_verification_reference} onChange={(e) => update("xai_verification_reference", e.target.value)} placeholder="Four-line call test reference" /></Field><Field label="Grok setup status"><select className={inputClass} value={form.xai_setup_status} onChange={(e) => update("xai_setup_status", e.target.value as FormState["xai_setup_status"])}><option value="pending">Pending</option><option value="verified">Verified after four-line test</option><option value="failed">Failed</option></select></Field></div>{payload.agent_bootstrap_prompt && <div className="mt-4"><p className="text-xs font-black text-[var(--as-text)]">Fixed shared-agent instructions</p><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--as-soft)] p-3 text-xs leading-relaxed text-[var(--as-text)]">{payload.agent_bootstrap_prompt}</pre><button type="button" onClick={() => void copy(payload.agent_bootstrap_prompt, "Fixed Grok instructions copied.")} className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]"><Clipboard className="h-3.5 w-3.5" /> Copy fixed instructions</button></div>}<button type="button" aria-label="Save shared Grok Voice setup" disabled={saving} onClick={() => void saveLineSetup()} className="mt-4 rounded-lg border border-[var(--as-border)] px-3 py-2 text-xs font-black text-[var(--as-text)]">Save shared Grok setup</button></details>}
             </section>
 
