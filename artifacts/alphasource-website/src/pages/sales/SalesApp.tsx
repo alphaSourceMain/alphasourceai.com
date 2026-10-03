@@ -45,6 +45,17 @@ export default function SalesApp() {
   const [accessError, setAccessError] = useState("");
 
   useEffect(() => {
+    if (salesUsesMockApi || typeof window === "undefined") return;
+    const handleInvalidSalesAuth = () => {
+      setRep(null);
+      setChecking(false);
+      setAccessError("Sales access could not be verified. Your account remains signed in.");
+    };
+    window.addEventListener("alphasource:sales-auth-invalid", handleInvalidSalesAuth);
+    return () => window.removeEventListener("alphasource:sales-auth-invalid", handleInvalidSalesAuth);
+  }, []);
+
+  useEffect(() => {
     if ((!clientAuthReady || salesLoginLoading) && !salesUsesMockApi) return;
     if (!salesUsesMockApi && !isLoggedIn) {
       setRep(null);

@@ -191,15 +191,15 @@ export default function AdminSalesPayrollPage() {
         <button type="button" onClick={() => setActiveTab("payments")} aria-current={activeTab === "payments" ? "page" : undefined} className={activeTab === "payments" ? "rounded-lg bg-[#9f75ef] px-4 py-2 text-sm font-semibold text-white" : "rounded-lg border px-4 py-2 text-sm"}>Payments</button>
       </nav>
       {activeTab === "payments" ? <AdminSalesPaymentsTab request={request} reps={overview?.representatives || []} onRecorded={() => { void load(); }} /> : <>
-      {overview?.truncated && <p role="alert" className="rounded-lg border border-amber-400/50 p-3 text-sm">The ledger exceeds the display limit. Do not use these totals for payroll until the full ledger is exported and reconciled.</p>}
+      {overview?.truncated && <p role="alert" className="rounded-lg border border-amber-400/50 p-3 text-sm">The ledger exceeds the display limit. Totals and this page’s receipt selectors are incomplete; pause payroll entry and reconcile against the full provider and database records.</p>}
       <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border p-4"><p className="text-sm">Activated sales without a reviewed receipt</p><p className="text-2xl font-bold">{overview?.pending_evidence.length ?? "—"}</p><p className="text-xs">Recurring receipts require a fresh review each period.</p></div>
+        <div className="rounded-xl border p-4"><p className="text-sm">Activated sales without a reviewed receipt</p><p className="text-2xl font-bold">{overview?.truncated ? "Incomplete" : overview?.pending_evidence.length ?? "—"}</p><p className="text-xs">Recurring receipts require a fresh review each period.</p></div>
         <div className="rounded-xl border p-4"><p className="text-sm">Verified commission, net of adjustments</p><p className="text-2xl font-bold">{overview?.truncated ? "Incomplete" : money(totalVerified)}</p></div>
         <div className="rounded-xl border p-4"><p className="text-sm">Recorded ACH payouts</p><p className="text-2xl font-bold">{overview?.truncated ? "Incomplete" : money(totalPaid)}</p><p className="text-xs">Recording does not initiate ACH.</p></div>
       </section>
       <section className="rounded-xl border p-4">
         <h2 className="font-bold">Automation</h2>
-        <label className="mt-2 flex items-center gap-3 text-sm"><input type="checkbox" role="switch" checked={false} disabled aria-label="Automated payroll disabled pending separate review" /> Automated payroll: Off</label>
+        <label className="mt-2 flex items-center gap-3 text-sm"><input type="checkbox" role="switch" checked={Boolean(overview?.automation.enabled)} disabled aria-label="Automated payroll status; changes require separate review" /> Automated payroll: {overview?.automation.enabled ? "On" : "Off"}</label>
         <p className="mt-1 text-xs">{overview?.automation.reason || "Automation is not available."} The server rejects attempts to turn it on.</p>
       </section>
       <section className="rounded-xl border p-4">
@@ -221,7 +221,7 @@ export default function AdminSalesPayrollPage() {
         <label className="text-sm">Approved discount ($)<input required value={discount} onChange={(e) => setDiscount(e.target.value)} className={inputClass} /></label>
         <label className="text-sm">Allocated provider fee ($)<input required value={fee} onChange={(e) => setFee(e.target.value)} className={inputClass} /></label>
         <label className="text-sm">Evidence reference<input required value={evidence} onChange={(e) => setEvidence(e.target.value)} className={inputClass} placeholder="Provider receipt or internal review ID" /></label>
-        <div className="sm:col-span-2"><button type="submit" disabled={saving} className={buttonClass}>Approve receipt</button></div>
+        <div className="sm:col-span-2"><button type="submit" disabled={saving || overview?.truncated} className={buttonClass}>Approve receipt</button></div>
       </form>
       <section className="overflow-x-auto rounded-xl border p-4">
         <h2 className="font-bold">Reviewed receipt ledger</h2>
@@ -240,7 +240,7 @@ export default function AdminSalesPayrollPage() {
           <label className="text-sm">Net membership affected ($)<input required value={adjustmentNet} onChange={(e) => setAdjustmentNet(e.target.value)} className={inputClass} /></label>
           <label className="text-sm">Effective time (timestamp with timezone)<input required value={adjustmentAt} onChange={(e) => setAdjustmentAt(e.target.value)} className={inputClass} placeholder="2026-10-02T18:00:00Z" /></label>
           <label className="text-sm">Evidence reference<input required value={adjustmentEvidence} onChange={(e) => setAdjustmentEvidence(e.target.value)} className={inputClass} /></label>
-          <button type="submit" disabled={saving} className={buttonClass}>Record reviewed adjustment</button>
+          <button type="submit" disabled={saving || overview?.truncated} className={buttonClass}>Record reviewed adjustment</button>
         </form>
         <form onSubmit={recordPayout} className="grid gap-3 rounded-xl border p-4">
           <h2 className="font-bold">Record an ACH already sent</h2><p className="text-xs">This never sends money. Do not record a planned transfer as paid.</p>
@@ -249,7 +249,7 @@ export default function AdminSalesPayrollPage() {
           <label className="text-sm">ACH confirmation reference<input required value={achReference} onChange={(e) => setAchReference(e.target.value)} className={inputClass} /></label>
           <label className="text-sm">Paid at (timestamp with timezone)<input required value={paidAt} onChange={(e) => setPaidAt(e.target.value)} className={inputClass} placeholder="2026-10-02T18:00:00Z" /></label>
           <label className="text-sm">Evidence reference<input required value={payoutEvidence} onChange={(e) => setPayoutEvidence(e.target.value)} className={inputClass} /></label>
-          <button type="submit" disabled={saving} className={buttonClass}>Record existing payout</button>
+          <button type="submit" disabled={saving || overview?.truncated} className={buttonClass}>Record existing payout</button>
         </form>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -267,7 +267,7 @@ export default function AdminSalesPayrollPage() {
           <p className="text-xs">Lock only after the Monday–Sunday Mountain Time week closes and you have reconciled receipts and adjustments. The snapshot cannot be revised.</p>
           <label className="text-sm">Representative<select required value={statementRep} onChange={(e) => setStatementRep(e.target.value)} className={inputClass}><option value="">Select representative</option>{overview?.representatives.map((r) => <option key={r.user_id} value={r.user_id}>{r.display_name || r.email}</option>)}</select></label>
           <label className="text-sm">Monday week start<input required type="date" value={statementWeek} onChange={(e) => setStatementWeek(e.target.value)} className={inputClass} /></label>
-          <button type="submit" disabled={saving} className={buttonClass}>Lock reviewed statement</button>
+          <button type="submit" disabled={saving || overview?.truncated} className={buttonClass}>Lock reviewed statement</button>
           {!!overview?.locked_statements.length && <p className="text-xs">Locked: {overview.locked_statements.map((s) => `${repNames.get(s.rep_user_id) || s.rep_user_id}: ${s.week_start}`).join(" · ")}</p>}
         </form>
       </div>
