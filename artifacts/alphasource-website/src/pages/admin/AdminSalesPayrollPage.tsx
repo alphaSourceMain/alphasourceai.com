@@ -1,543 +1,278 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  AlertCircle,
-  ArrowDownRight,
-  ArrowUpRight,
-  CheckCircle2,
-  Download,
-  FileText,
-  Percent,
-  Plus,
-  RefreshCw,
-  Upload,
-  WalletCards,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
+import AdminSalesPaymentsTab from "./AdminSalesPaymentsTab";
 import { supabase } from "@/lib/supabaseClient";
 
-interface Representative {
-  user_id: string;
-  email: string;
-  display_name: string;
-  active: boolean;
-}
-
-interface PayrollTotals {
-  closed_won_count: number;
-  gross_membership_cents: number;
-  discounts_cents: number;
-  net_membership_cents: number;
-  deductions_cents: number;
-  credits_cents: number;
-  adjusted_net_membership_cents: number;
-  commission_cents: number;
-}
-
-interface PayrollSale {
-  id: string;
-  activated_at: string | null;
-  label: string;
-  company_name: string;
-  buyer_name: string;
-  buyer_email: string;
-  plan_key: string;
-  billing_cadence: string;
-  representative: Representative;
-  annualization_multiplier: number;
-  gross_membership_cents: number;
-  discount_cents: number;
-  net_membership_cents: number;
-  commission_eligible: boolean;
-  commission_cents: number;
-}
-
-interface PayrollAdjustment {
-  id: string;
-  effective_at: string | null;
-  adjustment_type: string;
-  direction: "deduction" | "credit";
-  amount_cents: number;
-  signed_membership_cents: number;
-  commission_impact_cents: number;
-  reason: string;
-  representative: Representative;
-  related_sale: { id: string; label: string } | null;
-  document: { available: boolean; filename: string; content_type: string; size_bytes: number } | null;
-  created_by_email: string;
-  created_at: string | null;
-}
-
-interface PayrollPayload {
-  generated_at: string;
-  commission_rate: number;
-  policy: {
-    basis: string;
-    monthly_annualization_multiplier: number;
-    excluded: string[];
-    adjustment_period_basis: string;
-    time_zone: string;
-    rounding_basis: string;
-  };
-  filters: { date_from: string; date_to: string; representative_user_id: string | null };
-  summary: PayrollTotals;
-  representatives: Representative[];
-  by_representative: Array<PayrollTotals & { representative: Representative }>;
-  sales: PayrollSale[];
-  related_sales: Array<{ id: string; label: string; activated_at: string | null; representative: Representative }>;
-  adjustments: PayrollAdjustment[];
-}
+type Rep = { user_id: string; email: string; display_name: string; active: boolean };
+type ReviewCandidate = { id: string; company_legal_name: string; selected_plan_key: string; selected_billing_cadence: string; created_by_user_id: string; activated_at: string; reviewed_receipt_count: number };
+type Receipt = { id: string; purchase_intent_id: string; rep_user_id: string; provider: string; provider_payment_id: string; payment_kind: string; gross_membership_cents: number; discount_cents: number; provider_fee_cents: number; net_membership_cents: number; commission_cents: number; statement_week_start: string; reviewed_at: string; evidence_reference: string };
+type Adjustment = { id: string; receipt_id: string; adjustment_type: string; commission_delta_cents: number; statement_week_start: string };
+type Payout = { id: string; receipt_id: string; amount_cents: number; ach_reference: string; paid_at: string };
+type Overview = {
+  representatives: Rep[]; pending_evidence: ReviewCandidate[]; review_candidates: ReviewCandidate[]; receipts: Receipt[];
+  adjustments: Adjustment[]; payouts: Payout[];
+  departures: Array<{ rep_user_id: string; final_day: string }>;
+  locked_statements: Array<{ rep_user_id: string; week_start: string; locked_at: string }>;
+  truncated: boolean;
+  automation: { enabled: boolean; can_enable: boolean; reason: string };
+};
 
 const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
+const backendBase = String(
+  (env as Record<string, unknown>).VITE_BACKEND_URL ||
+  (env as Record<string, unknown>).VITE_API_URL ||
+  (env as Record<string, unknown>).VITE_PUBLIC_BACKEND_URL ||
+  (env as Record<string, unknown>).PUBLIC_BACKEND_URL ||
+  (env as Record<string, unknown>).BACKEND_URL || "",
+).trim().replace(/\/+$/, "");
 
-function firstBase(...values: unknown[]): string {
-  for (const value of values) {
-    const normalized = String(value || "").trim().replace(/\/+$/, "");
-    if (normalized) return normalized;
-  }
-  return "";
+function cents(dollars: string): number {
+  const value = dollars.trim().replace(/[$,]/g, "");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) throw new Error("Enter a nonnegative dollar amount with at most two decimals.");
+  const result = Math.round(Number(value) * 100);
+  if (!Number.isSafeInteger(result)) throw new Error("Amount is out of range.");
+  return result;
 }
 
-const backendBase = firstBase(
-  (env as Record<string, unknown>).VITE_BACKEND_URL,
-  (env as Record<string, unknown>).VITE_API_URL,
-  (env as Record<string, unknown>).VITE_PUBLIC_BACKEND_URL,
-  (env as Record<string, unknown>).PUBLIC_BACKEND_URL,
-  (env as Record<string, unknown>).BACKEND_URL,
-);
-const PAYROLL_TIME_ZONE = "America/Denver";
-
-const surfaceCardStyle = {
-  backgroundColor: "var(--as-surface)",
-  border: "1px solid var(--as-border)",
-  boxShadow: "var(--as-shadow)",
-};
-const primaryTextStyle = { color: "var(--as-text)" };
-const mutedTextStyle = { color: "var(--as-text-muted)" };
-const subtleTextStyle = { color: "var(--as-text-subtle)" };
-const fieldStyle = {
-  backgroundColor: "var(--as-surface)",
-  borderColor: "var(--as-border)",
-  color: "var(--as-text)",
-};
-
-function localDateString(date = new Date(), timeZone = PAYROLL_TIME_ZONE): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
+function money(value: number | null | undefined): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0) / 100);
 }
 
-function currentMonthStart(): string {
-  return `${localDateString().slice(0, 8)}01`;
+function iso(value: string): string {
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value.trim())) throw new Error("Use a timestamp with an explicit timezone, such as 2026-10-02T18:00:00Z.");
+  const date = new Date(value);
+  if (!value || !Number.isFinite(date.getTime())) throw new Error("Enter a valid date and time.");
+  return date.toISOString();
 }
 
-function formatMoney(cents: unknown): string {
-  const numeric = Number(cents);
-  if (!Number.isFinite(numeric)) return "$0.00";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(numeric / 100);
+function errorMessage(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  return "Sales Payroll is unavailable.";
 }
 
-function formatDate(value: unknown, timeZone = PAYROLL_TIME_ZONE): string {
-  const date = new Date(String(value || ""));
-  if (!Number.isFinite(date.getTime())) return "Not available";
-  return date.toLocaleDateString("en-US", { timeZone, year: "numeric", month: "short", day: "numeric" });
-}
-
-function titleCase(value: unknown): string {
-  return String(value || "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function extractErrorMessage(text: string, fallback: string): string {
-  try {
-    const parsed = JSON.parse(text) as { detail?: unknown; message?: unknown; error?: unknown };
-    return String(parsed.detail || parsed.message || parsed.error || fallback);
-  } catch {
-    return fallback;
-  }
-}
-
-function dollarsToCents(value: string): number | null {
-  const normalized = value.trim().replace(/[$,]/g, "");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
-  const cents = Math.round(Number(normalized) * 100);
-  return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
-}
-
-function csvCell(value: unknown): string {
-  return `"${String(value ?? "").replace(/"/g, '""')}"`;
-}
-
-function SummaryCard({ label, value, detail, icon: Icon, tone }: {
-  label: string;
-  value: string;
-  detail: string;
-  icon: typeof WalletCards;
-  tone: string;
-}) {
-  return (
-    <section className="rounded-2xl border p-4" style={surfaceCardStyle}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={subtleTextStyle}>{label}</p>
-          <p className="mt-2 text-2xl font-black" style={primaryTextStyle}>{value}</p>
-          <p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>{detail}</p>
-        </div>
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${tone}18`, color: tone }}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
-      </div>
-    </section>
-  );
-}
+const inputClass = "w-full rounded-lg border px-3 py-2 text-sm";
+const buttonClass = "rounded-lg bg-[#9f75ef] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
 
 export default function AdminSalesPayrollPage() {
-  const [dateFrom, setDateFrom] = useState(currentMonthStart);
-  const [dateTo, setDateTo] = useState(localDateString);
-  const [representativeId, setRepresentativeId] = useState("");
-  const [payload, setPayload] = useState<PayrollPayload | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [activeTab, setActiveTab] = useState<"ledger" | "payments">("ledger");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [showAdjustment, setShowAdjustment] = useState(false);
-  const [adjustmentRepId, setAdjustmentRepId] = useState("");
-  const [adjustmentType, setAdjustmentType] = useState("manual_adjustment");
-  const [direction, setDirection] = useState<"deduction" | "credit">("deduction");
-  const [amount, setAmount] = useState("");
-  const [effectiveDate, setEffectiveDate] = useState(localDateString);
-  const [relatedSaleId, setRelatedSaleId] = useState("");
-  const [reason, setReason] = useState("");
-  const [documentFile, setDocumentFile] = useState<File | null>(null);
-  const [fileInputKey, setFileInputKey] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [formSuccess, setFormSuccess] = useState("");
-  const [openingDocumentId, setOpeningDocumentId] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [intentId, setIntentId] = useState("");
+  const [provider, setProvider] = useState("stripe");
+  const [paymentKind, setPaymentKind] = useState("monthly");
+  const [paymentId, setPaymentId] = useState("");
+  const [paymentAt, setPaymentAt] = useState("");
+  const [fundsAt, setFundsAt] = useState("");
+  const [gross, setGross] = useState("");
+  const [discount, setDiscount] = useState("0");
+  const [fee, setFee] = useState("0");
+  const [evidence, setEvidence] = useState("");
+  const [adjustmentReceipt, setAdjustmentReceipt] = useState("");
+  const [adjustmentType, setAdjustmentType] = useState("refund");
+  const [adjustmentEvent, setAdjustmentEvent] = useState("");
+  const [adjustmentNet, setAdjustmentNet] = useState("");
+  const [adjustmentAt, setAdjustmentAt] = useState("");
+  const [adjustmentEvidence, setAdjustmentEvidence] = useState("");
+  const [payoutReceipt, setPayoutReceipt] = useState("");
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [achReference, setAchReference] = useState("");
+  const [paidAt, setPaidAt] = useState("");
+  const [payoutEvidence, setPayoutEvidence] = useState("");
+  const [departureRep, setDepartureRep] = useState("");
+  const [finalDay, setFinalDay] = useState("");
+  const [departureEvidence, setDepartureEvidence] = useState("");
+  const [statementRep, setStatementRep] = useState("");
+  const [statementWeek, setStatementWeek] = useState("");
 
-  const getToken = useCallback(async () => {
+  const request = useCallback(async (path: string, body?: object) => {
+    if (!backendBase) throw new Error("The sales service URL is not configured.");
     const { data: { session } } = await supabase.auth.getSession();
-    const token = String(session?.access_token || "").trim();
-    if (!token) throw new Error("Missing session token.");
-    return token;
+    if (!session?.access_token) throw new Error("Please sign in again.");
+    const response = await fetch(`${backendBase}/admin/sales-payroll${path}`, {
+      method: body ? "POST" : "GET", credentials: "omit", cache: "no-store",
+      headers: { Authorization: `Bearer ${session.access_token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) throw new Error(String(payload.error || "Sales Payroll request failed.").replace(/_/g, " "));
+    return payload;
   }, []);
 
-  const loadPayroll = useCallback(async () => {
-    if (!backendBase) {
-      setError("Missing backend base URL configuration.");
-      setLoading(false);
-      return;
-    }
+  const load = useCallback(async () => {
     setLoading(true);
-    setError("");
-    try {
-      const token = await getToken();
-      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-      if (representativeId) params.set("representative_user_id", representativeId);
-      const response = await fetch(`${backendBase}/admin/sales-payroll?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "omit",
-      });
-      const text = await response.text();
-      if (!response.ok) throw new Error(extractErrorMessage(text, "Could not load sales payroll."));
-      const nextPayload = JSON.parse(text) as PayrollPayload;
-      setPayload(nextPayload);
-      setAdjustmentRepId((current) => current || nextPayload.representatives.find((rep) => rep.active)?.user_id || "");
-    } catch (loadError) {
-      setPayload(null);
-      setError(loadError instanceof Error ? loadError.message : "Could not load sales payroll.");
-    } finally {
-      setLoading(false);
-    }
-  }, [dateFrom, dateTo, getToken, representativeId]);
+    try { setOverview(await request("/") as Overview); setError(""); }
+    catch (cause) { setError(errorMessage(cause)); }
+    finally { setLoading(false); }
+  }, [request]);
 
-  useEffect(() => {
-    void loadPayroll();
-  }, [loadPayroll]);
+  useEffect(() => { void load(); }, [load]);
 
-  const relatedSales = useMemo(
-    () => (payload?.related_sales || []).filter((sale) => !adjustmentRepId || sale.representative.user_id === adjustmentRepId),
-    [adjustmentRepId, payload?.related_sales],
-  );
+  async function submit(path: string, body: object, success: string) {
+    setSaving(true); setError(""); setNotice("");
+    try { await request(path, body); setNotice(success); await load(); }
+    catch (cause) { setError(errorMessage(cause)); }
+    finally { setSaving(false); }
+  }
 
-  const resetAdjustmentForm = useCallback(() => {
-    setAdjustmentType("manual_adjustment");
-    setDirection("deduction");
-    setAmount("");
-    setEffectiveDate(localDateString());
-    setRelatedSaleId("");
-    setReason("");
-    setDocumentFile(null);
-    setFileInputKey((value) => value + 1);
-  }, []);
-
-  const submitAdjustment = useCallback(async (event: FormEvent) => {
+  function recordReceipt(event: FormEvent) {
     event.preventDefault();
-    setFormError("");
-    setFormSuccess("");
-    const amountCents = dollarsToCents(amount);
-    if (amountCents == null) {
-      setFormError("Enter an amount greater than zero with no more than two decimal places.");
-      return;
-    }
-    if (!adjustmentRepId) {
-      setFormError("Select a sales representative.");
-      return;
-    }
-    setSaving(true);
     try {
-      const token = await getToken();
-      const form = new FormData();
-      form.set("sales_rep_user_id", adjustmentRepId);
-      form.set("adjustment_type", adjustmentType);
-      form.set("direction", direction);
-      form.set("amount_cents", String(amountCents));
-      form.set("effective_date", effectiveDate);
-      form.set("reason", reason);
-      if (relatedSaleId) form.set("purchase_intent_id", relatedSaleId);
-      if (documentFile) form.set("documentation", documentFile);
-      const response = await fetch(`${backendBase}/admin/sales-payroll/adjustments`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-        credentials: "omit",
-      });
-      const text = await response.text();
-      if (!response.ok) throw new Error(extractErrorMessage(text, "Could not save the payroll adjustment."));
-      resetAdjustmentForm();
-      setFormSuccess("Adjustment saved and included in the selected period when its effective date falls within the range.");
-      await loadPayroll();
-    } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "Could not save the payroll adjustment.");
-    } finally {
-      setSaving(false);
-    }
-  }, [adjustmentRepId, adjustmentType, amount, direction, documentFile, effectiveDate, getToken, loadPayroll, reason, relatedSaleId, resetAdjustmentForm]);
+      void submit("/receipts", {
+        purchase_intent_id: intentId, provider, provider_payment_id: paymentId, payment_kind: paymentKind,
+        payment_success_at: iso(paymentAt), funds_received_at: iso(fundsAt),
+        gross_membership_cents: cents(gross), discount_cents: cents(discount), provider_fee_cents: cents(fee),
+        evidence_reference: evidence,
+      }, "Verified receipt recorded. No payment was sent.");
+    } catch (cause) { setError(errorMessage(cause)); }
+  }
 
-  const openDocument = useCallback(async (adjustmentId: string) => {
-    setOpeningDocumentId(adjustmentId);
-    setError("");
+  function recordAdjustment(event: FormEvent) {
+    event.preventDefault();
     try {
-      const token = await getToken();
-      const response = await fetch(`${backendBase}/admin/sales-payroll/adjustments/${encodeURIComponent(adjustmentId)}/document`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "omit",
-      });
-      const text = await response.text();
-      if (!response.ok) throw new Error(extractErrorMessage(text, "Could not open the supporting document."));
-      const result = JSON.parse(text) as { document?: { url?: string } };
-      if (!result.document?.url) throw new Error("The document link was not returned.");
-      window.open(result.document.url, "_blank", "noopener,noreferrer");
-    } catch (documentError) {
-      setError(documentError instanceof Error ? documentError.message : "Could not open the supporting document.");
-    } finally {
-      setOpeningDocumentId("");
-    }
-  }, [getToken]);
+      void submit("/adjustments", {
+        receipt_id: adjustmentReceipt, adjustment_type: adjustmentType, provider_event_id: adjustmentEvent,
+        net_membership_cents: cents(adjustmentNet), effective_at: iso(adjustmentAt), evidence_reference: adjustmentEvidence,
+      }, "Linked adjustment recorded. No money moved.");
+    } catch (cause) { setError(errorMessage(cause)); }
+  }
 
-  const exportCsv = useCallback(() => {
-    if (!payload) return;
-    const header = ["Record type", "Effective date", "Representative", "Company or reason", "Plan", "Cadence", "Gross membership", "Discount", "Credit", "Deduction", "Net membership", "Commission"];
-    const rows: unknown[][] = [];
-    for (const sale of payload.sales) {
-      rows.push(["Sale", sale.activated_at ? localDateString(new Date(sale.activated_at), payload.policy.time_zone) : "", sale.representative.display_name, sale.label, titleCase(sale.plan_key), titleCase(sale.billing_cadence), sale.gross_membership_cents / 100, sale.discount_cents / 100, 0, 0, sale.net_membership_cents / 100, sale.commission_cents / 100]);
-    }
-    for (const adjustment of payload.adjustments) {
-      rows.push([titleCase(adjustment.adjustment_type), adjustment.effective_at ? localDateString(new Date(adjustment.effective_at), payload.policy.time_zone) : "", adjustment.representative.display_name, adjustment.reason, "", "", 0, 0, adjustment.direction === "credit" ? adjustment.amount_cents / 100 : 0, adjustment.direction === "deduction" ? adjustment.amount_cents / 100 : 0, adjustment.signed_membership_cents / 100, adjustment.commission_impact_cents / 100]);
-    }
-    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `alphascreen-sales-payroll-${dateFrom}-to-${dateTo}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }, [dateFrom, dateTo, payload]);
+  function recordPayout(event: FormEvent) {
+    event.preventDefault();
+    try {
+      void submit("/payouts", {
+        receipt_id: payoutReceipt, amount_cents: cents(payoutAmount), ach_reference: achReference,
+        paid_at: iso(paidAt), evidence_reference: payoutEvidence,
+      }, "Existing ACH payout recorded. This action did not initiate payment.");
+    } catch (cause) { setError(errorMessage(cause)); }
+  }
 
-  const summary = payload?.summary;
+  function recordDeparture(event: FormEvent) {
+    event.preventDefault();
+    void submit("/departures", { rep_user_id: departureRep, final_day: finalDay, evidence_reference: departureEvidence },
+      "Reviewed final day recorded. Existing locked receipts were not changed.");
+  }
 
-  return (
-    <AdminLayout title="Sales Payroll">
-      <div className="space-y-6">
-        <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.24em]" style={subtleTextStyle}>Admin only</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-3xl" style={primaryTextStyle}>Sales Payroll</h1>
-            <p className="mt-2 text-sm font-semibold leading-relaxed" style={mutedTextStyle}>
-              Calculate contractor commission from activated alphaScreen memberships and record later credits or deductions in the period when they occur.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={exportCsv} disabled={!payload || loading} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-black disabled:opacity-50" style={fieldStyle}>
-              <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
-            </button>
-            <button type="button" onClick={() => setShowAdjustment((value) => !value)} className="inline-flex items-center gap-2 rounded-xl bg-[#0A1547] px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#111f5c]">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Add adjustment
-            </button>
-          </div>
-        </section>
+  function lockStatement(event: FormEvent) {
+    event.preventDefault();
+    void submit("/statements/lock", { rep_user_id: statementRep, week_start: statementWeek },
+      "Weekly statement locked. Its reviewed lines are immutable.");
+  }
 
-        <section className="rounded-2xl border p-4" style={surfaceCardStyle} aria-label="Payroll filters">
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.4fr_auto] md:items-end">
-            <label className="block text-xs font-black" style={primaryTextStyle}>
-              Start date
-              <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle} />
-            </label>
-            <label className="block text-xs font-black" style={primaryTextStyle}>
-              End date
-              <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle} />
-            </label>
-            <label className="block text-xs font-black" style={primaryTextStyle}>
-              Sales representative
-              <select value={representativeId} onChange={(event) => setRepresentativeId(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle}>
-                <option value="">All representatives</option>
-                {(payload?.representatives || []).map((rep) => <option key={rep.user_id} value={rep.user_id}>{rep.display_name}{rep.active ? "" : " (inactive)"}</option>)}
-              </select>
-            </label>
-            <button type="button" onClick={() => void loadPayroll()} disabled={loading} className="inline-flex h-[42px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black disabled:opacity-50" style={fieldStyle}>
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
-            </button>
-          </div>
-          <p className="mt-3 text-xs font-semibold" style={mutedTextStyle}>Period boundaries use {payload?.policy.time_zone || "America/Denver"}.</p>
-        </section>
+  const repNames = useMemo(() => new Map((overview?.representatives || []).map((rep) => [rep.user_id, rep.display_name || rep.email])), [overview]);
+  const adjustmentTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of overview?.adjustments || []) map.set(row.receipt_id, (map.get(row.receipt_id) || 0) + row.commission_delta_cents);
+    return map;
+  }, [overview]);
+  const paidTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of overview?.payouts || []) map.set(row.receipt_id, (map.get(row.receipt_id) || 0) + row.amount_cents);
+    return map;
+  }, [overview]);
+  const totalVerified = (overview?.receipts || []).reduce((sum, row) => sum + row.commission_cents, 0) +
+    (overview?.adjustments || []).reduce((sum, row) => sum + row.commission_delta_cents, 0);
+  const totalPaid = (overview?.payouts || []).reduce((sum, row) => sum + row.amount_cents, 0);
 
-        {error ? (
-          <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200" role="alert">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" /> {error}
-          </div>
-        ) : null}
-
-        {showAdjustment ? (
-          <form onSubmit={submitAdjustment} className="rounded-2xl border p-5" style={surfaceCardStyle}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-black" style={primaryTextStyle}>Add payroll adjustment</h2>
-                <p className="mt-1 text-xs font-semibold leading-relaxed" style={mutedTextStyle}>Enter the adjustment amount. The report applies the 50% commission impact automatically. Records remain in the audit history; correct an error with an offsetting entry.</p>
-              </div>
-              <button type="button" onClick={() => setShowAdjustment(false)} className="self-start text-xs font-black text-[#7C5FCC]">Close</button>
-            </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <label className="text-xs font-black" style={primaryTextStyle}>Representative
-                <select required value={adjustmentRepId} onChange={(event) => { setAdjustmentRepId(event.target.value); setRelatedSaleId(""); }} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle}>
-                  <option value="">Select representative</option>
-                  {(payload?.representatives || []).map((rep) => <option key={rep.user_id} value={rep.user_id}>{rep.display_name}{rep.active ? "" : " (inactive)"}</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Type
-                <select required value={adjustmentType} onChange={(event) => setAdjustmentType(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle}>
-                  <option value="cancellation">Cancellation</option>
-                  <option value="refund">Refund</option>
-                  <option value="chargeback">Chargeback</option>
-                  <option value="manual_adjustment">Manual adjustment</option>
-                </select>
-              </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Effect
-                <select required value={direction} onChange={(event) => setDirection(event.target.value as "deduction" | "credit")} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle}>
-                  <option value="deduction">Deduction</option>
-                  <option value="credit">Credit</option>
-                </select>
-              </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Adjustment amount
-                <div className="mt-1.5 flex rounded-xl border" style={fieldStyle}><span className="px-3 py-2.5 text-sm font-black" style={mutedTextStyle}>$</span><input required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" className="min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-sm font-semibold outline-none" /></div>
-              </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Effective date
-                <input required type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle} />
-              </label>
-              <label className="text-xs font-black md:col-span-1 xl:col-span-2" style={primaryTextStyle}>Related sale <span className="font-semibold" style={mutedTextStyle}>(optional, 500 most recent)</span>
-                <select value={relatedSaleId} onChange={(event) => setRelatedSaleId(event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold" style={fieldStyle}>
-                  <option value="">No linked sale</option>
-                  {relatedSales.map((sale) => <option key={sale.id} value={sale.id}>{sale.label} · {formatDate(sale.activated_at)}</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-black" style={primaryTextStyle}>Supporting file <span className="font-semibold" style={mutedTextStyle}>(optional)</span>
-                <input key={fileInputKey} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.doc,.docx" onChange={(event) => setDocumentFile(event.target.files?.[0] || null)} className="mt-1.5 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[#A380F6]/10 file:px-3 file:py-2 file:font-black file:text-[#7C5FCC]" style={mutedTextStyle} />
-              </label>
-              <label className="text-xs font-black md:col-span-2 xl:col-span-4" style={primaryTextStyle}>Reason
-                <textarea required minLength={3} maxLength={2000} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain the cancellation, refund, chargeback, or other correction." className="mt-1.5 w-full resize-y rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#A380F6]" style={fieldStyle} />
-              </label>
-            </div>
-            {formError ? <p className="mt-4 text-sm font-bold text-rose-600" role="alert">{formError}</p> : null}
-            {formSuccess ? <p className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-600" role="status"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{formSuccess}</p> : null}
-            <div className="mt-5 flex justify-end">
-              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[#02D99D] px-5 py-2.5 text-sm font-black text-[#071033] disabled:opacity-50">
-                <Upload className="h-4 w-4" aria-hidden="true" /> {saving ? "Saving…" : "Save adjustment"}
-              </button>
-            </div>
-          </form>
-        ) : null}
-
-        {loading && !payload ? <p className="flex items-center gap-2 text-sm font-bold" style={mutedTextStyle} role="status"><RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />Loading payroll report…</p> : null}
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-busy={loading && !payload}>
-          <SummaryCard label="Closed memberships" value={!payload ? "—" : String(summary?.closed_won_count || 0)} detail={!payload ? (loading ? "Loading report…" : "Report unavailable") : "Activated in this period"} icon={CheckCircle2} tone="#02A77E" />
-          <SummaryCard label="Annual membership" value={!payload ? "—" : formatMoney(summary?.gross_membership_cents || 0)} detail={!payload ? (loading ? "Loading report…" : "Report unavailable") : "Platform fees before discounts"} icon={WalletCards} tone="#0A1547" />
-          <SummaryCard label="Discounts" value={!payload ? "—" : formatMoney(summary?.discounts_cents || 0)} detail={!payload ? (loading ? "Loading report…" : "Report unavailable") : "Annualized membership discounts"} icon={Percent} tone="#D97706" />
-          <SummaryCard label="Net adjustments" value={!payload ? "—" : formatMoney((summary?.credits_cents || 0) - (summary?.deductions_cents || 0))} detail={!payload ? (loading ? "Loading report…" : "Report unavailable") : `${formatMoney(summary?.credits_cents || 0)} credits · ${formatMoney(summary?.deductions_cents || 0)} deductions`} icon={(summary?.credits_cents || 0) >= (summary?.deductions_cents || 0) ? ArrowUpRight : ArrowDownRight} tone="#7C5FCC" />
-          <SummaryCard label="Commission due" value={!payload ? "—" : formatMoney(summary?.commission_cents || 0)} detail={!payload ? (loading ? "Loading report…" : "Report unavailable") : "Sum of each record’s 50% commission"} icon={WalletCards} tone="#02A77E" />
-        </div>
-
-        <section className="overflow-hidden rounded-2xl border" style={surfaceCardStyle}>
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--as-border)" }}>
-            <h2 className="text-lg font-black" style={primaryTextStyle}>Commission by representative</h2>
-            <p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>Role fees, interview fees, and first-role prepayment are excluded.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead><tr className="text-[10px] font-black uppercase tracking-wider" style={subtleTextStyle}>
-                <th className="px-5 py-3">Representative</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Gross</th><th className="px-4 py-3 text-right">Discounts</th><th className="px-4 py-3 text-right">Adjustments</th><th className="px-5 py-3 text-right">Commission</th>
-              </tr></thead>
-              <tbody>
-                {(payload?.by_representative || []).map((row) => (
-                  <tr key={row.representative.user_id} className="border-t" style={{ borderColor: "var(--as-border)" }}>
-                    <td className="px-5 py-4"><p className="font-black" style={primaryTextStyle}>{row.representative.display_name}</p><p className="mt-0.5 text-xs font-semibold" style={mutedTextStyle}>{row.representative.email}</p></td>
-                    <td className="px-4 py-4 text-right font-bold" style={primaryTextStyle}>{row.closed_won_count}</td>
-                    <td className="px-4 py-4 text-right font-bold" style={primaryTextStyle}>{formatMoney(row.gross_membership_cents)}</td>
-                    <td className="px-4 py-4 text-right font-bold text-amber-700 dark:text-amber-300">{formatMoney(row.discounts_cents)}</td>
-                    <td className="px-4 py-4 text-right font-bold" style={primaryTextStyle}>{formatMoney(row.credits_cents - row.deductions_cents)}</td>
-                    <td className="px-5 py-4 text-right text-base font-black text-emerald-700 dark:text-emerald-300">{formatMoney(row.commission_cents)}</td>
-                  </tr>
-                ))}
-                {!loading && (payload?.by_representative || []).length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold" style={mutedTextStyle}>No sales or adjustments in this period.</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <div className="grid gap-6 xl:grid-cols-2">
-          <section className="overflow-hidden rounded-2xl border" style={surfaceCardStyle}>
-            <div className="border-b px-5 py-4" style={{ borderColor: "var(--as-border)" }}><h2 className="text-lg font-black" style={primaryTextStyle}>Membership sales</h2></div>
-            <div className="divide-y" style={{ borderColor: "var(--as-border)" }}>
-              {(payload?.sales || []).map((sale) => (
-                <article key={sale.id} className="p-5">
-                  <div className="flex items-start justify-between gap-4"><div><p className="font-black" style={primaryTextStyle}>{sale.label}</p><p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>{sale.representative.display_name} · {titleCase(sale.plan_key)} {titleCase(sale.billing_cadence)} · {formatDate(sale.activated_at)}</p></div><div className="text-right"><p className="font-black text-emerald-700 dark:text-emerald-300">{formatMoney(sale.commission_cents)}</p>{!sale.commission_eligible ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em]" style={subtleTextStyle}>Not commissionable</p> : null}</div></div>
-                  <p className="mt-3 text-xs font-semibold" style={mutedTextStyle}>{formatMoney(sale.gross_membership_cents)} gross − {formatMoney(sale.discount_cents)} discount = {formatMoney(sale.net_membership_cents)} net</p>
-                </article>
-              ))}
-              {!loading && (payload?.sales || []).length === 0 ? <p className="p-8 text-center text-sm font-semibold" style={mutedTextStyle}>No activated memberships in this period.</p> : null}
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-2xl border" style={surfaceCardStyle}>
-            <div className="border-b px-5 py-4" style={{ borderColor: "var(--as-border)" }}><h2 className="text-lg font-black" style={primaryTextStyle}>Adjustments</h2></div>
-            <div className="divide-y" style={{ borderColor: "var(--as-border)" }}>
-              {(payload?.adjustments || []).map((adjustment) => (
-                <article key={adjustment.id} className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div><p className="font-black" style={primaryTextStyle}>{titleCase(adjustment.adjustment_type)}</p><p className="mt-1 text-xs font-semibold" style={mutedTextStyle}>{adjustment.representative.display_name} · {formatDate(adjustment.effective_at)}</p></div>
-                    <p className={`text-right font-black ${adjustment.direction === "credit" ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>{adjustment.direction === "credit" ? "+" : "−"}{formatMoney(adjustment.amount_cents)}<span className="block text-[10px] font-bold">{adjustment.direction === "credit" ? "+" : "−"}{formatMoney(Math.abs(adjustment.commission_impact_cents))} commission</span></p>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold leading-relaxed" style={primaryTextStyle}>{adjustment.reason}</p>
-                  {adjustment.document ? <button type="button" onClick={() => void openDocument(adjustment.id)} disabled={openingDocumentId === adjustment.id} className="mt-3 inline-flex items-center gap-2 text-xs font-black text-[#7C5FCC] disabled:opacity-50"><FileText className="h-4 w-4" aria-hidden="true" />{openingDocumentId === adjustment.id ? "Opening…" : adjustment.document.filename}</button> : null}
-                </article>
-              ))}
-              {!loading && (payload?.adjustments || []).length === 0 ? <p className="p-8 text-center text-sm font-semibold" style={mutedTextStyle}>No adjustments in this period.</p> : null}
-            </div>
-          </section>
-        </div>
+  return <AdminLayout title="Sales Payroll">
+    <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6" style={{ color: "var(--as-text)" }}>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div><h1 className="text-2xl font-bold">Sales Payroll</h1>
+          <p className="mt-1 text-sm">Manual, admin-reviewed receipts. Annual plans paid monthly earn commission only on each funded net monthly payment, never the full year at activation.</p></div>
+        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RefreshCw className="h-4 w-4" />Refresh</button>
+      </header>
+      {error && <p role="alert" className="rounded-lg border border-red-400/50 p-3 text-sm">{error}</p>}
+      {notice && <p role="status" className="rounded-lg border border-green-400/50 p-3 text-sm">{notice}</p>}
+      <nav aria-label="Sales Payroll sections" className="flex gap-2 border-b pb-2">
+        <button type="button" onClick={() => setActiveTab("ledger")} aria-current={activeTab === "ledger" ? "page" : undefined} className={activeTab === "ledger" ? "rounded-lg bg-[#9f75ef] px-4 py-2 text-sm font-semibold text-white" : "rounded-lg border px-4 py-2 text-sm"}>Receipt ledger</button>
+        <button type="button" onClick={() => setActiveTab("payments")} aria-current={activeTab === "payments" ? "page" : undefined} className={activeTab === "payments" ? "rounded-lg bg-[#9f75ef] px-4 py-2 text-sm font-semibold text-white" : "rounded-lg border px-4 py-2 text-sm"}>Payments</button>
+      </nav>
+      {activeTab === "payments" ? <AdminSalesPaymentsTab request={request} reps={overview?.representatives || []} onRecorded={() => { void load(); }} /> : <>
+      {overview?.truncated && <p role="alert" className="rounded-lg border border-amber-400/50 p-3 text-sm">The ledger exceeds the display limit. Do not use these totals for payroll until the full ledger is exported and reconciled.</p>}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border p-4"><p className="text-sm">Activated sales without a reviewed receipt</p><p className="text-2xl font-bold">{overview?.pending_evidence.length ?? "—"}</p><p className="text-xs">Recurring receipts require a fresh review each period.</p></div>
+        <div className="rounded-xl border p-4"><p className="text-sm">Verified commission, net of adjustments</p><p className="text-2xl font-bold">{overview?.truncated ? "Incomplete" : money(totalVerified)}</p></div>
+        <div className="rounded-xl border p-4"><p className="text-sm">Recorded ACH payouts</p><p className="text-2xl font-bold">{overview?.truncated ? "Incomplete" : money(totalPaid)}</p><p className="text-xs">Recording does not initiate ACH.</p></div>
+      </section>
+      <section className="rounded-xl border p-4">
+        <h2 className="font-bold">Automation</h2>
+        <label className="mt-2 flex items-center gap-3 text-sm"><input type="checkbox" role="switch" checked={false} disabled aria-label="Automated payroll disabled pending separate review" /> Automated payroll: Off</label>
+        <p className="mt-1 text-xs">{overview?.automation.reason || "Automation is not available."} The server rejects attempts to turn it on.</p>
+      </section>
+      <section className="rounded-xl border p-4">
+        <h2 className="font-bold">Activated sales for provider receipt review</h2>
+        <p className="mt-1 text-xs">Every activated sale stays here for later monthly payments. Reconcile against the provider each period; this list does not detect a new payment automatically.</p>
+        {!overview?.review_candidates.length ? <p className="mt-2 text-sm">None in the current view.</p> : <ul className="mt-3 space-y-2 text-sm">{overview.review_candidates.map((row) =>
+          <li key={row.id} className="flex flex-wrap justify-between gap-2 border-b pb-2"><span>{row.company_legal_name} · {row.selected_plan_key} {row.selected_billing_cadence} · {repNames.get(row.created_by_user_id) || "Attribution needs review"} · {row.reviewed_receipt_count} reviewed receipt{row.reviewed_receipt_count === 1 ? "" : "s"}</span><button type="button" className="underline" onClick={() => setIntentId(row.id)}>Review {row.reviewed_receipt_count ? "another" : "first"} receipt</button></li>)}</ul>}
+      </section>
+      <form onSubmit={recordReceipt} className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+        <h2 className="font-bold sm:col-span-2">Approve a verified provider receipt</h2>
+        <p className="text-xs sm:col-span-2">Check the provider payment, funding, discounts, allocated fees, signed sale, and account activation before approving. Only platform membership fees belong here.</p>
+        <label className="text-sm">Activated sale ID<input required value={intentId} onChange={(e) => setIntentId(e.target.value)} className={inputClass} /></label>
+        <label className="text-sm">Provider<select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputClass}><option value="stripe">Stripe</option><option value="financing_partner">Financing partner</option><option value="other_verified">Other verified</option></select></label>
+        <label className="text-sm">Provider payment ID<input required value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className={inputClass} /></label>
+        <label className="text-sm">Payment type<select value={paymentKind} onChange={(e) => setPaymentKind(e.target.value)} className={inputClass}><option value="monthly">Annual term paid monthly</option><option value="paid_in_full">Annual paid in full</option><option value="financed_checkout">Financed checkout</option></select></label>
+        <label className="text-sm">Payment succeeded (timestamp with timezone)<input required value={paymentAt} onChange={(e) => setPaymentAt(e.target.value)} className={inputClass} placeholder="2026-10-02T18:00:00Z" /></label>
+        <label className="text-sm">Funds received (timestamp with timezone)<input required value={fundsAt} onChange={(e) => setFundsAt(e.target.value)} className={inputClass} placeholder="2026-10-05T18:00:00Z" /></label>
+        <label className="text-sm">Gross platform membership ($)<input required value={gross} onChange={(e) => setGross(e.target.value)} className={inputClass} /></label>
+        <label className="text-sm">Approved discount ($)<input required value={discount} onChange={(e) => setDiscount(e.target.value)} className={inputClass} /></label>
+        <label className="text-sm">Allocated provider fee ($)<input required value={fee} onChange={(e) => setFee(e.target.value)} className={inputClass} /></label>
+        <label className="text-sm">Evidence reference<input required value={evidence} onChange={(e) => setEvidence(e.target.value)} className={inputClass} placeholder="Provider receipt or internal review ID" /></label>
+        <div className="sm:col-span-2"><button type="submit" disabled={saving} className={buttonClass}>Approve receipt</button></div>
+      </form>
+      <section className="overflow-x-auto rounded-xl border p-4">
+        <h2 className="font-bold">Reviewed receipt ledger</h2>
+        {!overview?.receipts.length ? <p className="mt-2 text-sm">No receipts reviewed yet. Activated deals remain pending evidence, not $0 commission.</p> :
+          <table className="mt-3 w-full min-w-[850px] text-left text-sm"><thead><tr><th>Rep / source</th><th>Payment</th><th>Net membership</th><th>Commission</th><th>Adjustment</th><th>ACH paid</th><th>Remaining</th><th>Week</th></tr></thead><tbody>{overview.receipts.map((row) => {
+            const adjusted = adjustmentTotals.get(row.id) || 0; const paid = paidTotals.get(row.id) || 0;
+            return <tr key={row.id} className="border-t"><td className="py-2">{repNames.get(row.rep_user_id) || row.rep_user_id}<br/><small>{row.id}</small></td><td>{row.provider} · {row.payment_kind}<br/><small>{row.provider_payment_id}</small></td><td>{money(row.net_membership_cents)}</td><td>{money(row.commission_cents)}</td><td>{money(adjusted)}</td><td>{money(paid)}</td><td>{money(row.commission_cents + adjusted - paid)}</td><td>{row.statement_week_start}</td></tr>;
+          })}</tbody></table>}
+      </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={recordAdjustment} className="grid gap-3 rounded-xl border p-4">
+          <h2 className="font-bold">Record a linked refund, chargeback, or recovery</h2>
+          <label className="text-sm">Original receipt<select required value={adjustmentReceipt} onChange={(e) => setAdjustmentReceipt(e.target.value)} className={inputClass}><option value="">Select receipt</option>{overview?.receipts.map((r) => <option key={r.id} value={r.id}>{repNames.get(r.rep_user_id)} · {r.provider_payment_id}</option>)}</select></label>
+          <label className="text-sm">Type<select value={adjustmentType} onChange={(e) => setAdjustmentType(e.target.value)} className={inputClass}><option value="refund">Refund</option><option value="chargeback">Chargeback</option><option value="recovery">Recovery</option></select></label>
+          <label className="text-sm">Provider event ID<input required value={adjustmentEvent} onChange={(e) => setAdjustmentEvent(e.target.value)} className={inputClass} /></label>
+          <label className="text-sm">Net membership affected ($)<input required value={adjustmentNet} onChange={(e) => setAdjustmentNet(e.target.value)} className={inputClass} /></label>
+          <label className="text-sm">Effective time (timestamp with timezone)<input required value={adjustmentAt} onChange={(e) => setAdjustmentAt(e.target.value)} className={inputClass} placeholder="2026-10-02T18:00:00Z" /></label>
+          <label className="text-sm">Evidence reference<input required value={adjustmentEvidence} onChange={(e) => setAdjustmentEvidence(e.target.value)} className={inputClass} /></label>
+          <button type="submit" disabled={saving} className={buttonClass}>Record reviewed adjustment</button>
+        </form>
+        <form onSubmit={recordPayout} className="grid gap-3 rounded-xl border p-4">
+          <h2 className="font-bold">Record an ACH already sent</h2><p className="text-xs">This never sends money. Do not record a planned transfer as paid.</p>
+          <label className="text-sm">Source receipt<select required value={payoutReceipt} onChange={(e) => setPayoutReceipt(e.target.value)} className={inputClass}><option value="">Select receipt</option>{overview?.receipts.map((r) => <option key={r.id} value={r.id}>{repNames.get(r.rep_user_id)} · {r.provider_payment_id}</option>)}</select></label>
+          <label className="text-sm">Amount actually paid ($)<input required value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} className={inputClass} /></label>
+          <label className="text-sm">ACH confirmation reference<input required value={achReference} onChange={(e) => setAchReference(e.target.value)} className={inputClass} /></label>
+          <label className="text-sm">Paid at (timestamp with timezone)<input required value={paidAt} onChange={(e) => setPaidAt(e.target.value)} className={inputClass} placeholder="2026-10-02T18:00:00Z" /></label>
+          <label className="text-sm">Evidence reference<input required value={payoutEvidence} onChange={(e) => setPayoutEvidence(e.target.value)} className={inputClass} /></label>
+          <button type="submit" disabled={saving} className={buttonClass}>Record existing payout</button>
+        </form>
       </div>
-    </AdminLayout>
-  );
+      <div className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={recordDeparture} className="grid gap-3 rounded-xl border p-4">
+          <h2 className="font-bold">Record a representative’s final day</h2>
+          <p className="text-xs">Review the actual final workday and evidence before saving. This entry cannot be edited; payment and close must both meet the 30-day Mountain Time cutoff.</p>
+          <label className="text-sm">Representative<select required value={departureRep} onChange={(e) => setDepartureRep(e.target.value)} className={inputClass}><option value="">Select representative</option>{overview?.representatives.map((r) => <option key={r.user_id} value={r.user_id}>{r.display_name || r.email}</option>)}</select></label>
+          <label className="text-sm">Final workday<input required type="date" value={finalDay} onChange={(e) => setFinalDay(e.target.value)} className={inputClass} /></label>
+          <label className="text-sm">Evidence reference<input required value={departureEvidence} onChange={(e) => setDepartureEvidence(e.target.value)} className={inputClass} /></label>
+          <button type="submit" disabled={saving} className={buttonClass}>Record reviewed final day</button>
+          {!!overview?.departures.length && <p className="text-xs">Recorded: {overview.departures.map((d) => `${repNames.get(d.rep_user_id) || d.rep_user_id}: ${d.final_day}`).join(" · ")}</p>}
+        </form>
+        <form onSubmit={lockStatement} className="grid gap-3 rounded-xl border p-4">
+          <h2 className="font-bold">Lock a weekly statement</h2>
+          <p className="text-xs">Lock only after the Monday–Sunday Mountain Time week closes and you have reconciled receipts and adjustments. The snapshot cannot be revised.</p>
+          <label className="text-sm">Representative<select required value={statementRep} onChange={(e) => setStatementRep(e.target.value)} className={inputClass}><option value="">Select representative</option>{overview?.representatives.map((r) => <option key={r.user_id} value={r.user_id}>{r.display_name || r.email}</option>)}</select></label>
+          <label className="text-sm">Monday week start<input required type="date" value={statementWeek} onChange={(e) => setStatementWeek(e.target.value)} className={inputClass} /></label>
+          <button type="submit" disabled={saving} className={buttonClass}>Lock reviewed statement</button>
+          {!!overview?.locked_statements.length && <p className="text-xs">Locked: {overview.locked_statements.map((s) => `${repNames.get(s.rep_user_id) || s.rep_user_id}: ${s.week_start}`).join(" · ")}</p>}
+        </form>
+      </div>
+      <p className="text-xs">No automatic receipt ingestion, refund execution, reconciliation, or ACH runs in this release. Automation remains off and cannot be enabled until a separate worker and review are complete.</p>
+      </>}
+    </main>
+  </AdminLayout>;
 }
