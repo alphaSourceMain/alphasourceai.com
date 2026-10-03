@@ -126,11 +126,11 @@ export default function AdminSalesPaymentsTab({ request, reps, onRecorded }: { r
   return <div className="space-y-6">
     <section className="rounded-xl border p-4">
       <h2 className="text-lg font-bold">Payments by salesperson</h2>
-      <p className="mt-1 text-xs">Earned commission is based on reviewed membership receipts and linked adjustments. Paid dates show each recorded, non-reversed payout. No payment is initiated here.</p>
+      <p className="mt-1 text-xs">Lifetime commission ledger, not the selected date period above. Here “commission changes” means stored commission deltas on refunds and recoveries, not the Sales overview’s revenue adjustments. Paid dates show recorded, non-reversed payouts. No payment is initiated here.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{summary.map((rep) => <button type="button" key={rep.rep_user_id}
         onClick={() => { setRepFilter(rep.rep_user_id); setPage(0); }} className="rounded-xl border p-3 text-left">
         <strong>{rep.display_name || rep.email}</strong><span className="mt-1 block text-xs">{rep.receipt_count} reviewed receipts · sale net {money(rep.net_membership_cents)}</span>
-        <span className="block text-xs">Adjustments {money(rep.adjustment_cents)} · earned {money(rep.earned_cents)}</span>
+        <span className="block text-xs">Commission changes {money(rep.adjustment_cents)} · lifetime earned {money(rep.earned_cents)}</span>
         <span className="block text-xs">Paid {money(rep.paid_cents)} · outstanding {money(rep.outstanding_cents)}</span>
       </button>)}</div>
       <label className="mt-4 block max-w-sm text-sm">Salesperson
@@ -139,7 +139,7 @@ export default function AdminSalesPaymentsTab({ request, reps, onRecorded }: { r
         </select>
       </label>
       {loading ? <p className="mt-3 text-sm">Loading payments…</p> : rows.length === 0 ? <p className="mt-3 text-sm">No reviewed commission receipts in this view.</p> :
-        <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr><th>Salesperson / sale</th><th>Sale amount</th><th>Adjustments</th><th>Commission earned</th><th>Commission paid</th><th>Paid date(s)</th><th>Outstanding</th></tr></thead>
+        <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr><th>Salesperson / sale</th><th>Lifetime net membership</th><th>Commission changes</th><th>Lifetime commission earned</th><th>Commission paid</th><th>Paid date(s)</th><th>Outstanding</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.receipt_id} className="border-t"><td className="py-2">{reps.find((rep) => rep.user_id === row.rep_user_id)?.display_name || row.rep_user_id}<br/><small>{row.provider_payment_id} · {row.payment_kind}</small><br/><small>Receipt {row.receipt_id}</small></td>
             <td>{money(row.net_membership_cents)}</td><td>{money(row.adjustment_cents)}</td><td>{money(row.commission_cents + row.adjustment_cents)}</td><td>{money(row.paid_cents)}</td>
             <td>{row.paid_dates?.length ? row.paid_dates.map(formatPaidDate).join(", ") : "—"}</td><td>{money(row.outstanding_cents)}</td></tr>)}</tbody></table></div>}
