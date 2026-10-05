@@ -1,0 +1,108 @@
+@font-face { font-family: RaceDisplay; src: url("/sales-race-assets/race-display.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: RaceInter; src: url("/sales-race-assets/race-inter-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: RaceInter; src: url("/sales-race-assets/race-inter-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: RaceInter; src: url("/sales-race-assets/race-inter-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: RaceInter; src: url("/sales-race-assets/race-inter-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+.sales-race-page { font-family: RaceInter, Inter, sans-serif; line-height: normal; color: #09143b; background: #faf6ed; font-synthesis: none; --navy: #09143b; --purple: #653bd5; --cream: #faf6ed; --gold: #d4aa70; }
+.sales-race-page * { box-sizing: border-box; }
+.sales-race-page { margin: 0; min-width: 320px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.sales-race-page button, .sales-race-page input { font: inherit; }
+.sales-race-page button, .sales-race-page a, .sales-race-page summary { -webkit-tap-highlight-color: transparent; }
+.sales-race-page button { cursor: pointer; }
+.sales-race-page a { color: inherit; }
+.sales-race-page button:focus-visible, .sales-race-page a:focus-visible, .sales-race-page input:focus-visible, .sales-race-page summary:focus-visible { outline: 3px solid #168673; outline-offset: 5px; }
+.sales-race-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.sales-race-page .skip-link { position: fixed; top: 10px; left: 10px; z-index: 20; padding: 12px; background: white; border: 2px solid var(--purple); transform: translateY(-160%); }
+.sales-race-page .skip-link:focus { transform: none; }
+.sales-race-page .sidebar { width: 210px; position: fixed; inset: 0 auto 0 0; background: #0a1538; color: #f7f8ff; padding: 28px 12px; }
+.sales-race-page .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; text-decoration: none; }
+.sales-race-page .brand img { width: 30px; height: 34px; }
+.sales-race-page .brand span { font-size: 24px; letter-spacing: -1.3px; font-weight: 400; }
+.sales-race-page nav { margin-top: 37px; display: grid; gap: 6px; }
+.sales-race-page nav a { display: flex; align-items: center; gap: 14px; min-height: 50px; padding: 12px; border-radius: 10px; text-decoration: none; font-size: 14px; font-weight: 500; }
+.sales-race-page nav a:hover { background: #ffffff12; }
+.sales-race-page nav a[aria-current] { background: #7250d9; color: white; }
+.sales-race-page .shell { margin-left: 210px; min-height: 100vh; padding-bottom: 8px; }
+.sales-race-page .hero { height: 226px; position: relative; padding: 84px 40px 20px; background: url('/sales-race-assets/fairground-header.png') center 43% / cover no-repeat; }
+.sales-race-page .qa-pill { position: absolute; top: 14px; right: 20px; font-size: 13px; font-weight: 600; padding: 10px 13px; color: #00594b; background: #e2f4ec; border: 1px solid #9fcfc3; border-radius: 8px; }
+.sales-race-page .eyebrow { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; color: #7143cd; margin: 0 0 8px; }
+.sales-race-page h1 { font-family: 'RaceDisplay', Georgia, serif; font-size: clamp(48px, 6.15vw, 92px); font-weight: 400; letter-spacing: -2px; line-height: 1.05; margin: 0; }
+.sales-race-page .content { margin: 0 auto; max-width: 1580px; padding: 0 30px; }
+.sales-race-page .summary-strip { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); background: #fbf7efd9; border: 1px solid #dfbc88; border-radius: 16px; min-height: 90px; align-items: center; padding: 16px 26px; }
+.sales-race-page .summary-item { display: flex; align-items: center; gap: 16px; min-width: 0; padding-left: 22px; border-left: 1px solid #d8c9b2; }
+.sales-race-page .summary-item:first-child { border-left: 0; padding-left: 0; }
+.sales-race-page .summary-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.sales-race-page .summary-item strong { font-size: 26px; letter-spacing: -.7px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sales-race-page .summary-item .inline-total { font-size: 22px; }
+.sales-race-page .summary-item p { font-size: 14px; font-weight: 500; margin: 0; line-height: 1.5; }
+.sales-race-page .summary-item .product-name { font-size: 22px; font-weight: 500; letter-spacing: -.8px; }
+.sales-race-page .summary-item .period-value { font-size: 16px; letter-spacing: -.3px; line-height: 1.4; }
+.sales-race-page .product-mark { background: #daeee7; }
+.sales-race-page .product-mark img { width: 32px; height: 32px; }
+.sales-race-page .icon-disc { display: grid; place-items: center; width: 50px; height: 50px; flex: none; border-radius: 50%; }
+.sales-race-page .icon-disc.revenue { background: #e9d9fa; color: #653bd5; }
+.sales-race-page .icon-disc.participants { background: #dceee6; color: #00584a; }
+.sales-race-page .icon-disc.dates { background: #f7e5c9; color: #302816; }
+.sales-race-page .race-panel { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 8px; align-items: stretch; border: 1px solid #cf9d59; outline: 1px solid #e3c492; outline-offset: -5px; border-radius: 20px; background: #fcf8f0; margin: 20px -12px 0; padding: 23px 12px 22px 24px; }
+.sales-race-page .standings { min-width: 0; padding: 6px 4px 0 0; }
+.sales-race-page h2 { font-family: 'RaceDisplay', Georgia, serif; font-size: 32px; font-weight: 400; margin: 0; letter-spacing: -.5px; }
+.sales-race-page .standings-trim { display: flex; gap: 9px; align-items: center; justify-content: center; margin: 14px 2px 12px; color: #c99b50; }
+.sales-race-page .standings-trim::before, .sales-race-page .standings-trim::after { content: ''; flex: 1; border-bottom: 1px solid #ddba85; }
+.sales-race-page table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sales-race-page td, .sales-race-page tbody th { height: 74px; border-bottom: 1px solid #e2d6c5; padding: 10px 0; }
+.sales-race-page tr:last-child td, .sales-race-page tr:last-child th { border-bottom: none; }
+.sales-race-page td:first-child { width: 45px; }
+.sales-race-page tbody th { font-weight: 600; text-align: left; white-space: nowrap; }
+.sales-race-page .net-value { text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sales-race-page .rank-badge { width: 35px; height: 35px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; font-weight: 600; }
+.sales-race-page .rank-badge.violet { color: #542f9d; background: #ede0ff; }.sales-race-page .rank-badge.mint { color: #06594a; background: #d6eee5; }.sales-race-page .rank-badge.sky { color: #0c4285; background: #d6e7fb; }.sales-race-page .rank-badge.amber { color: #65430c; background: #fae3b5; }
+.sales-race-page .lane-dot { width: 12px; height: 12px; display: inline-block; vertical-align: -1px; margin-right: 9px; border-radius: 50%; }
+.sales-race-page .lane-dot.violet { background: #b18aef; }.sales-race-page .lane-dot.mint { background: #68bda3; }.sales-race-page .lane-dot.sky { background: #3997ed; }.sales-race-page .lane-dot.amber { background: #dc9a13; }
+.sales-race-page .race-board { align-self: center; position: relative; width: 100%; overflow: hidden; }
+.sales-race-page .cabinet { display: block; width: 100%; height: auto; }
+.sales-race-page .horse-runway { position: absolute; left: 6%; width: 76%; height: 0; }
+.sales-race-page .horse-mover { width: 100%; height: 0; }
+.sales-race-page .horse-mover img { display: block; width: 21%; height: auto; transform: translateY(-88%); user-select: none; pointer-events: none; }
+.sales-race-page .horse-runway[data-lane="1"] img { transform: translateY(-86.8%); }
+.sales-race-page .horse-runway[data-lane="2"] img { transform: translateY(-88%); }
+.sales-race-page .horse-runway[data-lane="3"] img { transform: translateY(-91.5%); }
+.sales-race-page .horse-runway[data-lane="4"] img { transform: translateY(-88.3%); }
+.sales-race-page .motion-ready .horse-mover { transition: transform 650ms cubic-bezier(.22,.65,.3,1); }
+.sales-race-page .utility-row { display: flex; align-items: center; gap: 16px; margin: 25px 4px 22px; }
+.sales-race-page button { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; border-radius: 9px; padding: 12px 23px; font-size: 17px; font-weight: 600; }
+.sales-race-page .primary { background: var(--purple); color: white; border: 1px solid #653bd5; box-shadow: 0 2px 3px #30106515; }
+.sales-race-page .primary:hover { background: #5430ba; }.sales-race-page .primary:active { background: #442497; }
+.sales-race-page .secondary { background: #fcf9f2; border: 1px solid #cdc4b8; color: var(--navy); }.sales-race-page .secondary:hover { background: #f1e9dc; }
+.sales-race-page .scoring-button { font-size: 14px; font-weight: 500; margin-left: 14px; border: none; border-left: 1px solid #d8c9b2; border-radius: 0; padding: 8px 8px 8px 30px; background: transparent; min-height: 40px; text-decoration: underline; text-underline-offset: 4px; }
+.sales-race-page .scoring-button:hover { color: #5830b6; }
+.sales-race-page .scoring-details { background: #fcf9f2; padding: 24px; border: 1px solid #e3cfab; border-radius: 12px; margin-bottom: 18px; }
+.sales-race-page .scoring-details h2 { font-size: 24px; }
+.sales-race-page .scoring-details p, .sales-race-page .setup-note { color: #4d5971; font-size: 13px; line-height: 1.7; }
+.sales-race-page .contest-setup { border: 1px solid #dfbc88; background: #fcf8f0; border-radius: 16px; }
+.sales-race-page summary { list-style: none; display: flex; align-items: center; gap: 15px; min-height: 83px; padding: 20px 28px; cursor: pointer; font-size: 19px; font-weight: 600; }
+.sales-race-page summary::-webkit-details-marker { display: none; }.sales-race-page .disclosure-caret { margin-left: auto; }.sales-race-page details[open] .disclosure-caret { transform: rotate(180deg); }
+.sales-race-page .setup-body { border-top: 1px solid #e5d6bf; padding: 8px 28px 24px; }
+.sales-race-page .setup-body form { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin: 20px 0; }
+.sales-race-page label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600; }
+.sales-race-page input { width: 210px; min-width: 0; background: #fffdf8; padding: 13px; min-height: 48px; border: 1px solid #b6ad9e; border-radius: 8px; color: var(--navy); }.sales-race-page input[aria-invalid=true] { border-color: #a62235; }
+.sales-race-page .setup-body button { font-size: 14px; min-height: 48px; }.sales-race-page .range-readback { font-size: 12px; font-weight: 600; color: #45516b; }.sales-race-page .date-error { font-size: 13px; color: #9c2030; line-height: 1.6; margin: 0; }
+.sales-race-page footer { font-size: 12px; color: #4b5972; padding: 48px 4px 20px; }.sales-race-page .art-error { align-self: center; padding: 25px; color: #9c2030; }.sales-race-page .unavailable { padding: 30px; }
+@media (prefers-reduced-motion: reduce) { .sales-race-page .motion-ready .horse-mover { transition: none; } }
+@media (min-width: 1750px) { .sales-race-page .hero { padding-left: max(40px, calc((100vw - 210px - 1580px) / 2 + 40px)); } }
+@media (max-width: 1250px) { .sales-race-page .sidebar { width: 185px; }.sales-race-page .shell { margin-left: 185px; }.sales-race-page .brand span { font-size: 21px; }.sales-race-page .content { padding: 0 22px; }.sales-race-page .hero { padding-left: 30px; }.sales-race-page .summary-strip { padding: 14px 18px; grid-template-columns: 1fr .8fr 1.25fr; }.sales-race-page .summary-item { gap: 12px; padding-left: 18px; }.sales-race-page .timezone { display: block; font-size: 11px; }.sales-race-page .race-panel { grid-template-columns: 230px minmax(0,1fr); padding-left: 20px; gap: 5px; }.sales-race-page td, .sales-race-page tbody th { height: 63px; }.sales-race-page table { font-size: 12px; }.sales-race-page td:first-child { width: 40px; }.sales-race-page h2 { font-size: 29px; } }
+@media (max-width: 1000px) { .sales-race-page .sidebar { width: 170px; }.sales-race-page .shell { margin-left: 170px; }.sales-race-page .brand span { font-size: 19px; }.sales-race-page .brand img { width: 25px; }.sales-race-page .hero { height: 205px; padding-top: 85px; }.sales-race-page .summary-strip { grid-template-columns: 1fr 1fr; gap: 18px 0; }.sales-race-page .summary-item.period { grid-column: 1 / -1; border: none; padding-left: 0; border-top: 1px solid #e0d2be; padding-top: 16px; }.sales-race-page .timezone { display: inline; font-size: inherit; }.sales-race-page .race-panel { grid-template-columns: 1fr; padding: 22px 16px; }.sales-race-page .standings { padding: 0 4px 16px; }.sales-race-page .standings-trim { max-width: 260px; }.sales-race-page table { font-size: 14px; }.sales-race-page td, .sales-race-page tbody th { height: 58px; }.sales-race-page td:first-child { width: 54px; }.sales-race-page .race-board { width: 100%; }.sales-race-page .utility-row { flex-wrap: wrap; gap: 12px; }.sales-race-page .scoring-button { margin-left: 0; } }
+@media (max-width: 680px) { .sales-race-page .sidebar { position: static; width: 100%; padding: 18px 16px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }.sales-race-page .brand { padding: 0; }.sales-race-page .brand span { font-size: 22px; }.sales-race-page nav { margin: 0; display: flex; gap: 8px; }.sales-race-page nav a { min-height: 44px; padding: 10px; gap: 8px; font-size: 12px; }.sales-race-page nav a svg { width: 18px; }.sales-race-page .shell { margin-left: 0; }.sales-race-page .hero { height: 205px; padding: 88px 22px 24px; background-position: center; }.sales-race-page h1 { font-size: clamp(42px, 8.5vw, 60px); letter-spacing: -1px; }.sales-race-page .qa-pill { top: 15px; right: 18px; font-size: 11px; }.sales-race-page .eyebrow { font-size: 9px; letter-spacing: 1.8px; }.sales-race-page .content { padding: 0 18px; }.sales-race-page .summary-strip { border-radius: 12px; padding: 16px; }.sales-race-page .summary-item { gap: 10px; padding-left: 12px; }.sales-race-page .summary-item strong { font-size: 23px; }.sales-race-page .summary-label { font-size: 11px; }.sales-race-page .summary-item .inline-total { font-size: 20px; }.sales-race-page .summary-item p { font-size: 12px; }.sales-race-page .icon-disc { width: 38px; height: 38px; }.sales-race-page .icon-disc svg { width: 20px; }.sales-race-page .period .icon-disc { width: 38px; }.sales-race-page .timezone { font-size: 11px; }.sales-race-page .race-panel { margin-left: -4px; margin-right: -4px; padding: 19px 12px; border-radius: 16px; }.sales-race-page .utility-row { margin: 20px 0; gap: 10px; }.sales-race-page .utility-row button { font-size: 14px; padding: 12px 17px; min-height: 48px; }.sales-race-page .utility-row .scoring-button { flex-basis: 100%; border: none; justify-content: flex-start; padding: 4px 0; min-height: 44px; font-size: 13px; }.sales-race-page .scoring-details { padding: 18px; }.sales-race-page .scoring-details h2 { font-size: 22px; }.sales-race-page summary { min-height: 72px; padding: 17px; font-size: 17px; }.sales-race-page .setup-body { padding: 6px 17px 18px; }.sales-race-page .setup-body form { gap: 15px; }.sales-race-page label, .sales-race-page input { width: 100%; }.sales-race-page label { flex: 1 1 100%; }.sales-race-page footer { padding-top: 30px; line-height: 1.6; } }
+@media (max-width: 375px) { .sales-race-page .sidebar { gap: 12px; }.sales-race-page nav { width: 100%; }.sales-race-page nav a { flex: 1; }.sales-race-page .summary-strip { grid-template-columns: 1fr; gap: 14px; }.sales-race-page .summary-item { padding-left: 0; border: none; }.sales-race-page .summary-item.period { grid-column: auto; }.sales-race-page .summary-item:nth-child(2) { border-top: 1px solid #e0d2be; padding-top: 14px; }.sales-race-page table { font-size: 12px; }.sales-race-page td:first-child { width: 40px; }.sales-race-page .lane-dot { width: 9px; height: 9px; margin-right: 7px; }.sales-race-page .rank-badge { width: 30px; height: 30px; font-size: 16px; } }
+
+/* Four balanced summary sections; stack without leaving an empty date column. */
+@media (max-width: 1250px) {
+  .sales-race-page .summary-strip { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px 0; }
+  .sales-race-page .summary-item:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .sales-race-page .summary-item:nth-child(n+3) { padding-top: 16px; border-top: 1px solid #e0d2be; }
+  .sales-race-page .summary-item.period { grid-column: auto; padding-left: 18px; border-left: 1px solid #d8c9b2; }
+}
+@media (max-width: 600px) {
+  .sales-race-page .summary-strip { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  .sales-race-page .summary-item, .sales-race-page .summary-item.period { padding-left: 0; border-left: 0; }
+  .sales-race-page .summary-item:not(:first-child) { padding-top: 14px; border-top: 1px solid #e0d2be; }
+}

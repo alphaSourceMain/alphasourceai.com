@@ -174,3 +174,22 @@ final result: pending hosted authenticated dashboard QA
 ## Final Result
 
 final result: passed
+# QA carnival sales-race integration — October5,2026
+
+Source visual truth: `/Users/jasongardner/Desktop/ai-interview-final/QA/output/sales-carnival-preview-20261005/summary-v2-desktop.png`, approved sample carnival mock. Integrated native page `http://127.0.0.1:4181/sales/race`, existing DEV-only sales mock, never authenticated hosted acceptance. Render QA is a separate final check.
+
+Source and implementation both 1487×1058 pixels at CSS1487×1058,1× density, snapshotA, collapsed setup. Implementation `/Users/jasongardner/Desktop/ai-interview-final/QA/tmp/carnival-integrated-desktop-20261005.png`. Full combined comparison `tmp/carnival-integrated-comparison-20261005.png`2974×1058; focused summary `tmp/carnival-integrated-summary-comparison-20261005.png`2974×200, opened together. Phone320×900CSS full screenshot `tmp/carnival-integrated-mobile-20261005.png`320×1444. Document widths match viewport, all controls readable.
+
+Findings history: initial integration inherited app line-height1.5, increasing summary90→97 and pushing race7px down [P2]. Fixed isolated `.sales-race-page {line-height:normal}`; recapture restores exact90px summary at y226 and approved major-region rhythm. Restored filled library stars and play icon. No remaining actionableP0/P1/P2. Existing Lucide icons substitute closest matching silhouettes for standalone Phosphor icons; slightly heavier stroke is acceptableP3, not generated-art substitution.
+
+Required surfaces: locally bundled same Inter/DM Serif font files, renamed RaceInter/RaceDisplay to avoid app font collision; sizes/weights/hierarchy retained. Scoped padding/grid/90px summary/race placement match target. Cream/navy/purple/teal tokens unchanged. All cabinet/header/alpha horses/approved logo byte-identical to selected preview, no CSS/handmade image substitutes. Copy remains sample-only, productalphaScreen first, no header timezone; four equal summary sections. QA/sample/not-payroll labels persistent; no real contest/revenue claims.
+
+Primary interactions tested in Chrome: A395/B798/Reset395, fixed lane order; setup disclosure; validDec1–31 dates update label; reversed date fails with previous valid date retained; native Sales hub link returns in-app hub; nav link returns race. Hub retains Raleway/default admin styling rather than RaceDisplay; no race container or duplicate sidebar remains. Mobile layout and image loading checked. Console has only earlier missing local auth placeholders from initial boot; after restarting with nonfunctional loopback placeholders, no new error/warn entries. These placeholders are CLI-only and not source/env changes.
+
+19 tests pass (contest12, host/auth/stylegate2, existing hub/signature5). Full app typecheck/build plus14publicprerender/15HTMLintegrity pass; existing sourcemap/largechunk warnings remain. Page lazy-loaded11KBJS/15KBCSS, artwork/fonts8.6MB total. No new npm dependencies. Existing SalesApp authentication/verifiedrep/admin gate retained; exact QA hostname or DEV required before race is rendered. No backend/schema/env/call/routing/payment/account change.
+
+Residual limitations: real screen-reader/high contrast not run; no receipt source or saved contest; hosted actual signed-in UI acceptance pending after deployment. Exact candidate Grok review recorded separately before deployment. Production untouched.
+
+final result: passed
+
+---

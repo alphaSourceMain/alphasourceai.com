@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   BriefcaseBusiness,
+  ChartColumn,
   Building2,
   ChevronRight,
   Handshake,
@@ -18,6 +19,7 @@ import { useAppearance } from "@/context/AppearanceContext";
 import { useAuth } from "@/context/AuthContext";
 import type { SalesRep } from "@/features/sales/types";
 import { salesUsesMockApi } from "@/features/sales/salesApi";
+import { salesRaceAvailable } from "@/features/sales/salesRaceGate.mjs";
 
 interface SalesLayoutProps {
   children: ReactNode;
@@ -26,6 +28,7 @@ interface SalesLayoutProps {
 
 const navigation = [
   { label: "Sales hub", href: "/sales/home", icon: LayoutDashboard },
+  ...(salesRaceAvailable(typeof window === "undefined" ? "" : window.location.hostname, import.meta.env.DEV) ? [{ label: "Sales race · QA", href: "/sales/race", icon: ChartColumn }] : []),
   { label: "My deals", href: "/sales", icon: LayoutList },
   { label: "New sale", href: "/sales/new", icon: Plus },
   { label: "Enterprise handoff", href: "/sales/enterprise", icon: Handshake },

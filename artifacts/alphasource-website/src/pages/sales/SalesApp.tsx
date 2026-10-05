@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ShieldX } from "lucide-react";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { salesRaceAvailable } from "@/features/sales/salesRaceGate.mjs";
 import { AppearanceProvider } from "@/context/AppearanceContext";
 import { useAuth } from "@/context/AuthContext";
 import SalesLayout from "@/components/SalesLayout";
@@ -13,6 +14,8 @@ import SalesNewDealPage from "@/pages/sales/SalesNewDealPage";
 import SalesEnterpriseHandoffPage from "@/pages/sales/SalesEnterpriseHandoffPage";
 import SalesDealDetailPage from "@/pages/sales/SalesDealDetailPage";
 import NotFound from "@/pages/not-found";
+
+const SalesRacePage = lazy(() => import("@/pages/sales/SalesRacePage"));
 
 function LoadingScreen() {
   return (
@@ -40,6 +43,7 @@ function AccessDenied({ message }: { message: string }) {
 }
 
 export default function SalesApp() {
+  const [location] = useLocation();
   const { isLoggedIn, clientAuthReady, salesLoginLoading } = useAuth();
   const [rep, setRep] = useState<SalesRep | null>(null);
   const [checking, setChecking] = useState(true);
@@ -91,6 +95,11 @@ export default function SalesApp() {
   if (((!clientAuthReady || salesLoginLoading) && !salesUsesMockApi) || checking) return <LoadingScreen />;
   if (!salesUsesMockApi && !isLoggedIn) return <SalesSignInPage />;
   if (!rep) return <AccessDenied message={accessError || "Sales access could not be verified."} />;
+
+  if (location === "/sales/race" || location === "/sales/race/") {
+    if (!salesRaceAvailable(typeof window === "undefined" ? "" : window.location.hostname, import.meta.env.DEV)) return <NotFound />;
+    return <Suspense fallback={<LoadingScreen />}><SalesRacePage /></Suspense>;
+  }
 
   return (
     <AppearanceProvider>
