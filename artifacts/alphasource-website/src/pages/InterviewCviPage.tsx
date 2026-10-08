@@ -436,6 +436,11 @@ export const CANDIDATE_INACTIVITY_NUDGE_TEXT =
 export const NORMAL_COMPLETION_FAREWELL_TEXT =
   "Thank you for your time. I am ending the session now.";
 export const NORMAL_COMPLETION_END_DELAY_MS = 5500;
+export const NORMAL_COMPLETION_ANSWERS = Object.freeze([
+  "I'm conducting the structured interview for this role.",
+  "I don't have that information. The hiring team can answer that outside the interview.",
+  "I can't share internal evaluation details during the interview.",
+]);
 export const FINAL_CLOSING_ANNOUNCEMENT_TEXT =
   "We are out of time. Thank you for your time. I am ending the session now.";
 const TERMINAL_INTERVIEW_TOOL_NAMES = new Set(["end_call", "end_interview"]);
@@ -446,6 +451,16 @@ export function isTerminalInterviewToolName(value: unknown): boolean {
 
 function normalizeCompleteUtterance(value: unknown): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+}
+
+export function isApprovedNormalCompletionSpeech(speech: unknown): boolean {
+  const utterance = normalizeCompleteUtterance(speech);
+  if (utterance === normalizeCompleteUtterance(NORMAL_COMPLETION_FAREWELL_TEXT)) {
+    return true;
+  }
+  return NORMAL_COMPLETION_ANSWERS.some((answer) =>
+    utterance === normalizeCompleteUtterance(`${answer} ${NORMAL_COMPLETION_FAREWELL_TEXT}`),
+  );
 }
 
 export function normalCompletionEndAllowed(input: {
@@ -474,8 +489,7 @@ export function isNormalCompletionFarewell(input: {
       avatarClosingActive: input.avatarClosingActive,
       endTriggered: false,
     }) &&
-    normalizeCompleteUtterance(input.speech) ===
-      normalizeCompleteUtterance(NORMAL_COMPLETION_FAREWELL_TEXT);
+    isApprovedNormalCompletionSpeech(input.speech);
 }
 
 export const FINAL_CLOSING_START_TIMEOUT_MS = 5000;

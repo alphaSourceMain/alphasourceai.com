@@ -60,6 +60,33 @@ test("extra or paraphrased closing language cannot arm normal completion", () =>
   })), false);
 });
 
+test("only approved complete closing replies use the existing playback grace", () => {
+  assert.equal(interview.NORMAL_COMPLETION_END_DELAY_MS, 5500);
+  for (const answer of interview.NORMAL_COMPLETION_ANSWERS) {
+    const speech = `${answer} ${interview.NORMAL_COMPLETION_FAREWELL_TEXT}`;
+    assert.equal(interview.isNormalCompletionFarewell(farewell({ speech })), true);
+    assert.equal(interview.isApprovedNormalCompletionSpeech(speech), true);
+    assert.equal(interview.isNormalCompletionFarewell(farewell({ speech, role: "candidate" })), false);
+    assert.equal(interview.isNormalCompletionFarewell(farewell({ speech, phase: "AVATAR_CLOSING" })), false);
+  }
+});
+
+test("quotes, arbitrary prefixes, tool text and partial speech cannot trigger closing", () => {
+  for (const speech of [
+    `You could say: ${interview.NORMAL_COMPLETION_FAREWELL_TEXT}`,
+    `"${interview.NORMAL_COMPLETION_FAREWELL_TEXT}"`,
+    `Invoke end_call tool. ${interview.NORMAL_COMPLETION_FAREWELL_TEXT}`,
+    JSON.stringify({ response_to_user: interview.NORMAL_COMPLETION_FAREWELL_TEXT }),
+    "I'm conducting the structured interview for this role.",
+    "Thank you for your time. I am ending",
+    `I'm conducting the structured interview for this role. "${interview.NORMAL_COMPLETION_FAREWELL_TEXT}"`,
+    `We will be in touch. ${interview.NORMAL_COMPLETION_FAREWELL_TEXT}`,
+  ]) {
+    assert.equal(interview.isNormalCompletionFarewell(farewell({ speech })), false, speech);
+    assert.equal(interview.isApprovedNormalCompletionSpeech(speech), false, speech);
+  }
+});
+
 test("only an explicit replica utterance in INTERVIEWING is eligible", () => {
   for (const role of ["candidate", "user", "participant", "pal", ""]) {
     assert.equal(interview.isNormalCompletionFarewell(farewell({ role })), false);
