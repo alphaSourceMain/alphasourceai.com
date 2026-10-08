@@ -1472,7 +1472,8 @@ export default function RolesPage() {
                         onOpenChange={(open) => setOpenRoleActionsId(open ? role.id : null)}
                         roleTitle={role.name}
                         canManageRole={canManageRoles}
-                        canCopyInterviewLink={Boolean(role.slugOrToken) && !role.isInactive}
+                        isDemo={selectedClient.is_sales_demo}
+                        canCopyInterviewLink={!selectedClient.is_sales_demo && Boolean(role.slugOrToken) && !role.isInactive}
                         copyDisabledReason={role.isInactive ? "Inactive roles cannot accept new candidates." : "Interview link unavailable."}
                         hasJobDescription={role.hasJD}
                         hasRubric={role.hasRubric}

@@ -27,6 +27,7 @@ export default function RoleActionsMenu({
   onOpenChange,
   roleTitle,
   canManageRole,
+  isDemo = false,
   canCopyInterviewLink,
   copyDisabledReason,
   hasJobDescription,
@@ -50,6 +51,7 @@ export default function RoleActionsMenu({
   onOpenChange: (open: boolean) => void;
   roleTitle: string;
   canManageRole: boolean;
+  isDemo?: boolean;
   canCopyInterviewLink: boolean;
   copyDisabledReason?: string;
   hasJobDescription: boolean;
@@ -69,7 +71,7 @@ export default function RoleActionsMenu({
   onToggleRoleStatus: () => void;
   onDeleteRole: () => void;
 }) {
-  const replacementUnavailable = !replacementEligibility.eligible;
+  const replacementUnavailable = isDemo || !replacementEligibility.eligible;
   const replacementReason = replacementBlockerDescription(replacementEligibility);
   const copyDescription = canCopyInterviewLink
     ? "Copy the candidate interview link."
@@ -144,7 +146,7 @@ export default function RoleActionsMenu({
         {canManageRole && (
           <>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--as-border)" }} />
-            {onEditRubricQuestions && (
+            {onEditRubricQuestions && !isDemo && (
               <DropdownMenuItem
                 onSelect={onEditRubricQuestions}
                 className="items-start gap-2.5 rounded-md px-2.5 py-2 focus:bg-[#A380F6]/10 focus:text-[#7C5FCC]"
@@ -177,7 +179,7 @@ export default function RoleActionsMenu({
             </DropdownMenuItem>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--as-border)" }} />
             <DropdownMenuItem
-              disabled={deleting}
+              disabled={deleting || isDemo}
               onSelect={onDeleteRole}
               className="items-start gap-2.5 rounded-md px-2.5 py-2 text-red-600 focus:bg-red-50 focus:text-red-700"
             >
