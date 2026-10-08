@@ -429,8 +429,11 @@ export function mapRowToCandidate(item: Record<string, unknown>, index: number):
   const riskReasonFromTranscript = String(transcriptScores.ai_aided_risk_reason || "").trim();
   const reliabilityFromTranscript = toScoreOrNull(transcriptScores.confidence);
   const perceptionMode = String(perceptionScores.mode || "").trim().toLowerCase();
-  const isTextInterview = perceptionMode === "text" || perceptionScores.unavailable === true;
-  const perceptionUnavailable = perceptionMode === "text" || perceptionScores.unavailable === true;
+  // A server-confirmed QA demo may display explicitly synthetic examples while
+  // preserving the fact that actual media/perception analysis is unavailable.
+  const syntheticDemoSignals = item.is_sales_demo === true && perceptionMode === "demo" && perceptionScores.synthetic === true;
+  const isTextInterview = perceptionMode === "text" || (perceptionScores.unavailable === true && !syntheticDemoSignals);
+  const perceptionUnavailable = perceptionMode === "text" || (perceptionScores.unavailable === true && !syntheticDemoSignals);
   const interviewState = normalizeInterviewState(item.interview_state);
   const interviewStateLabelValue = interviewStateLabel(interviewState);
   const insufficientInterview = !isTextInterview && (interviewState === "no_response" || interviewState === "tech_issue");
@@ -978,6 +981,7 @@ function ExpandedPanel({
             <p className="text-xs font-black uppercase tracking-widest" style={primaryTextStyle}>Interview Analysis</p>
             <InfoTooltip content="AI-scored evaluation of the candidate's interview performance across verbal and communication dimensions" side="bottom" />
           </div>
+          {c.isSalesDemo && <p className="text-[11px] mb-3" style={mutedTextStyle}>Simulated demo values — no audio/video was analyzed.</p>}
           {hasInterview ? (
             <>
               <div className="mb-4">
@@ -1014,6 +1018,7 @@ function ExpandedPanel({
             <p className="text-xs font-black uppercase tracking-widest" style={primaryTextStyle}>Signals</p>
             <InfoTooltip content="Interview signals based on transcript evidence strength and AI-aided response-risk indicators" side="bottom" />
           </div>
+          {c.isSalesDemo && <p className="text-[11px] mb-3" style={mutedTextStyle}>Simulated demo signals — not a real assessment.</p>}
           {hasInterview ? (
             <div className="space-y-3">
               {/* Evaluation Reliability */}
@@ -1095,6 +1100,7 @@ function ExpandedPanel({
             </button>
             {advancedExpanded && (
               <div className="mt-4">
+                {c.isSalesDemo && <p className="text-[11px] mb-3" style={mutedTextStyle}>All five condition and risk indicators are synthetic examples.</p>}
                 <div className="grid md:grid-cols-2 gap-5 items-stretch">
                   <div className="h-full">
                     {advancedScoreRows.map((s) => <ScoreBar key={s.label} {...s} barColor={s.color} />)}
