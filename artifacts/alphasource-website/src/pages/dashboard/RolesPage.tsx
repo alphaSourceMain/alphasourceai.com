@@ -1104,7 +1104,7 @@ export default function RolesPage() {
     <DashboardLayout title="Roles">
       <CurrentScopeBanner client={selectedClient} />
 
-      {canManageRoles && (
+      {canManageRoles && !selectedClient.is_sales_demo && (
         <div
           className="rounded-2xl p-6 mb-6 min-w-0 max-w-[calc(100vw-2.5rem)] lg:max-w-none"
           style={surfaceCardStyle}
