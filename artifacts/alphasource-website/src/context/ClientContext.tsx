@@ -7,6 +7,7 @@ export interface Client {
   letter: string;
   color: string;
   role?: string;
+  is_sales_demo?: boolean;
   parent_client_id?: string | null;
   parent_client_name?: string | null;
   entity_label?: string | null;
@@ -315,6 +316,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             letter: letterForClient(name),
             color: colorForClient(id, index),
             role,
+            is_sales_demo: item.is_sales_demo === true,
             parent_client_id: optionalText(item.parent_client_id),
             parent_client_name: optionalText(item.parent_client_name),
             entity_label: optionalText(item.entity_label),

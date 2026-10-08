@@ -64,6 +64,7 @@ interface Candidate {
   transcriptText?: string;
   videoUrl?: string | null;
   hasVideo?: boolean;
+  isSalesDemo?: boolean;
   recordingStatus?: string | null;
   recordingReadyAt?: string | null;
   name: string;
@@ -90,6 +91,7 @@ interface Candidate {
 }
 
 interface RecordingModalState {
+  isDemo?: boolean;
   interviewId: string;
   candidateName: string;
   url: string;
@@ -456,6 +458,7 @@ export function mapRowToCandidate(item: Record<string, unknown>, index: number):
     transcriptText,
     videoUrl: videoUrl || null,
     hasVideo,
+    isSalesDemo: item.is_sales_demo === true,
     recordingStatus: String(item.recording_status || "").trim() || null,
     recordingReadyAt: String(item.recording_ready_at || "").trim() || null,
     name: String(candidate.name || "").trim() || "Unnamed Candidate",
@@ -841,11 +844,11 @@ function ExpandedPanel({
   const openingResume = Boolean(actionLoading[`${String(c.id)}:resume`]);
   const openingPdf = Boolean(actionLoading[`${String(c.id)}:pdf`]);
   const transcriptDisabled = openingTranscript || !c.transcriptText;
-  const recordingAvailable =
+  const recordingAvailable = c.isSalesDemo === true || (
     Boolean(c.interviewId) &&
     String(c.recordingStatus || "").toLowerCase() === "ready" &&
     c.reliabilityState !== "not_applicable" &&
-    !c.insufficientInterview;
+    !c.insufficientInterview);
   const resumeDisabled = openingResume || !c.candidateId;
   const pdfDisabled = openingPdf || (!c.candidateId && !c.interviewId);
   const advancedAnalysis = hasInterview ? c.interviewAnalysisV2 : null;
@@ -1326,6 +1329,15 @@ export default function CandidatesPage() {
       const token = String(session?.access_token || "").trim();
       if (!token) throw new Error("Missing session token.");
 
+      if (candidate.isSalesDemo) {
+        const response = await fetch(`${backendBase}/demo/resumes/${encodeURIComponent(candidate.candidateId)}`, {headers:{Authorization:`Bearer ${token}`},credentials:'omit'});
+        if (!response.ok) throw new Error('Could not open demo resume.');
+        const url = URL.createObjectURL(await response.blob());
+        window.open(url, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return;
+      }
+
       const response = await fetch(
         `${backendBase}/files/resume-signed-url?candidate_id=${encodeURIComponent(candidate.candidateId)}`,
         {
@@ -1344,6 +1356,10 @@ export default function CandidatesPage() {
   }, [withCandidateAction]);
 
   const openRecordingForCandidate = useCallback((candidate: Candidate) => {
+    if (candidate.isSalesDemo) {
+      setRecordingModal({isDemo:true,interviewId:candidate.interviewId || '',candidateName:candidate.name,url:''});
+      return;
+    }
     void withCandidateAction(candidate, "recording", async () => {
       const interviewId = String(candidate.interviewId || "").trim();
       if (!interviewId) {
@@ -1448,6 +1464,19 @@ export default function CandidatesPage() {
 
   const downloadPdfForCandidate = useCallback((candidate: Candidate) => {
     void withCandidateAction(candidate, "pdf", async () => {
+      if (candidate.isSalesDemo) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || !candidate.candidateId) throw new Error("Missing demo session.");
+        const response = await fetch(`${backendBase}/demo/reports/${encodeURIComponent(candidate.candidateId)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }, credentials: "omit",
+        });
+        if (!response.ok) throw new Error("Could not download the demo report.");
+        const objectUrl = window.URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        link.href = objectUrl; link.download = `${candidate.name}-synthetic-report.pdf`;
+        link.click(); window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60000);
+        return;
+      }
       if (!candidate.candidateId && !candidate.interviewId) {
         throw new Error("Report cannot be generated for this candidate.");
       }
@@ -2114,20 +2143,20 @@ export default function CandidatesPage() {
               </button>
             </div>
             <div className="px-5 py-4 overflow-y-auto max-h-[calc(85vh-72px)]">
-              <video
+              {recordingModal.isDemo ? <div className="flex min-h-64 items-center justify-center rounded-xl bg-black p-6 text-center text-sm text-white/75">Demo placeholder — no recording is included.</div> : <video
                 controls
                 src={recordingModal.url}
                 className="w-full max-h-[58vh] rounded-xl bg-black"
               >
                 Your browser does not support the video tag.
-              </video>
+              </video>}
               {recordingMeta && (
                 <p className="mt-3 text-[11px] font-semibold" style={mutedTextStyle}>{recordingMeta}</p>
               )}
-              <p className="mt-2 text-[11px] font-semibold" style={mutedTextStyle}>
+              {!recordingModal.isDemo && <p className="mt-2 text-[11px] font-semibold" style={mutedTextStyle}>
                 If the link expires, close this window and click Recording again.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
+              </p>}
+              {!recordingModal.isDemo && <div className="mt-4 flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2148,7 +2177,7 @@ export default function CandidatesPage() {
                   <Download className="w-3.5 h-3.5" />
                   Download
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         </div>

@@ -30,6 +30,7 @@ import { useAppearance } from "@/context/AppearanceContext";
 import { useClient, type Client } from "@/context/ClientContext";
 import DashboardBrand from "@/components/DashboardBrand";
 import SupportVoicePopover from "@/components/SupportVoicePopover";
+import SalesDemoBanner from "@/components/SalesDemoBanner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -464,6 +465,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
   const dropdownRef  = useRef<HTMLDivElement>(null);
   const visibleNavItems = useMemo(
     () => navItems.filter((item) => {
+      if (selectedClient.is_sales_demo && ['Automation','Members','Billing','Entities'].includes(item.label)) return false;
       if (item.label === "Members") return hasMembersNavAccess(selectedClient);
       if (item.label === "Billing") return hasBillingNavAccess(selectedClient);
       if (item.label === "Entities") return hasEntitiesNavAccess(selectedClient, isGlobalAdmin);
@@ -660,7 +662,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
         </nav>
 
         <div className={`flex-shrink-0 ${collapsed ? "px-3" : "px-5"}`}>
-          {collapsed ? <SupportVoicePopover placement="sidebar" collapsed /> : <SupportVoicePopover />}
+          {!selectedClient.is_sales_demo && (collapsed ? <SupportVoicePopover placement="sidebar" collapsed /> : <SupportVoicePopover />)}
           {collapsed && (
             <button
               type="button"
@@ -810,7 +812,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-5 lg:px-8 lg:py-5">{children}</main>
+        <main className="flex-1 p-5 lg:px-8 lg:py-5">{selectedClient.is_sales_demo ? <SalesDemoBanner /> : null}{children}</main>
       </div>
 
       {/* ── Spotlight tour ───────────────────────────────────── */}
