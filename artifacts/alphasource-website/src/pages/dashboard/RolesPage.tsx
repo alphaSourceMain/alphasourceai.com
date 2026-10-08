@@ -1726,7 +1726,7 @@ export default function RolesPage() {
                 <button
                   type="button"
                   onClick={() => { void requestRubricChanges(); }}
-                  disabled={rubricSending}
+                  disabled={rubricSending || selectedClient.is_sales_demo}
                   className="px-4 py-2 text-xs font-bold text-white rounded-full transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ backgroundColor: "#A380F6" }}
                 >
