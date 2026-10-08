@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
+import SyntheticInterviewTests from "@/components/admin/SyntheticInterviewTests";
 import { useAdminClient } from "@/context/AdminClientContext";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -810,6 +811,8 @@ export default function AdminInterviewReliabilityPage() {
             Refresh
           </button>
         </div>
+
+        <SyntheticInterviewTests backendBase={backendBase} getToken={getToken} />
 
         <section aria-label="Support voice reliability" className="rounded-xl border p-4" style={surfaceStyle}>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
