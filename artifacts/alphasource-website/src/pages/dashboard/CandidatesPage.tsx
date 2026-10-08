@@ -1040,7 +1040,7 @@ function ExpandedPanel({
                 </div>
                 {typeof c.reliability !== "number" && (
                   <p className="text-[11px] mt-2" style={mutedTextStyle}>
-                    {c.reliabilityState === "not_applicable" ? "Not applicable for text interviews." : "Not yet available."}
+                    {c.isSalesDemo ? "Not assessed in this demo (no recording)." : c.reliabilityState === "not_applicable" ? "Not applicable for text interviews." : "Not yet available."}
                   </p>
                 )}
               </div>
