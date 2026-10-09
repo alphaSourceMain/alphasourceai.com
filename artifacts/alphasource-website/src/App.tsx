@@ -75,6 +75,7 @@ import BillingPage from "@/pages/dashboard/BillingPage";
 import EntitiesPage from "@/pages/dashboard/EntitiesPage";
 import DashboardFaqPage from "@/pages/dashboard/FaqPage";
 import ProfileSettingsPage from "@/pages/dashboard/ProfileSettingsPage";
+import DemoManagerRoute from "@/components/SalesDemoManagerPage";
 
 /* Admin dashboard */
 import AdminOverviewPage from "@/pages/admin/AdminOverviewPage";
@@ -485,12 +486,12 @@ function DashboardGuard() {
         <Switch>
           <Route path="/dashboard"            component={OverviewPage} />
           <Route path="/dashboard/roles"      component={RolesPage} />
-          <Route path="/dashboard/automation" component={AutomationPage} />
+          <Route path="/dashboard/automation">{() => <DemoManagerRoute page="automation"><AutomationPage /></DemoManagerRoute>}</Route>
           <Route path="/dashboard/candidates" component={CandidatesPage} />
-          <Route path="/dashboard/members"    component={MembersPage} />
-          <Route path="/dashboard/billing"    component={BillingPage} />
-          <Route path="/dashboard/entities"   component={EntitiesPage} />
-          <Route path="/dashboard/profile"    component={ProfileSettingsPage} />
+          <Route path="/dashboard/members">{() => <DemoManagerRoute page="members"><MembersPage /></DemoManagerRoute>}</Route>
+          <Route path="/dashboard/billing">{() => <DemoManagerRoute page="billing"><BillingPage /></DemoManagerRoute>}</Route>
+          <Route path="/dashboard/entities">{() => <DemoManagerRoute page="entities"><EntitiesPage /></DemoManagerRoute>}</Route>
+          <Route path="/dashboard/profile">{() => <DemoManagerRoute page="profile"><ProfileSettingsPage /></DemoManagerRoute>}</Route>
           <Route path="/dashboard/support"    component={DashboardFaqPage} />
           <Route path="/dashboard/faq"        component={DashboardFaqPage} />
           <Route component={NotFound} />

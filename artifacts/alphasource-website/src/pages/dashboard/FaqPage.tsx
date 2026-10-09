@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { useClient } from "@/context/ClientContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   DASHBOARD_SUPPORT_KNOWLEDGE_VERSION,
   dataPracticeSections,
@@ -38,6 +40,9 @@ const faqSections = supportFaqSections.map((section) => (
 ));
 
 export default function DashboardFaqPage() {
+  const { selectedClient } = useClient();
+  const { currentUser } = useAuth();
+  const isDemo = selectedClient.is_sales_demo === true || Boolean(currentUser?.app_metadata?.sales_demo_client_id);
   return (
     <DashboardLayout title="Support">
       <div data-support-knowledge-version={DASHBOARD_SUPPORT_KNOWLEDGE_VERSION} />
@@ -57,8 +62,10 @@ export default function DashboardFaqPage() {
           Email the team for account-specific help. Talk with Support provides AI guidance and, when available, can submit a brief support message after you approve your name, reply email, and summary. It cannot inspect accounts, change settings, or transfer the browser call.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <a href="mailto:support@alphasourceai.com" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Email the support team</a>
-          <a href={AI_SUPPORT_PHONE_URI} className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>AI Customer Support: {AI_SUPPORT_PHONE_DISPLAY}</a>
+          {isDemo ? <span className="text-xs font-semibold" style={mutedTextStyle}>Support contact and calling are disabled in the synthetic demo.</span> : <>
+            <a href="mailto:support@alphasourceai.com" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Email the support team</a>
+            <a href={AI_SUPPORT_PHONE_URI} className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>AI Customer Support: {AI_SUPPORT_PHONE_DISPLAY}</a>
+          </>}
           <a href="#common-questions" className="rounded-full border px-4 py-2 text-sm font-bold" style={mutedPanelStyle}>Find an answer</a>
         </div>
         <p className="mt-3 text-xs leading-relaxed" style={mutedTextStyle}>Do not share passwords, verification codes, payment details, or private access links. Keep candidate and account details out of browser AI support.</p>

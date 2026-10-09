@@ -19,7 +19,7 @@ export default function SalesDemoBanner() {
   }
   return <section className="mb-5 rounded-xl border border-[#A380F6]/30 bg-[#A380F6]/10 px-4 py-3" aria-label="Sales demonstration">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><p className="text-sm font-bold" style={{color:'var(--as-text)'}}>Sales demo · Northstar Talent Partners</p><p className="mt-1 text-xs" style={{color:'var(--as-text-muted)'}}>Fictional candidates and illustrative scores. Explore the dashboard and open or close roles. Outreach, billing, and live interviews are disabled.</p></div>
+      <div><p className="text-sm font-bold" style={{color:'var(--as-text)'}}>Sales demo · Northstar Talent Partners</p><p className="mt-1 text-xs" style={{color:'var(--as-text-muted)'}}>Fictional client data and illustrative scores. Explore every manager page and open or close roles. Payments, invitations, outreach, and live interviews are disabled.</p></div>
       <button type="button" disabled={busy} onClick={() => { void reset(); }} className="shrink-0 rounded-lg bg-[#0A1547] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{busy?'Restoring…':'Reset shared demo'}</button>
     </div>
     {error ? <p role="alert" className="mt-2 text-xs text-red-600">{error}</p> : null}

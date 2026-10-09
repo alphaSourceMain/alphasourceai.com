@@ -465,7 +465,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
   const dropdownRef  = useRef<HTMLDivElement>(null);
   const visibleNavItems = useMemo(
     () => navItems.filter((item) => {
-      if (selectedClient.is_sales_demo && ['Automation','Members','Billing','Entities'].includes(item.label)) return false;
+      if (selectedClient.is_sales_demo === true && selectedClient.id === 'd38ade00-2026-4000-8000-000000000001') return true;
       if (item.label === "Members") return hasMembersNavAccess(selectedClient);
       if (item.label === "Billing") return hasBillingNavAccess(selectedClient);
       if (item.label === "Entities") return hasEntitiesNavAccess(selectedClient, isGlobalAdmin);
@@ -662,7 +662,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
         </nav>
 
         <div className={`flex-shrink-0 ${collapsed ? "px-3" : "px-5"}`}>
-          {!selectedClient.is_sales_demo && (collapsed ? <SupportVoicePopover placement="sidebar" collapsed /> : <SupportVoicePopover />)}
+          {!selectedClient.is_sales_demo && !currentUser?.app_metadata?.sales_demo_client_id && (collapsed ? <SupportVoicePopover placement="sidebar" collapsed /> : <SupportVoicePopover />)}
           {collapsed && (
             <button
               type="button"
