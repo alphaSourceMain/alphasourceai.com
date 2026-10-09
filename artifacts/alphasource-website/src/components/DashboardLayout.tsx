@@ -707,7 +707,7 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
       )}
 
       {/* ── Main content ─────────────────────────────────────── */}
-      <div className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${contentML}`}>
+      <div className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${selectedClient.is_sales_demo === true && selectedClient.id === 'd38ade00-2026-4000-8000-000000000001' ? 'min-w-0' : ''} ${contentML}`}>
         {/* Top bar */}
         <header
           className="sticky top-0 z-20 flex min-h-[88px] items-center gap-4 px-5 lg:px-8"
