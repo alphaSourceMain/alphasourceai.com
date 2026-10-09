@@ -80,7 +80,11 @@ export function DemoWorkspaceContent({page,data}: {page:DemoManagerPage;data:Dem
 }
 
 
-export function demoManagerMode(client: Pick<Client, 'id'|'is_sales_demo'>, marker: unknown): 'demo'|'blocked'|'live' {
-  if (marker || client.is_sales_demo===true || client.id===DEMO_CLIENT) return marker===DEMO_CLIENT && usesDemoManagerPage(client)?'demo':'blocked';
+export function demoManagerMode(client: Pick<Client, 'id'|'is_sales_demo'>, marker: unknown, isGlobalAdmin: boolean = false): 'demo'|'blocked'|'live' {
+  if (marker || client.is_sales_demo===true || client.id===DEMO_CLIENT) {
+    const manager = marker===DEMO_CLIENT && isGlobalAdmin!==true;
+    const adminPreview = !marker && isGlobalAdmin===true;
+    return usesDemoManagerPage(client) && (manager || adminPreview)?'demo':'blocked';
+  }
   return 'live';
 }

@@ -33,11 +33,11 @@ function SalesDemoManagerPage({page}: {page:DemoManagerPage}) {
 }
 
 export default function DemoManagerRoute({page,children}: {page:DemoManagerPage;children:ReactNode}) {
-  const {selectedClient,loading,error}=useClient();
+  const {selectedClient,loading,error,isGlobalAdmin}=useClient();
   const {currentUser,clientAuthReady}=useAuth();
   // Do not mount live billing/invite/profile effects while scope is unknown.
   if (!clientAuthReady || !currentUser || loading || !selectedClient.id) return <DashboardLayout title={titles[page]}><p role="status" style={muted}>{error||'Loading client access…'}</p></DashboardLayout>;
-  const mode=demoManagerMode(selectedClient,currentUser?.app_metadata?.sales_demo_client_id);
+  const mode=demoManagerMode(selectedClient,currentUser?.app_metadata?.sales_demo_client_id,isGlobalAdmin);
   if (mode==='blocked') return <DashboardLayout title={titles[page]}><p role="alert" style={muted}>Demo access could not be verified. No live manager actions are available.</p></DashboardLayout>;
   return mode==='demo'?<SalesDemoManagerPage page={page}/>:children;
 }

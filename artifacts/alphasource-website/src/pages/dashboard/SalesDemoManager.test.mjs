@@ -23,6 +23,11 @@ test('demo adapters require the server flag and exact client, normal clients rem
   assert.equal(demoManagerMode({id:'real-client'},undefined),'live');
   for(const client of [{id:data.client_id},{id:'wrong',is_sales_demo:true},{id:'real-client',is_sales_demo:false}])assert.equal(demoManagerMode(client,data.client_id),'blocked');
   assert.equal(demoManagerMode({id:data.client_id,is_sales_demo:true},undefined),'blocked');
+  assert.equal(demoManagerMode({id:data.client_id,is_sales_demo:true},undefined,true),'demo');
+  assert.equal(demoManagerMode({id:data.client_id,is_sales_demo:true},data.client_id,true),'blocked');
+  assert.equal(demoManagerMode({id:data.client_id,is_sales_demo:true},undefined,'true'),'blocked');
+  for(const client of [{id:data.client_id},{id:'wrong',is_sales_demo:true}])assert.equal(demoManagerMode(client,undefined,true),'blocked');
+  assert.equal(demoManagerMode({id:'real-client'},undefined,true),'live');
 });
 test('all five manager previews display synthetic data with no consequential controls',()=>{
   for(const page of ['billing','entities','members','automation','profile']){
