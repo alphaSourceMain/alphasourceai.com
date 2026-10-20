@@ -28,6 +28,8 @@ test('option B preserves actual video attributes without browser chrome',()=>{
  assert.match(screen,/className="b1-video-card"/);assert.match(screen,/className="b1-video-footer/);
  assert.doesNotMatch(screen,/alphaScreen Demo|#FF5F57|#FFBD2E|#28C840/);
  assert.match(screen,/<video[\s\S]*?autoPlay\s+muted\s+loop\s+playsInline/);
+ const demoCta=screen.match(/<a[^>]+data-testid="alphascreen-video-demo-cta"/)[0];
+ assert.doesNotMatch(demoCta,/bg-\[/,'video CTA must not inherit the legacy dark-mode fill adapter');
  assert.match(screen,/b1-screen-demo-mesh/);assert.match(css,/\.b1-screen-demo-mesh::before \{\s*opacity: \.15; background-size: 420px/);
 });
 test('mesh exclusions and solid enterprise CTA are explicit in every interaction state',()=>{

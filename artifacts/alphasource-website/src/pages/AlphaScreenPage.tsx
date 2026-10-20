@@ -133,7 +133,7 @@ function HeroSection() {
                 </p>
                 <a
                   href="#request-demo"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-[#F8F9FD] px-4 py-2.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 px-4 py-2.5 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
                   data-testid="alphascreen-video-demo-cta"
                   data-analytics-cta="Request a Demo"
                   data-analytics-placement="alphascreen-video-card"
