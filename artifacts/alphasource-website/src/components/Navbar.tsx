@@ -1,6 +1,6 @@
 import { useState, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Check, KeyRound, LogIn, Menu, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppearance } from "@/context/AppearanceContext";
@@ -29,6 +29,19 @@ export default function Navbar() {
   const signInInFlightRef = useRef(false);
   const { login, loginWithPasskey, clientLoginLoading, clientLoginError } = useAuth();
   const { resolvedMode } = useAppearance();
+  const queryLoginRef = useRef(false);
+  const search = useSearch();
+
+  useEffect(() => {
+    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && new URLSearchParams(window.location.search).get("signin") === "client";
+    if (!matches) {
+      if (queryLoginRef.current) { setMobileOpen(false); setLoginOpen(false); queryLoginRef.current = false; }
+      return;
+    }
+    queryLoginRef.current = true;
+    if (window.innerWidth < 1280) setMobileOpen(true);
+    else setLoginOpen(true);
+  }, [location, search]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);

@@ -38,7 +38,7 @@ import {
 } from "@/lib/dashboardActivity";
 
 /* Public pages */
-import HomePage from "@/pages/HomePage";
+import HomePage from "@/pages/B1HomePage";
 import AlphaScreenPage from "@/pages/AlphaScreenPage";
 import AlphaScreenPricingPage from "@/pages/AlphaScreenPricingPage";
 import {
@@ -224,8 +224,8 @@ function PublicSiteShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={`public-site-shell min-h-screen ${isHomePage ? "public-site-home" : "public-site-rest"} ${resolvedMode === "dark" ? "dark" : ""}`}
-      data-theme={resolvedMode}
+      className={`public-site-shell min-h-screen ${isHomePage ? "public-site-home" : "public-site-rest"} ${!isHomePage && resolvedMode === "dark" ? "dark" : ""}`}
+      data-theme={isHomePage ? "light" : resolvedMode}
     >
       {children}
     </div>
@@ -562,6 +562,7 @@ function InterviewCompletePage() {
 /* ── Router ─────────────────────────────────────────────── */
 function Router() {
   const [location] = useLocation();
+  const PublicMain = location === "/" ? "div" : "main";
   const isDashboard = location === "/dashboard" || location.startsWith("/dashboard/");
   const isAdmin     = location === "/admin"     || location.startsWith("/admin/");
   const isSales     = location === "/sales"     || location.startsWith("/sales/");
@@ -643,8 +644,8 @@ function Router() {
       <AppearanceProvider>
         <PublicSiteShell>
           <div className="min-h-screen flex flex-col bg-white text-[#0A1547] transition-colors duration-300 dark:bg-[#080E2E] dark:text-white">
-            <Navbar />
-            <main className="flex-1">
+            {location !== "/" && <Navbar />}
+            <PublicMain className="flex-1">
               <Switch>
           <Route path="/checkout/password-setup-preview/" component={PasswordSetupPreviewPage} />
           <Route path="/checkout/password-setup-preview" component={PasswordSetupPreviewPage} />
@@ -683,8 +684,8 @@ function Router() {
           <Route path="/terms"       component={TermsPage} />
           <Route component={NotFound} />
               </Switch>
-            </main>
-            <Footer />
+            </PublicMain>
+            {location !== "/" && <Footer />}
             <TrackingConsentNotice visible />
           </div>
         </PublicSiteShell>

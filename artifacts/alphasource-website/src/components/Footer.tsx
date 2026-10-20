@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTrackingConsent } from "@/context/TrackingConsentContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -42,6 +42,19 @@ export default function Footer() {
   const { loginAdmin, adminLoginLoading, adminLoginError, clearAdminLoginError } = useAuth();
   const { openTrackingPreferences } = useTrackingConsent();
   const [location, setLocation]             = useLocation();
+  const queryLoginRef = useRef(false);
+  const search = useSearch();
+  useEffect(() => {
+    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && new URLSearchParams(window.location.search).get("signin") === "admin";
+    if (!matches) {
+      if (queryLoginRef.current) { setAdminLoginOpen(false); queryLoginRef.current = false; }
+      return;
+    }
+    queryLoginRef.current = true;
+    setAdminLoginOpen(true);
+    const frame = window.requestAnimationFrame(() => dropdownRef.current?.scrollIntoView({ block: "end" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [location, search]);
   const normalizedPath = String(location || "/").split("?")[0].replace(/\/$/, "") || "/";
   const showPatentNotice =
     normalizedPath !== "/" &&

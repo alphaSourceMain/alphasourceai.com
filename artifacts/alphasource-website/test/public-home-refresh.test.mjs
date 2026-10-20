@@ -12,11 +12,12 @@ const appearance = read("src/components/AppearanceSelector.tsx");
 const navbar = read("src/components/Navbar.tsx");
 const footer = read("src/components/Footer.tsx");
 const styles = read("src/index.css");
-const home = read("src/pages/HomePage.tsx");
+const home = read("src/pages/B1HomePage.tsx");
+const b1 = read("src/pages/b1-home.css");
 const about = read("src/pages/AboutPage.tsx");
 const alphaScreen = read("src/pages/AlphaScreenPage.tsx");
 
-test("the full public site exposes the dashboard-style appearance contract", () => {
+test("non-home public routes retain appearance while approved B1 homepage stays fixed", () => {
   assert.match(appearance, /value: "light"/);
   assert.match(appearance, /value: "dark"/);
   assert.match(appearance, /value: "system"/);
@@ -24,9 +25,9 @@ test("the full public site exposes the dashboard-style appearance contract", () 
   assert.match(navbar, /<AppearanceSelector \/>/);
   assert.match(navbar, /<AppearanceSelector alwaysShowLabel \/>/);
   assert.doesNotMatch(navbar, /isHomePage && <AppearanceSelector/);
-  assert.match(app, /data-theme=\{resolvedMode\}/);
+  assert.match(app, /data-theme=\{isHomePage \? "light" : resolvedMode\}/);
   assert.match(app, /public-site-rest/);
-  assert.doesNotMatch(app, /resolvedMode : "light"/);
+  assert.match(app, /!isHomePage && resolvedMode === "dark"/);
 });
 
 test("approved rest-of-site treatment keeps the footer and theme provider-neutral", () => {
@@ -47,24 +48,30 @@ test("dark technology copy and how-it-works card sizing remain consistent", () =
   assert.match(alphaScreen, /min-h-\[10\.625rem\] h-full bg-white rounded-2xl/);
 });
 
-test("approved homepage structure keeps the continuous dark value band", () => {
-  assert.match(home, /function ValueBandSection\(\)/);
-  assert.match(home, /bg-\[#070E36\]/);
-  assert.match(home, /<HeroSection \/>\s*<ValueBandSection \/>\s*<PeopleDrivenSection \/>/);
-  assert.match(home, /dark:bg-\[#09133E\]/);
-  assert.match(home, /dark:bg-\[#0D1A4A\]/);
+test("live homepage follows approved B1 structure, supplied assets and exact copy", () => {
+  assert.match(app, /import HomePage from "@\/pages\/B1HomePage"/);
+  assert.match(home, /className="hero wrap"/);
+  assert.match(home, /className="stats"/);
+  assert.match(home, /<main id="home-content">/);
+  assert.match(home, /<\/main>\s*<footer>/);
+  assert.match(home, /Illustrative workflow/);
+  assert.match(home, /\/brand\/b1\/logo-light\.png/);
+  assert.match(home, /\/brand\/b1\/alpha\.png/);
+  assert.match(home, /Unleash your/);
+  assert.doesNotMatch(home, /dangerouslySetInnerHTML|<iframe/);
 });
 
-test("owner-approved hero and alphaScreen motion timings remain intact", () => {
-  assert.match(home, /animate=\{\{ y: \[0, -10, 0\] \}\}/);
-  assert.match(home, /duration: 5, repeat: Infinity/);
-  assert.match(home, /duration: 4\.5/);
-  assert.match(home, /duration: 3\.8/);
-  assert.match(home, /delay: 0\.2/);
-  assert.match(home, /delay: 0\.7/);
-  assert.match(home, /delay: 1\.2/);
-  assert.match(home, /delay: 1\.7/);
-  assert.match(home, /delay: 2\.2, duration: 0\.5/);
+test("B1 reference motion and mobile menu preserve reduced motion and focus boundaries", () => {
+  assert.match(b1, /animation:\s*b1-float 9s ease-in-out infinite/);
+  assert.match(b1, /@keyframes b1-float/);
+  assert.doesNotMatch(b1, /@keyframes float|html:has|scrollbar-width/);
+  assert.match(b1, /prefers-reduced-motion:\s*reduce/);
+  assert.match(home, /IntersectionObserver/);
+  assert.match(home, /inert=\{!menuOpen\}/);
+  assert.match(home, /event.key === "Escape"/);
+  assert.match(home, /event.key !== "Tab"/);
+  assert.match(home, /element.inert = inert/);
+  assert.match(home, /window.cancelAnimationFrame/);
 });
 
 test("public routes, contact form, and sign-in affordances remain wired", () => {
