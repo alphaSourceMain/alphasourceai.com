@@ -599,11 +599,6 @@ function platformFeeForCadence(plan: AlphaScreenPackage, billingCadence: string)
   return billingCadence === "annual" ? plan.platform_annual_fee : plan.platform_monthly_fee;
 }
 
-function formatPlatformFee(plan: AlphaScreenPackage, billingCadence: string): string {
-  const value = platformFeeForCadence(plan, billingCadence);
-  return formatUsd(value);
-}
-
 function cadenceOptions(plan: AlphaScreenPackage | null): BillingCadence[] {
   const options = (plan?.billing_cadences || []).filter((cadence) => String(cadence.key || "").trim());
   return options.length ? options : [{ key: "monthly", display_name: "Monthly" }];
@@ -659,7 +654,6 @@ function PackageMetric({
 function PlanCard({
   plan,
   selected,
-  billingCadence,
   onStart,
   catalog,
   available,
@@ -667,7 +661,6 @@ function PlanCard({
 }: {
   plan: AlphaScreenPackage;
   selected: boolean;
-  billingCadence: BillingCadenceKey;
   onStart: (plan: AlphaScreenPackage) => void;
   catalog: MembershipQuoteCatalog | null;
   available: boolean;
@@ -677,7 +670,6 @@ function PlanCard({
   const included = plan.included_interviews_per_role || plan.included_interviews;
   const duration = plan.max_interview_minutes || plan.interview_duration_minutes;
   const overage = plan.additional_interview_fee || plan.additional_interview_price || plan.overage_price;
-  const platformSuffix = billingCadence === "annual" ? "/year platform" : "/mo platform";
   const cardPricing = catalog ? membershipCardPricing(catalog, plan.plan_key as "basic" | "pro", commitmentMonths) : null;
 
   return (
@@ -702,23 +694,18 @@ function PlanCard({
 
       <p className="text-sm leading-relaxed text-[#0A1547]/60">{BEST_FOR[plan.plan_key]}</p>
 
-      <div className="mb-5 mt-6">
+      <div className="mb-5 mt-6" style={{ minHeight: 144 }}>
         <div className="flex items-end gap-2">
-          <span className="text-4xl font-black tracking-normal text-[#0A1547]">{catalog ? commitmentMonths : formatPlatformFee(plan, billingCadence)}</span>
-          <span className={catalog ? "text-4xl font-black tracking-normal text-[#0A1547]" : "pb-1.5 text-sm font-bold text-[#0A1547]/55"}>{catalog ? "months" : platformSuffix}</span>
+          <span className="text-4xl font-black tracking-normal text-[#0A1547]">{commitmentMonths}</span>
+          <span className="text-4xl font-black tracking-normal text-[#0A1547]">months</span>
         </div>
         {cardPricing ? <div className="mt-3 grid gap-1 text-sm font-bold text-[#0A1547]">
           <p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
           {cardPricing.monthlyPaymentCents !== null ? <p className="text-xs font-bold text-[#0A1547]/55">
             {membershipMoney(cardPricing.monthlyPaymentCents)} monthly <span className="text-[10px] font-medium">(contact sales for monthly)</span>
           </p> : null}
-        </div> : null}
-        <p className="mt-2 text-sm font-black text-[#0A1547]">+ {formatUsd(plan.per_role_fee)} / role</p>
-        {!catalog && billingCadence === "annual" ? (
-          <p className="mt-1 text-xs font-bold text-[#0A1547]/55">
-            Annual platform pricing is discounted and billed upfront.
-          </p>
-        ) : null}
+        </div> : <p className="mt-3 text-sm font-bold text-[#0A1547]/60">Awaiting current pricing</p>}
+        {catalog ? <p className="mt-2 text-sm font-black text-[#0A1547]">+ {formatUsd(plan.per_role_fee)} / role</p> : null}
       </div>
 
       <div className="grid gap-3">
@@ -735,7 +722,7 @@ function PlanCard({
         <PackageMetric
           icon={<BadgeDollarSign className="h-4 w-4" />}
           label="Additional interviews"
-          value={`${formatUsd(overage)} per additional interview`}
+          value={catalog ? `${formatUsd(overage)} per additional interview` : "Awaiting current rate"}
         />
       </div>
 
@@ -1541,7 +1528,7 @@ function LoadingNotice({ state }: { state: PackageLoadState }) {
     <div role={isLoading ? "status" : "alert"} className="mb-6 rounded-lg border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-semibold text-[#0A1547]/65">
       {isLoading
         ? "Loading current alphaScreen membership configuration..."
-        : "Current pricing could not be verified. Signup is unavailable until pricing loads; displayed defaults are reference only."}
+        : "Current pricing could not be verified. Memberships are available in 3-, 6-, or 12-month terms. New signup is unavailable until current pricing loads."}
     </div>
   );
 }
@@ -1588,10 +1575,12 @@ export default function AlphaScreenPricingPage() {
         if (!response.ok) throw new Error(`Package endpoint returned ${response.status}`);
         const body = await response.json();
         const verified = verifiedPublicCatalog(body);
+        // Public signup no longer offers the legacy Monthly/Annual catalog.
+        // Keep initial/error rendering on 3/6/12 without inventing current prices.
+        if (!verified.catalog) throw new Error("Current 3/6/12 membership pricing is unavailable");
         if (controller.signal.aborted) return;
         setRetailCatalog(verified.catalog);
-        setPackages(verified.catalog ? Object.values(verified.catalog.plans).map(retailDisplayPackage)
-          : verified.packages.map(pkg => normalizePackage(pkg)!));
+        setPackages(Object.values(verified.catalog.plans).map(retailDisplayPackage));
         setLoadState("ready");
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -1795,14 +1784,6 @@ export default function AlphaScreenPricingPage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [resendCooldownSeconds]);
-
-  const updateSelectedBillingCadence = (cadence: BillingCadenceKey) => {
-    if (purchaseResult?.purchase_intent_id || purchaseSubmitInFlightRef.current || retailCatalog) return;
-    setSelectedBillingCadence(cadence);
-    if (selectedPlan && planSupportsCadence(selectedPlan, cadence)) {
-      setPurchaseForm((prev) => ({ ...prev, billing_cadence: cadence }));
-    }
-  };
 
   const updatePurchaseField = <K extends keyof PurchaseIntentForm>(field: K, value: PurchaseIntentForm[K]) => {
     if (purchaseResult?.purchase_intent_id || purchaseSubmitInFlightRef.current) return;
@@ -2225,23 +2206,7 @@ export default function AlphaScreenPricingPage() {
         </div>
         <div className="pr-dock" role="group" aria-label="Billing term">
           <span className="pr-dock__label">Billing term</span>
-            {!retailCatalog ? <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
-              {(["monthly", "annual"] as BillingCadenceKey[]).map((cadence) => (
-                <button
-                  key={cadence}
-                  type="button"
-                  onClick={() => updateSelectedBillingCadence(cadence)}
-                  disabled={loadState !== "ready" || Boolean(purchaseResult?.purchase_intent_id)}
-                  className={`rounded-md px-4 py-2 text-sm font-black transition-colors ${
-                    selectedBillingCadence === cadence
-                      ? "bg-[#0A1547] text-white"
-                      : "text-[#0A1547]/65 hover:text-[#0A1547]"
-                  }`}
-                >
-                  {cadence === "annual" ? "Annual" : "Monthly"}
-                </button>
-              ))}
-            </div> : <div role="group" aria-label="Membership length" className="flex rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
+            <div role="group" aria-label="Membership length" className="flex rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
               {([3, 6, 12] as const).map(months => <button key={months} type="button"
                 aria-pressed={cardCommitmentMonths === months}
                 onClick={() => setCardCommitmentMonths(months)}
@@ -2249,7 +2214,7 @@ export default function AlphaScreenPricingPage() {
                 className={`rounded-md px-4 py-2 text-sm font-black transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A380F6] ${
                   cardCommitmentMonths === months ? "bg-[#0A1547] text-white" : "text-[#0A1547]/65 hover:text-[#A380F6]"
                 }`}>{months} months</button>)}
-            </div>}
+            </div>
         </div>
       </section>
 
@@ -2262,7 +2227,6 @@ export default function AlphaScreenPricingPage() {
                 key={plan.plan_key}
                 plan={plan}
                 selected={selectedPlanKey === plan.plan_key}
-                billingCadence={selectedBillingCadence}
                 onStart={startPurchase}
                 catalog={retailCatalog}
                 available={Boolean(purchaseResult?.purchase_intent_id) || loadState === "ready"}

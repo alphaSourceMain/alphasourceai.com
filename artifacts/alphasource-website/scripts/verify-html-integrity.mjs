@@ -56,6 +56,18 @@ function verifyHtmlFile(filePath) {
   const modules = scriptTags.filter((tag) => readAttr(tag, "type").value.toLowerCase() === "module");
   const watchdogs = html.match(new RegExp(`id=["']${WATCHDOG_ID}["']`, "gi")) || [];
 
+  // The pre-JavaScript pricing document must use today's term structure too.
+  if (routeLabel === path.join("alphascreen", "pricing", "index.html")) {
+    // This is the existing no-JS content snapshot, not React's interactive dock.
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    if (![3, 6, 12].every(months => text.includes(`for ${months} months`))) {
+      errors.push(`${routeLabel}: initial pricing snapshot must describe 3/6/12 months`);
+    }
+    if (/\$299\b|\$599\b|\/mo platform|\/year platform/.test(html)) {
+      errors.push(`${routeLabel}: initial document contains obsolete fallback pricing`);
+    }
+  }
+
   for (const script of scriptTags) {
     const type = readAttr(script, "type");
     const src = readAttr(script, "src");

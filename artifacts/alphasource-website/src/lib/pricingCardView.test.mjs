@@ -15,9 +15,59 @@ const fragments=['PackageMetric','PlanCard','EnterpriseCard'].map(name=>ast.stat
 const js=ts.transpileModule(fragments,{compilerOptions:{jsx:ts.JsxEmit.React,module:ts.ModuleKind.CommonJS}}).outputText;
 const icon=()=>React.createElement('span');
 const {PlanCard,EnterpriseCard}=vm.runInNewContext(js+'\n({PlanCard,EnterpriseCard});',{
- React,membershipCardPricing,membershipMoney,formatUsd:n=>'$'+n,formatPlatformFee:()=>'$legacy',
+ React,membershipCardPricing,membershipMoney,formatUsd:n=>'$'+n,
  PLAN_ACCENTS:{basic:{color:'#02D99D'},pro:{color:'#A380F6'}},BEST_FOR:{basic:'Essential test',pro:'Pro test'},
  BriefcaseBusiness:icon,Layers3:icon,CheckCircle:icon,Clock3:icon,BadgeDollarSign:icon,ArrowRight:icon,Building2:icon,
+});
+test('initial and unavailable cards always render 3/6/12 terms without unverified legacy dollar amounts',()=>{
+ for(const plan_key of ['basic','pro'])for(const months of [3,6,12]){
+  const html=renderToStaticMarkup(React.createElement(PlanCard,{plan:{plan_key,display_name:plan_key==='basic'?'Essential':'Pro',
+   platform_monthly_fee:plan_key==='basic'?299:599,platform_annual_fee:3299,per_role_fee:399,
+   included_interviews_per_role:20,max_interview_minutes:10,additional_interview_fee:25},
+   selected:false,onStart:()=>{},catalog:null,available:false,commitmentMonths:months}));
+  assert.match(html,new RegExp('>'+months+'</span>'));
+  assert.match(html,/>months<\/span>/);
+  assert.match(html,/Awaiting current pricing/);
+  assert.doesNotMatch(html,/\$\d|\/mo platform|\/year platform|Annual platform pricing/);
+  assert.match(html,/<button[^>]*disabled=""/);
+ }
+ const dock=source.slice(source.indexOf('<div className="pr-dock"'),source.indexOf('<section id="packages"'));
+ assert.match(dock,/\(\[3, 6, 12\] as const\)/);
+ assert.doesNotMatch(dock,/!retailCatalog|Monthly|Annual|updateSelectedBillingCadence/);
+});
+
+let loadDeclaration;
+function findLoader(node){if(ts.isFunctionDeclaration(node)&&node.name?.text==='loadPackages')loadDeclaration=node;ts.forEachChild(node,findLoader);}
+findLoader(ast);
+assert.ok(loadDeclaration);
+const loadJs=ts.transpileModule(loadDeclaration.getText(ast)+';loadPackages;',
+ {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+function loaderHarness(fetcher,verified){
+ const calls=[];
+ const loader=vm.runInNewContext(loadJs,{fetch:fetcher,verifiedPublicCatalog:verified,
+  controller:{signal:{aborted:false}},getPublicBackendBase:()=> 'https://synthetic.invalid',joinUrl:(a,b)=>a+b,
+  retailDisplayPackage:p=>({plan_key:p.plan_key}),FALLBACK_PACKAGES:[],
+  setRetailCatalog:x=>calls.push(['catalog',x]),setPackages:x=>calls.push(['packages',x]),setLoadState:x=>calls.push(['state',x])});
+ return{loader,calls};
+}
+test('actual loader stays pending during a delayed request and enables signup only for the verified term catalog',async()=>{
+ let release;
+ const pending=new Promise(resolve=>release=resolve),catalog=fixture();
+ const h=loaderHarness(()=>pending,()=>({catalog,packages:[]}));
+ const done=h.loader();assert.deepEqual(h.calls,[]);
+ release({ok:true,json:async()=>({})});await done;
+ assert.deepEqual(h.calls.filter(x=>x[0]==='state'),[['state','ready']]);
+ assert.equal(h.calls[0][1],catalog);
+});
+test('actual loader fails closed for offline, malformed and legacy-only catalogs',async()=>{
+ for(const mode of ['offline','malformed','legacy']){
+  const h=loaderHarness(async()=>{if(mode==='offline')throw Error('Synthetic offline');return{ok:true,json:async()=>({})};},
+   ()=>{if(mode==='malformed')throw Error('Synthetic malformed');return{catalog:null,packages:[{plan_key:'basic',platform_monthly_fee:299}]};});
+  await h.loader();
+  assert.deepEqual(h.calls.filter(x=>x[0]==='state'),[['state','fallback']]);
+  assert.equal(h.calls[0][1],null);
+  assert.ok(!h.calls.some(x=>x[0]==='state'&&x[1]==='ready'));
+ }
 });
 test('actual Enterprise card describes custom duration and both membership models without old scoring or duration claims',()=>{
  const html=renderToStaticMarkup(React.createElement(EnterpriseCard));
