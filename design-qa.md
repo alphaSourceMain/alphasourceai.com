@@ -1,4 +1,34 @@
-# Public Homepage Refresh — Design QA
+# B1 marketing reference port — CURRENT REVIEW, October19,2026
+
+Source truth: organization alphaSourceMain/alphasourceai.com reference3329ca801b63f9a7bad42668edef26c1b2bd3c9b, `design-reference/alphasource-b1/index.html`, b1-1440.png1440×4568 and b1-390.png390×7009. New feature branch off devb01584a. All older reports below are historical, not evidence for this release.
+
+Current result: local visual and interaction QA passed; exact-source release gate and DEV then QA hosted verification remain pending. No production frontend approval.
+
+Initial captures: `output/b1-redesign-20261019/build-desktop-initial.jpg`, `build-1440-pass2.jpg`, `mobile-menu.jpg` in parent QA workspace. Browser Chrome; normal100%zoom/1×density. Initial desktop capture1440content; scrollbar-hiding normalization was rejected and removed. Later captures must preserve normal scrollbars and record CSS viewport/content dimensions honestly.
+
+Independent Grok design HOLD preserved in `output/support-voice/2026-10-19-b1-design-grok.log`. All required source corrections completed: destination focus after menu links vs Escape restore, support-only query login and lifecycle, fixed home palette while preserving other-page themes, namespaced animation/no global scrollbar override, legal-style utility row, dismissible password setup status, true input labels/contrasting errors, proper header/main/footer landmarks, live-B1 test target. Exact-source re-review must confirm their disposition before deployment.
+
+Legacy tracked `src/pages/FaqPage 2.tsx` exists unchanged in baselineb01584a (blobd7b3e7e25fc1f1f3a13cca3de5ba85b495edcf51). It is not introduced/used by this patch; preserve owner baseline rather than deleting unrelated content. Ask Grok to review this finding disposition rather than silently claiming a deletion.
+
+Intentional integration additions requiring review: existing privacy disclosure beneath contact form; footer Client/Admin sign-in and Privacy choices; dismissible `setup=complete` status only when applicable. Reference stub links become working existing routes. Exact target copy/layout otherwise; no invented facts/assets/testimonials.
+
+Required fidelity surfaces examined together in full-view and focused comparisons: fonts/typography and wrapping, layout/spacing, reference colors, byte-identical transparent supplied images, and exact reference copy. Files in parent workspace `output/b1-redesign-20261019/`: `comparison-desktop-final-full.png`, `comparison-mobile-final-full.png`, and desktop/mobile `comparison-*-final-{hero,services,product,workflow-about,contact-footer}.png`. Each places target left and implementation right. Final mobile contact/footer comparison was regenerated after correcting input flex shrink; input54px/form497px now match target. Desktop form476.828px also matches target.
+
+Capture normalization: native browser has a6px vertical scrollbar. CSS viewports1446x1000 and396x844 produce content widths1440 and390. Native JPEG viewport tiles were rescaled uniformly back to CSS dimensions, only the6px browser gutter cropped, and stitched at observed scroll offsets. No app pixels were redrawn, no scrollbar hidden. All16 reveal elements were observed visible and settled; pointer placed in gutter to avoid hover transforms. Final output1440x4605 and390x7122 vs reference1440x4568 and390x7009. Added height is the preserved privacy disclosure/footer utilities, not an unexplained layout gap. P3 capture limitation: native JPEG color profile/compression softens screenshots relative to source PNG; source colors/fonts/assets are unchanged. Floating art can be at a different phase of the same animation.
+
+Interaction evidence: mobile solid menu, Tab/Shift-Tab wrap, Escape restores button focus, link closes to destination focus, desktop resize releases scroll lock; setup status Dismiss and Escape work; existing Client/Admin sign-in forms open through support-only links without submitting authentication. Local synthetic fixture verified native required-field validation, submitted success, rejection/error alert, partial-message omission and submitted-message inclusion. No email, CRM write or hosted form submission was performed. Console clean outside the intentional local400 error fixture. Other public routes retain existing shell/theme and forms.
+
+Local verification: typecheck/build pass,14 prerendered routes/15HTML integrity pass,223 frontend/library/sales tests pass0fail0skip,50 public route rules verified. Lighthouse13.5.0 local initial accessibility93/SEO100 identified heading order and inherited maximum-scale1: corrected footer headings without visual change and restored browser pinch zoom. Final/hosted Lighthouse results belong in release evidence, not inferred here. Existing large JS chunk warning is retained, not hidden or called a regression fix.
+
+No actionable P0/P1/P2 visual mismatch remains locally. Intentional integration additions and P3 screenshot transport limitations are disclosed above; this is not yet hosted acceptance.
+
+Exact-source follow-up: fixed a real menu effect-cleanup race by recording the hash destination and focusing only from the closed-menu effect, after the previous cleanup removes inert. Browser confirmed focus=contact/menu=false/body overflow restored. Prior image-omission HOLD was a diff-packet limitation: all3 PNGs were already tracked in9afc5de; git ls-tree and git-show SHA256 establish committed bytes, not merely local public files. Reference browser computed form Submit font is Arial15px/normal (body Raleway); retaining Arial is intentional exact-target fidelity, not an accidental font substitution. Final local Lighthouse accessibility100/SEO100; no failed scored audits.
+
+final result: passed
+
+---
+
+# HISTORICAL Public Homepage Refresh — Design QA
 
 ## Evidence
 

@@ -4,6 +4,7 @@ import { getLeadDraftId, hasUsableContact, saveLeadDraft, type LeadDraftFields }
 import { trackEvent } from "@/lib/analytics";
 
 type LeadCaptureFormProps = {
+  variant?: "b1";
   formId: string;
   formType: "contact" | "demo";
   formTestId: string;
@@ -33,6 +34,7 @@ function fieldLabel(fieldName: keyof LeadDraftFields): string {
 }
 
 export default function LeadCaptureForm({
+  variant,
   formId,
   formType,
   formTestId,
@@ -179,6 +181,7 @@ export default function LeadCaptureForm({
   };
 
   if (submitted) {
+    if (variant === "b1") return <div className="form-status" role="status"><h3>{successTitle}</h3><p>{successBody}</p></div>;
     return (
       <div className="h-full flex flex-col items-center justify-center text-center py-8">
         <div
@@ -196,6 +199,19 @@ export default function LeadCaptureForm({
       </div>
     );
   }
+
+  if (variant === "b1") return <>
+    <form ref={formRef} onSubmit={handleSubmit} data-testid={formTestId} aria-describedby={`${formId}-disclosure`}>
+      {([['first_name', 'First name', 'text', 'given-name'], ['last_name', 'Last name', 'text', 'family-name'], ['email', 'Email', 'email', 'email'], ['phone', 'Phone', 'tel', 'tel']] as const).map(([name, label, type, autoComplete]) => <label className="form-field" key={name} htmlFor={`${formId}-${name}`}>
+        <span className="visually-hidden">{label}</span>
+        <input id={`${formId}-${name}`} name={name} type={type} autoComplete={autoComplete} placeholder={label} required={name !== 'phone'} value={fields[name]} onChange={e => updateField(name, e.target.value)} onBlur={() => trackFieldBlur(name)} data-testid={`input-${name.replace('_', '-')}`} />
+      </label>)}
+      <label className="visually-hidden" htmlFor={`${formId}-message`}>How can we help?</label><textarea id={`${formId}-message`} name="message" className="full" rows={4} placeholder="How can we help?" value={fields.message || ''} onChange={e => updateField('message', e.target.value)} onBlur={() => trackFieldBlur('message')} data-testid="input-message" />
+      {submitError && <p className="form-error" role="alert">{submitError}</p>}
+      <button type="submit" className="btn btn-g full" data-testid="button-submit" data-analytics-cta={ctaLabel} data-analytics-placement={`${formId}-form`}>{ctaLabel}</button>
+    </form>
+    <p className="form-disclosure" id={`${formId}-disclosure`}>We may save the business contact details you enter so we can respond, help you finish this request, or prepare a future membership signup. Message details are saved only when you submit.</p>
+  </>;
 
   return (
     <>

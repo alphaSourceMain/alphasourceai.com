@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTrackingConsent } from "@/context/TrackingConsentContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -42,6 +42,19 @@ export default function Footer() {
   const { loginAdmin, adminLoginLoading, adminLoginError, clearAdminLoginError } = useAuth();
   const { openTrackingPreferences } = useTrackingConsent();
   const [location, setLocation]             = useLocation();
+  const queryLoginRef = useRef(false);
+  const search = useSearch();
+  useEffect(() => {
+    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && new URLSearchParams(window.location.search).get("signin") === "admin";
+    if (!matches) {
+      if (queryLoginRef.current) { setAdminLoginOpen(false); queryLoginRef.current = false; }
+      return;
+    }
+    queryLoginRef.current = true;
+    setAdminLoginOpen(true);
+    const frame = window.requestAnimationFrame(() => dropdownRef.current?.scrollIntoView({ block: "end" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [location, search]);
   const normalizedPath = String(location || "/").split("?")[0].replace(/\/$/, "") || "/";
   const showPatentNotice =
     normalizedPath !== "/" &&
@@ -109,7 +122,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="border-t border-[#A380F6]/25 bg-[#070E36] text-white">
+    <footer className="b1-footer border-t border-white/10 bg-[#050a1f] text-white">
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.25fr_0.72fr_0.92fr_1.05fr] lg:gap-12">
           {/* Brand */}
@@ -148,7 +161,7 @@ export default function Footer() {
 
           {/* Explore links */}
           <div>
-            <h4 className="mb-4 text-[11px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Explore</h4>
+            <h4 className="b1-foot-label mb-4">Explore</h4>
             <ul className="space-y-3">
               {EXPLORE_LINKS.map((link) => (
                 <li key={link.label}>
@@ -167,7 +180,7 @@ export default function Footer() {
 
           {/* Product links */}
           <div>
-            <h4 className="mb-4 text-[11px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Product</h4>
+            <h4 className="b1-foot-label mb-4">Product</h4>
             <ul className="space-y-3">
               {PRODUCT_LINKS.map((link) => (
                 <li key={link.label}>
@@ -188,13 +201,13 @@ export default function Footer() {
           <div>
             <div className="space-y-7">
               <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#A380F6]">Email us</p>
+                <p className="b1-foot-label mb-2">Email us</p>
                 <a href="mailto:info@alphasourceai.com" className="text-sm font-semibold text-white transition-colors hover:text-[#A380F6]">
                   info@alphasourceai.com
                 </a>
               </div>
               <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#A380F6]">AI Customer Support</p>
+                <p className="b1-foot-label mb-2">AI Customer Support</p>
                 <a
                   href={AI_SUPPORT_PHONE_URI}
                   aria-label={AI_SUPPORT_PHONE_LABEL}
@@ -309,8 +322,7 @@ export default function Footer() {
                     <button
                       type="submit"
                       disabled={adminLoginLoading}
-                      className="w-full py-2.5 text-sm font-bold text-white rounded-full transition-all hover:opacity-90 active:scale-[0.99]"
-                      style={{ backgroundColor: "#A380F6" }}
+                      className="b1-btn-g w-full py-2.5 text-sm font-bold"
                     >
                       {adminLoginLoading ? "Signing in..." : "Sign In"}
                     </button>

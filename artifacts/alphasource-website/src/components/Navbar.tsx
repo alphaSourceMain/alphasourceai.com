@@ -1,12 +1,11 @@
 import { useState, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Check, KeyRound, LogIn, Menu, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useAppearance } from "@/context/AppearanceContext";
 import { PASSKEYS_ENABLED, supabase } from "@/lib/supabaseClient";
 import { buildPwResetUrl } from "@/lib/urlConfig";
-import { alphaSourceLogo, alphaSourceLogoDark } from "@/assets/branding";
+import { alphaSourceLogoDark } from "@/assets/branding";
 import AppearanceSelector from "@/components/AppearanceSelector";
 
 export default function Navbar() {
@@ -27,14 +26,61 @@ export default function Navbar() {
   const setupSpotlightDescriptionId = useId();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const signInInFlightRef = useRef(false);
+  const mobileButtonRef = useRef<HTMLButtonElement>(null);
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
   const { login, loginWithPasskey, clientLoginLoading, clientLoginError } = useAuth();
-  const { resolvedMode } = useAppearance();
+  const queryLoginRef = useRef(false);
+  const search = useSearch();
+
+  useEffect(() => {
+    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && new URLSearchParams(window.location.search).get("signin") === "client";
+    if (!matches) {
+      if (queryLoginRef.current) { setMobileOpen(false); setLoginOpen(false); queryLoginRef.current = false; }
+      return;
+    }
+    queryLoginRef.current = true;
+    if (window.innerWidth < 1280) setMobileOpen(true);
+    else setLoginOpen(true);
+  }, [location, search]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const background = Array.from(document.querySelectorAll<HTMLElement>(".public-site-shell main, .public-site-shell footer, [data-testid=tracking-consent-banner]"))
+      .map(element => ({ element, inert: element.inert }));
+    background.forEach(({ element }) => { element.inert = true; });
+    const frame = window.requestAnimationFrame(() => mobilePanelRef.current?.querySelector<HTMLAnchorElement>("a")?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        mobileButtonRef.current?.focus();
+      }
+      if (event.key !== "Tab") return;
+      const controls = [mobileButtonRef.current, ...Array.from(mobilePanelRef.current?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)") || [])]
+        .filter((element): element is HTMLElement => !!element && !!element.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    const onResize = () => { if (window.innerWidth >= 1280) setMobileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      background.forEach(({ element, inert }) => { element.inert = inert; });
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [mobileOpen]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -165,11 +211,8 @@ export default function Navbar() {
     <>
       {pageDimOverlay}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 overflow-visible transition-all duration-300 ${
-          scrolled
-            ? "bg-white/95 backdrop-blur-md shadow-sm border-b border-[#DCE3F3] dark:bg-[#070E36]/95 dark:border-[#2A3568]"
-            : "bg-white/90 backdrop-blur-sm border-b border-transparent dark:bg-[#070E36]/90"
-        }`}
+        className={`b1-nav overflow-visible ${scrolled ? "shadow-[0_12px_40px_-24px_rgba(0,0,0,0.65)]" : ""}`}
+        aria-label="Main navigation"
       >
         {setupSpotlightVisible && (
           <button
@@ -179,36 +222,28 @@ export default function Navbar() {
             onClick={() => setSetupSpotlightVisible(false)}
           />
         )}
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-10 xl:px-[72px]">
-          <div className="flex items-center justify-between h-[88px]">
-            {/* Logo */}
+        <div className="b1-nav-inner">
+            {/* Logo — existing light artwork on the night bar. */}
             <Link
               href="/"
               className="flex items-center gap-0"
               data-testid="nav-logo"
             >
               <img
-                src={
-                  resolvedMode === "dark"
-                    ? alphaSourceLogoDark
-                    : alphaSourceLogo
-                }
+                src={alphaSourceLogoDark}
                 alt="alphaSource AI"
-                className="h-10 w-auto"
+                className="h-7 w-auto"
               />
             </Link>
 
             {/* Desktop Links */}
-            <div className="hidden xl:flex items-center gap-2">
+            <div className="b1-pillnav hidden xl:flex">
               {navLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
-                  className={`px-2.5 py-2 text-[13px] xl:px-3 xl:text-sm font-semibold rounded-lg transition-colors ${
-                    location === link.href
-                      ? "text-[#A380F6]"
-                      : "text-[#0A1547] hover:text-[#A380F6] dark:text-white/80 dark:hover:text-[#A380F6]"
-                  }`}
+                  className="transition-colors"
+                  aria-current={location === link.href ? "page" : undefined}
                   data-testid={`nav-link-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
                   data-analytics-cta={link.label}
                 data-analytics-placement="primary-nav"
@@ -230,10 +265,10 @@ export default function Navbar() {
                     if (setupSpotlightVisible) setSetupSpotlightVisible(false);
                     setLoginOpen(!loginOpen);
                   }}
-                  className={`relative h-10 px-4 text-sm font-semibold text-[#0A1547] border rounded-full transition-all duration-200 hover:border-[#A380F6] hover:text-[#A380F6] hover:shadow-sm active:scale-95 flex items-center gap-2 sm:px-5 dark:text-white dark:hover:text-[#A380F6] ${
+                  className={`b1-btn-g relative h-10 px-4 text-sm sm:px-5 ${
                     setupSpotlightVisible
-                      ? "border-[#A380F6] bg-white shadow-[0_0_0_6px_rgba(163,128,246,0.22),0_12px_28px_rgba(10,21,71,0.16)] dark:bg-[#111E57]"
-                      : "border-[#0A1547]/15 bg-white dark:border-[#A380F6]/45 dark:bg-[#111E57]"
+                      ? "shadow-[0_0_0_6px_rgba(25,227,177,0.28)]"
+                      : ""
                   }`}
                   data-testid="nav-login-button"
                   aria-describedby={
@@ -312,8 +347,7 @@ export default function Navbar() {
                       <button
                         type="submit"
                       disabled={clientLoginLoading || !email || !password}
-                      className="w-full py-2.5 text-sm font-semibold text-white rounded-full transition-all hover:opacity-90 active:scale-[0.99]"
-                      style={{ backgroundColor: "#A380F6" }}
+                      className="b1-btn-g w-full py-2.5 text-sm"
                     >
                       {clientLoginLoading ? "Signing in..." : "Sign In"}
                     </button>
@@ -378,14 +412,17 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-          </div>
+            </div>
 
             {/* Mobile hamburger */}
             <button
-              className={`xl:hidden p-2 rounded-lg text-[#0A1547] dark:text-white ${setupSpotlightVisible ? "hidden" : ""}`}
+              ref={mobileButtonRef}
+              className={`xl:hidden p-2 rounded-lg text-white ${setupSpotlightVisible ? "hidden" : ""}`}
               onClick={() => setMobileOpen(!mobileOpen)}
               data-testid="nav-mobile-menu-button"
-              aria-label="Toggle menu"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+              aria-controls="site-mobile-panel"
             >
               {mobileOpen ? (
                 <X aria-hidden="true" className="h-[22px] w-[22px]" />
@@ -393,12 +430,11 @@ export default function Navbar() {
                 <Menu aria-hidden="true" className="h-[22px] w-[22px]" />
               )}
             </button>
-          </div>
         </div>
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="xl:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-1 dark:bg-[#070E36] dark:border-[#2A3568]">
+          <div ref={mobilePanelRef} id="site-mobile-panel" role="dialog" aria-modal="true" aria-label="Navigation and client sign in" className="b1-mobile-panel xl:hidden">
             <div className="mb-3 px-3">
               <AppearanceSelector alwaysShowLabel />
             </div>
@@ -406,7 +442,7 @@ export default function Navbar() {
               <a
                 key={link.label}
                 href={link.href}
-                className="block px-3 py-2.5 text-sm font-medium text-[#0A1547] hover:text-[#A380F6] hover:bg-purple-50 rounded-lg transition-colors dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-[#A380F6]"
+                className="b1-mobile-link"
                 onClick={() => setMobileOpen(false)}
                 data-analytics-cta={link.label}
                 data-analytics-placement="mobile-nav"
@@ -439,8 +475,7 @@ export default function Navbar() {
                 <button
                   type="submit"
                 disabled={clientLoginLoading || !email || !password}
-                className="w-full py-2.5 text-sm font-semibold text-white rounded-full"
-                style={{ backgroundColor: "#A380F6" }}
+                className="b1-btn-g w-full py-2.5 text-sm"
               >
                 {clientLoginLoading ? "Signing in..." : "Sign In"}
               </button>

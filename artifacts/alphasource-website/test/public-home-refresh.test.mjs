@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -12,11 +13,12 @@ const appearance = read("src/components/AppearanceSelector.tsx");
 const navbar = read("src/components/Navbar.tsx");
 const footer = read("src/components/Footer.tsx");
 const styles = read("src/index.css");
-const home = read("src/pages/HomePage.tsx");
+const home = read("src/pages/B1HomePage.tsx");
+const b1 = read("src/pages/b1-home.css");
 const about = read("src/pages/AboutPage.tsx");
 const alphaScreen = read("src/pages/AlphaScreenPage.tsx");
 
-test("the full public site exposes the dashboard-style appearance contract", () => {
+test("non-home public routes retain appearance while approved B1 homepage stays fixed", () => {
   assert.match(appearance, /value: "light"/);
   assert.match(appearance, /value: "dark"/);
   assert.match(appearance, /value: "system"/);
@@ -24,9 +26,9 @@ test("the full public site exposes the dashboard-style appearance contract", () 
   assert.match(navbar, /<AppearanceSelector \/>/);
   assert.match(navbar, /<AppearanceSelector alwaysShowLabel \/>/);
   assert.doesNotMatch(navbar, /isHomePage && <AppearanceSelector/);
-  assert.match(app, /data-theme=\{resolvedMode\}/);
+  assert.match(app, /data-theme=\{isHomePage \? "light" : resolvedMode\}/);
   assert.match(app, /public-site-rest/);
-  assert.doesNotMatch(app, /resolvedMode : "light"/);
+  assert.match(app, /!isHomePage && resolvedMode === "dark"/);
 });
 
 test("approved rest-of-site treatment keeps the footer and theme provider-neutral", () => {
@@ -47,24 +49,54 @@ test("dark technology copy and how-it-works card sizing remain consistent", () =
   assert.match(alphaScreen, /min-h-\[10\.625rem\] h-full bg-white rounded-2xl/);
 });
 
-test("approved homepage structure keeps the continuous dark value band", () => {
-  assert.match(home, /function ValueBandSection\(\)/);
-  assert.match(home, /bg-\[#070E36\]/);
-  assert.match(home, /<HeroSection \/>\s*<ValueBandSection \/>\s*<PeopleDrivenSection \/>/);
-  assert.match(home, /dark:bg-\[#09133E\]/);
-  assert.match(home, /dark:bg-\[#0D1A4A\]/);
+test("live homepage follows approved B1 structure, supplied assets and exact copy", () => {
+  assert.match(app, /import HomePage from "@\/pages\/B1HomePage"/);
+  assert.match(home, /className="hero wrap"/);
+  assert.match(home, /className="stats"/);
+  assert.match(home, /<main id="home-content">/);
+  assert.match(home, /<\/main>\s*<footer>/);
+  assert.match(home, /Illustrative workflow/);
+  assert.match(home, /\/brand\/b1\/logo-light\.png/);
+  assert.match(home, /\/brand\/b1\/alpha\.png/);
+  assert.match(home, /Unleash your/);
+  assert.doesNotMatch(home, /dangerouslySetInnerHTML|<iframe/);
 });
 
-test("owner-approved hero and alphaScreen motion timings remain intact", () => {
-  assert.match(home, /animate=\{\{ y: \[0, -10, 0\] \}\}/);
-  assert.match(home, /duration: 5, repeat: Infinity/);
-  assert.match(home, /duration: 4\.5/);
-  assert.match(home, /duration: 3\.8/);
-  assert.match(home, /delay: 0\.2/);
-  assert.match(home, /delay: 0\.7/);
-  assert.match(home, /delay: 1\.2/);
-  assert.match(home, /delay: 1\.7/);
-  assert.match(home, /delay: 2\.2, duration: 0\.5/);
+test("B1 reference motion and mobile menu preserve reduced motion and focus boundaries", () => {
+  assert.match(b1, /animation:\s*b1-float 9s ease-in-out infinite/);
+  assert.match(b1, /@keyframes b1-float/);
+  assert.doesNotMatch(b1, /@keyframes float|html:has|scrollbar-width/);
+  assert.match(b1, /prefers-reduced-motion:\s*reduce/);
+  assert.match(home, /IntersectionObserver/);
+  assert.match(home, /inert=\{!menuOpen\}/);
+  assert.match(home, /event.key === "Escape"/);
+  assert.match(home, /event.key !== "Tab"/);
+  assert.match(home, /element.inert = inert/);
+  assert.match(home, /window.cancelAnimationFrame/);
+  assert.match(home, /if \(!menuOpen\) \{[\s\S]*?const destination = pendingDestination.current;[\s\S]*?document.getElementById\(destination\)\?\.focus/);
+  const closeHandler = home.slice(home.indexOf("const closeMenu ="), home.indexOf("  return (", home.indexOf("const closeMenu =")));
+  assert.match(closeHandler, /pendingDestination.current =/);
+  assert.doesNotMatch(closeHandler, /requestAnimationFrame|\.focus\(/);
+});
+
+test("B1 visual system covers shared chrome and the rest of the site", () => {
+  const site = read("src/b1-site.css");
+  const entry = read("src/main.tsx");
+  assert.match(entry, /import "\.\/b1-site\.css"/);
+  assert.doesNotMatch(read("index.html"), /class="b1-theme"/);
+  assert.match(site, /\.b1-public-scope \{[\s\S]*--b1-night/);
+  assert.doesNotMatch(site, /html|\.as-app-shell|--sidebar|--chart/);
+  assert.doesNotMatch(site, /:is\(aside, footer, nav\)/);
+  assert.match(site, /\.b1-footer a:hover \{\s*color: #fff !important/);
+  assert.match(app, /isDashboard \|\| isAdmin \|\| isSales \|\| location === "\/" \? content : <div className="b1-public-scope">/);
+  assert.match(read("src/pages/sales/SalesSignInPage.tsx"), /className="b1-public-scope/);
+  assert.match(site, /--b1-night: #050a1f/);
+  assert.match(site, /--b1-mint: #19e3b1/);
+  assert.match(site, /--b1-sky: #18b4f0/);
+  assert.match(site, /font-family: Sora/);
+  assert.match(navbar, /className=\{`b1-nav/);
+  assert.match(footer, /b1-footer/);
+  assert.match(styles, /\.dark \.gradient-hero-bg/);
 });
 
 test("public routes, contact form, and sign-in affordances remain wired", () => {
@@ -74,4 +106,15 @@ test("public routes, contact form, and sign-in affordances remain wired", () => 
   assert.match(home, /<LeadCaptureForm/);
   assert.match(home, /formId="home-contact"/);
   assert.match(navbar, /data-testid="nav-login-button"/);
+});
+
+test("signed-in global styles and boot HTML retain the accepted B1 baseline", () => {
+  const hash = path => createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex");
+  assert.equal(hash("src/index.css"), "cb500560a599cf1ed1a86b5fbeff5467e336b8b19db7392288d627439f01c57a");
+  assert.equal(hash("index.html"), "9d9209a12321e8930d33db6110156529f7f060fd0b40039752334c881ce5d9b8");
+  assert.doesNotMatch(read("src/pages/sales/SalesApp.tsx"), /b1-public-scope/);
+  assert.match(navbar, /document.body.style.overflow = "hidden"/);
+  assert.match(navbar, /document.body.style.overflow = previousOverflow/);
+  assert.match(navbar, /mobileButtonRef.current\?\.focus\(/);
+  assert.match(navbar, /event.key !== "Tab"/);
 });
