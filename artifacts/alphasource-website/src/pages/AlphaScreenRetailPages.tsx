@@ -22,7 +22,7 @@ import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 const EASE_OUT = "easeOut" as const;
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 1, y: 22 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,

@@ -14,6 +14,7 @@ import {
   Router as WouterRouter,
   useLocation,
 } from "wouter";
+import { MotionConfig } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -224,8 +225,8 @@ function PublicSiteShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={`public-site-shell min-h-screen ${isHomePage ? "public-site-home" : "public-site-rest"} ${!isHomePage && resolvedMode === "dark" ? "dark" : ""}`}
-      data-theme={isHomePage ? "light" : resolvedMode}
+      className={`public-site-shell min-h-screen ${isHomePage ? "public-site-home" : "public-site-rest"} ${resolvedMode === "dark" ? "dark" : ""}`}
+      data-theme={resolvedMode}
     >
       {children}
     </div>
@@ -642,9 +643,9 @@ function Router() {
   } else {
     content = (
       <AppearanceProvider>
-        <PublicSiteShell>
+        <MotionConfig reducedMotion="user"><PublicSiteShell>
           <div className="min-h-screen flex flex-col bg-[#f4f6fb] text-[#0A1547] transition-colors duration-300 dark:bg-[#050a1f] dark:text-white">
-            {location !== "/" && <Navbar />}
+            <Navbar />
             <PublicMain className="flex-1">
               <Switch>
           <Route path="/checkout/password-setup-preview/" component={PasswordSetupPreviewPage} />
@@ -685,10 +686,10 @@ function Router() {
           <Route component={NotFound} />
               </Switch>
             </PublicMain>
-            {location !== "/" && <Footer />}
+            <Footer />
             <TrackingConsentNotice visible />
           </div>
-        </PublicSiteShell>
+        </PublicSiteShell></MotionConfig>
       </AppearanceProvider>
     );
   }
@@ -698,7 +699,7 @@ function Router() {
       <Seo location={location} />
       <PageAnalytics location={location} />
       <IDPixelLoader location={location} />
-      {isDashboard || isAdmin || isSales || location === "/" ? content : <div className="b1-public-scope">{content}</div>}
+      {isDashboard || isAdmin || isSales || isInterview || isAutomationApproval || isAutomationDigestApproval ? content : <div className="b1-public-scope">{content}</div>}
     </>
   );
 }

@@ -18,64 +18,770 @@
     "/alphascreen/roi"
   ],
   "publicRedirects": [
-    { "source": "/about", "destination": "/about/", "status": 301 },
-    { "source": "/faq", "destination": "/faq/", "status": 301 },
-    { "source": "/support", "destination": "/support/", "status": 301 },
-    { "source": "/sales-sms-consent", "destination": "/sales-sms-consent/", "status": 301 },
-    { "source": "/privacy", "destination": "/privacy/", "status": 301 },
-    { "source": "/privacy-policy", "destination": "/privacy/", "status": 301 },
-    { "source": "/privacy-policy/", "destination": "/privacy/", "status": 301 },
-    { "source": "/terms", "destination": "/terms/", "status": 301 },
-    { "source": "/terms-and-conditions", "destination": "/terms/", "status": 301 },
-    { "source": "/terms-and-conditions/", "destination": "/terms/", "status": 301 },
-    { "source": "/alphascreen", "destination": "/alphascreen/", "status": 301 },
-    { "source": "/alphascreen/pricing", "destination": "/alphascreen/pricing/", "status": 301 },
-    { "source": "/alphascreen/how-it-works", "destination": "/alphascreen/how-it-works/", "status": 301 },
-    { "source": "/alphascreen/security", "destination": "/alphascreen/security/", "status": 301 },
-    { "source": "/alphascreen/candidate-experience", "destination": "/alphascreen/candidate-experience/", "status": 301 },
-    { "source": "/alphascreen/for-dental-groups", "destination": "/alphascreen/for-dental-groups/", "status": 301 },
-    { "source": "/alphascreen/roi", "destination": "/alphascreen/roi/", "status": 301 }
+    {
+      "source": "/about",
+      "destination": "/about/",
+      "status": 301
+    },
+    {
+      "source": "/faq",
+      "destination": "/faq/",
+      "status": 301
+    },
+    {
+      "source": "/support",
+      "destination": "/support/",
+      "status": 301
+    },
+    {
+      "source": "/sales-sms-consent",
+      "destination": "/sales-sms-consent/",
+      "status": 301
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy/",
+      "status": 301
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy/",
+      "status": 301
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/privacy/",
+      "status": 301
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/",
+      "status": 301
+    },
+    {
+      "source": "/terms-and-conditions",
+      "destination": "/terms/",
+      "status": 301
+    },
+    {
+      "source": "/terms-and-conditions/",
+      "destination": "/terms/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen",
+      "destination": "/alphascreen/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/pricing",
+      "destination": "/alphascreen/pricing/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/how-it-works",
+      "destination": "/alphascreen/how-it-works/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/security",
+      "destination": "/alphascreen/security/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/candidate-experience",
+      "destination": "/alphascreen/candidate-experience/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/for-dental-groups",
+      "destination": "/alphascreen/for-dental-groups/",
+      "status": 301
+    },
+    {
+      "source": "/alphascreen/roi",
+      "destination": "/alphascreen/roi/",
+      "status": 301
+    }
   ],
   "publicRewrites": [
-    { "source": "/about/", "destination": "/about/index.html", "status": 200 },
-    { "source": "/faq/", "destination": "/faq/index.html", "status": 200 },
-    { "source": "/support/", "destination": "/support/index.html", "status": 200 },
-    { "source": "/sales-sms-consent/", "destination": "/sales-sms-consent/index.html", "status": 200 },
-    { "source": "/privacy/", "destination": "/privacy/index.html", "status": 200 },
-    { "source": "/terms/", "destination": "/terms/index.html", "status": 200 },
-    { "source": "/alphascreen/", "destination": "/alphascreen/index.html", "status": 200 },
-    { "source": "/alphascreen/pricing/", "destination": "/alphascreen/pricing/index.html", "status": 200 },
-    { "source": "/alphascreen/how-it-works/", "destination": "/alphascreen/how-it-works/index.html", "status": 200 },
-    { "source": "/alphascreen/security/", "destination": "/alphascreen/security/index.html", "status": 200 },
-    { "source": "/alphascreen/candidate-experience/", "destination": "/alphascreen/candidate-experience/index.html", "status": 200 },
-    { "source": "/alphascreen/for-dental-groups/", "destination": "/alphascreen/for-dental-groups/index.html", "status": 200 },
-    { "source": "/alphascreen/roi/", "destination": "/alphascreen/roi/index.html", "status": 200 }
+    {
+      "source": "/about/",
+      "destination": "/about/index.html",
+      "status": 200
+    },
+    {
+      "source": "/faq/",
+      "destination": "/faq/index.html",
+      "status": 200
+    },
+    {
+      "source": "/support/",
+      "destination": "/support/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales-sms-consent/",
+      "destination": "/sales-sms-consent/index.html",
+      "status": 200
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/privacy/index.html",
+      "status": 200
+    },
+    {
+      "source": "/terms/",
+      "destination": "/terms/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/",
+      "destination": "/alphascreen/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/pricing/",
+      "destination": "/alphascreen/pricing/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/how-it-works/",
+      "destination": "/alphascreen/how-it-works/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/security/",
+      "destination": "/alphascreen/security/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/candidate-experience/",
+      "destination": "/alphascreen/candidate-experience/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/for-dental-groups/",
+      "destination": "/alphascreen/for-dental-groups/index.html",
+      "status": 200
+    },
+    {
+      "source": "/alphascreen/roi/",
+      "destination": "/alphascreen/roi/index.html",
+      "status": 200
+    }
   ],
   "spaShellRoutes": [
     "/checkout/subscription-success"
   ],
   "spaShellRewrites": [
-    { "source": "/checkout/subscription-success", "destination": "/checkout/subscription-success/index.html", "status": 200 },
-    { "source": "/checkout/subscription-success/", "destination": "/checkout/subscription-success/index.html", "status": 200 },
-    { "source": "/checkout/subscription-success/index.html", "destination": "/checkout/subscription-success/index.html", "status": 200 }
+    {
+      "source": "/checkout/subscription-success",
+      "destination": "/checkout/subscription-success/index.html",
+      "status": 200
+    },
+    {
+      "source": "/checkout/subscription-success/",
+      "destination": "/checkout/subscription-success/index.html",
+      "status": 200
+    },
+    {
+      "source": "/checkout/subscription-success/index.html",
+      "destination": "/checkout/subscription-success/index.html",
+      "status": 200
+    }
   ],
   "dynamicSpaRewrites": [
-    { "source": "/sales", "destination": "/index.html", "status": 200 },
-    { "source": "/sales/*", "destination": "/index.html", "status": 200 },
-    { "source": "/checkout/*", "destination": "/index.html", "status": 200 },
-    { "source": "/membership-agreement/*", "destination": "/index.html", "status": 200 },
-    { "source": "/pwreset", "destination": "/index.html", "status": 200 },
-    { "source": "/pwreset/", "destination": "/index.html", "status": 200 },
-    { "source": "/dashboard/*", "destination": "/index.html", "status": 200 },
-    { "source": "/admin/*", "destination": "/index.html", "status": 200 },
-    { "source": "/interview-access/*", "destination": "/index.html", "status": 200 },
-    { "source": "/interview/*", "destination": "/index.html", "status": 200 },
-    { "source": "/interview-host/*", "destination": "/index.html", "status": 200 },
-    { "source": "/text-interview/*", "destination": "/index.html", "status": 200 },
-    { "source": "/candidate/*", "destination": "/index.html", "status": 200 },
-    { "source": "/automation/*", "destination": "/index.html", "status": 200 },
-    { "source": "/accommodation/*", "destination": "/index.html", "status": 200 },
-    { "source": "/accommodation-request/*", "destination": "/index.html", "status": 200 }
+    {
+      "source": "/dashboard",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/roles",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/automation",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/candidates",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/members",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/billing",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/entities",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/profile",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/support",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/faq",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/metrics",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/interview-reliability",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sms-monitoring",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-analytics",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-purchases/playbook",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-purchases",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sales-payroll",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sales-team",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/clients",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/roles",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/candidates",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/role-config",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/automation",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/members",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/accommodations",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/billing",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/audit-logs",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/digest-approval/:token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/digest-approval",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/approval/:token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/approval",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation/:role_token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation-request/:role_token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation-request",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-access/:role_token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-host/:role_token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-host",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/text-interview/:token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/text-interview",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/membership-agreement/sign/:token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/membership-agreement/sign",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/sms-consent-evidence",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/terms",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/pwreset",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/pwreset/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-access",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-cvi",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-complete",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/live",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/complete",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/:role_token",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/checkout/password-setup-preview/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/checkout/password-setup-preview",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/home",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/home/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/new",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/new/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/enterprise",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/enterprise/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/deals/:id",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/deals/:id/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/sales/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/roles/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/automation/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/candidates/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/members/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/billing/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/entities/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/profile/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/support/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/dashboard/faq/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/metrics/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/interview-reliability/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sms-monitoring/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-analytics/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-purchases/playbook/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/public-purchases/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sales-payroll/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/sales-team/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/clients/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/roles/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/candidates/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/role-config/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/automation/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/members/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/accommodations/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/billing/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/admin/audit-logs/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/digest-approval/:token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/digest-approval/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/approval/:token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/automation/approval/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation/:role_token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation-request/:role_token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/accommodation-request/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-access/:role_token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-host/:role_token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-host/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/text-interview/:token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/text-interview/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/membership-agreement/sign/:token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/membership-agreement/sign/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/sms-consent-evidence/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/terms/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-access/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-cvi/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview-complete/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/live/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/complete/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/:role_token/",
+      "destination": "/index.html",
+      "status": 200
+    },
+    {
+      "source": "/interview/",
+      "destination": "/index.html",
+      "status": 200
+    }
   ],
-  "catchAll": { "source": "/*", "destination": "/index.html", "status": 200 }
+  "catchAll": null
 }

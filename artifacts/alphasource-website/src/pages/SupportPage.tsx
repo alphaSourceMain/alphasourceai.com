@@ -20,7 +20,7 @@ import {
 const EASE_OUT = "easeOut" as const;
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 1, y: 20 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,

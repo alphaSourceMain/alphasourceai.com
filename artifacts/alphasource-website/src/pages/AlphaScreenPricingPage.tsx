@@ -683,7 +683,7 @@ function PlanCard({
 
   return (
     <article
-      className="flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-transform hover:-translate-y-1"
+      className="b1-price-card flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-transform hover:-translate-y-1"
       style={{
         borderColor: plan.plan_key === "pro" ? accent.border : "rgba(10,21,71,0.10)",
         boxShadow: plan.plan_key === "pro" ? "0 18px 46px rgba(10,21,71,0.12)" : "0 10px 28px rgba(10,21,71,0.06)",
@@ -785,7 +785,7 @@ function PlanCard({
 
 function EnterpriseCard() {
   return (
-    <article className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
+    <article className="b1-price-card b1-price-enterprise b1-night-band flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#02ABE0]">Enterprise</p>
@@ -2213,7 +2213,7 @@ export default function AlphaScreenPricingPage() {
   };
 
   return (
-    <div className="bg-white">
+    <div className="b1-pricing-page bg-white">
       <section className="relative overflow-hidden bg-[#F8F9FD] pt-28">
         <div className="absolute inset-0 opacity-25" style={{
           backgroundImage: "radial-gradient(circle at 1px 1px, rgba(10,21,71,0.14) 1px, transparent 0)",

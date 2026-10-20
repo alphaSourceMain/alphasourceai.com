@@ -47,13 +47,16 @@ for (const privateDir of ["dashboard", "admin", "membership-agreement", "intervi
   }
 }
 
+const notFoundHtml = readRequiredFile(path.join(distRoot, "404.html"), "404 shell");
+assertIncludes(notFoundHtml, '<div id="root"', "404 React shell");
+if (manifest.catchAll) errors.push("Unknown routes must not be rewritten to HTTP 200.");
 const redirectRules = readRedirectRules();
 const expectedRules = [
   ...manifest.publicRedirects,
   ...manifest.publicRewrites,
   ...manifest.spaShellRewrites,
   ...manifest.dynamicSpaRewrites,
-  manifest.catchAll,
+  ...(manifest.catchAll ? [manifest.catchAll] : []),
 ].map(formatRouteRule);
 
 if (redirectRules.length !== expectedRules.length) {

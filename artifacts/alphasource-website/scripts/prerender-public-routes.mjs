@@ -543,6 +543,8 @@ for (const route of publicRoutes) {
 for (const route of routingManifest.spaShellRoutes) {
   writeSpaShellRoute(route);
 }
+// Unmatched paths are real host 404s; the React shell renders the public not-found page.
+fs.writeFileSync(path.join(distRoot, "404.html"), baseHtml);
 writeStaticRoutingFile();
 
 console.log(`Prerendered ${publicRoutes.length} public route HTML snapshots.`);
@@ -1045,7 +1047,7 @@ function writeStaticRoutingFile() {
     "",
     "# Authenticated and dynamic app routes remain client-rendered SPA routes.",
     ...routingManifest.dynamicSpaRewrites.map(formatRouteRule),
-    formatRouteRule(routingManifest.catchAll),
+    ...(routingManifest.catchAll ? [formatRouteRule(routingManifest.catchAll)] : []),
     "",
   ];
   fs.writeFileSync(path.join(distRoot, "_redirects"), lines.join("\n"));

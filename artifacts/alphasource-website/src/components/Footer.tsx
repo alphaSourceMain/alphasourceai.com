@@ -9,6 +9,7 @@ import {
   AI_SUPPORT_PHONE_LABEL,
   AI_SUPPORT_PHONE_URI,
 } from "@/lib/supportContact";
+import PublicSignInPanel from "@/components/PublicSignInPanel";
 import { alphaSourceLogoDark } from "@/assets/branding";
 
 const EXPLORE_LINKS = [
@@ -52,24 +53,13 @@ export default function Footer() {
     }
     queryLoginRef.current = true;
     setAdminLoginOpen(true);
-    const frame = window.requestAnimationFrame(() => dropdownRef.current?.scrollIntoView({ block: "end" }));
-    return () => window.cancelAnimationFrame(frame);
+
   }, [location, search]);
   const normalizedPath = String(location || "/").split("?")[0].replace(/\/$/, "") || "/";
   const showPatentNotice =
     normalizedPath !== "/" &&
     !normalizedPath.startsWith("/checkout") &&
     !normalizedPath.startsWith("/membership-agreement");
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setAdminLoginOpen(false);
-      }
-    };
-    if (adminLoginOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [adminLoginOpen]);
 
   const handleAdminSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,31 +263,14 @@ export default function Footer() {
                 Admin Login
               </button>
 
-              {adminLoginOpen && (
-                <div
-                  className="absolute right-0 bottom-full mb-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 z-50"
-                  style={{ fontFamily: "'Raleway', sans-serif" }}
-                >
-                  {/* Small arrow pointing down */}
-                  <div
-                    className="absolute bottom-[-6px] right-4 w-3 h-3 bg-white border-b border-r border-gray-100 rotate-45"
-                  />
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-black text-[#0A1547]">Admin Sign In</h3>
-                      <span
-                        className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"
-                        style={{ backgroundColor: "rgba(163,128,246,0.12)", color: "#7C5FCC" }}
-                      >
-                        Admin
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-[#0A1547]/45">Access the alphaSource admin dashboard</p>
-                  </div>
-
+              <PublicSignInPanel open={adminLoginOpen} onOpenChange={setAdminLoginOpen} title="Admin Sign In"
+                description="Access the alphaSource admin dashboard"
+                returnFocus={() => dropdownRef.current?.querySelector<HTMLButtonElement>("button")?.focus()}>
                   <form onSubmit={handleAdminSignIn} className="space-y-2.5">
                     <input
                       type="email"
+                      aria-label="Admin email address"
+                      autoComplete="username"
                       placeholder="Email address"
                       value={email}
                       onChange={(e) => {
@@ -311,6 +284,8 @@ export default function Footer() {
                     />
                     <input
                       type="password"
+                      aria-label="Admin password"
+                      autoComplete="current-password"
                       placeholder="Password"
                       value={password}
                       onChange={(e) => {
@@ -347,8 +322,7 @@ export default function Footer() {
                   {resetSuccess && (
                     <p className="mt-2 text-xs text-[#02D99D]">{resetSuccess}</p>
                   )}
-                </div>
-              )}
+              </PublicSignInPanel>
             </div>
           </div>
         </div>

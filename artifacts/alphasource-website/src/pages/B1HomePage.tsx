@@ -1,160 +1,19 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
-import { useTrackingConsent } from "@/context/TrackingConsentContext";
 import "./b1-home.css";
 
-const navigation = [
-  ["About", "#about"],
-  ["alphaScreen", "#screen"],
-  ["How it works", "#how"],
-  ["FAQ", "/faq"],
-];
-const explore = [
-  ["Home", "/"],
-  ["About us", "#about"],
-  ["alphaScreen", "#screen"],
-  ["Pricing", "/alphascreen/pricing"],
-  ["FAQ", "/faq"],
-  ["Support", "/support"],
-];
-const product = [
-  ["How it works", "#how"],
-  ["Security", "/alphascreen/security"],
-  ["Candidate experience", "/alphascreen/candidate-experience"],
-  ["Dental groups", "/alphascreen/for-dental-groups"],
-  ["ROI estimator", "/alphascreen/roi"],
-];
-
 export default function B1HomePage() {
-  const root = useRef<HTMLDivElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
-  const menuButton = useRef<HTMLButtonElement>(null);
-  const pendingDestination = useRef<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const { openTrackingPreferences } = useTrackingConsent();
   const [setupDismissed, setSetupDismissed] = useState(false);
-  const setupComplete =
-    !setupDismissed &&
-    typeof window !== "undefined" &&
+  const setupComplete = !setupDismissed && typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("setup") === "complete";
-
-  useEffect(() => {
-    // Match the reference's native anchors, restoring other routes' preference on exit.
-    const previous = document.documentElement.style.scrollBehavior;
-    document.documentElement.style.scrollBehavior = "auto";
-    return () => {
-      document.documentElement.style.scrollBehavior = previous;
-    };
-  }, []);
-
   useEffect(() => {
     if (!setupComplete) return;
-    const dismiss = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSetupDismissed(true);
-    };
+    const dismiss = (event: KeyboardEvent) => { if (event.key === "Escape") setSetupDismissed(true); };
     document.addEventListener("keydown", dismiss);
     return () => document.removeEventListener("keydown", dismiss);
   }, [setupComplete]);
-
-  useEffect(() => {
-    const elements = root.current?.querySelectorAll<HTMLElement>(".r");
-    if (!elements) return;
-    if (
-      typeof IntersectionObserver === "undefined" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      elements.forEach((element) => element.classList.add("in"));
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in");
-            observer.unobserve(entry.target);
-          }
-        }),
-      { threshold: 0.1 },
-    );
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      // React runs the previous menu effect's cleanup before this closed effect.
-      // Only then is the destination no longer inert and safe to focus.
-      const destination = pendingDestination.current;
-      pendingDestination.current = null;
-      if (!destination) return;
-      const frame = window.requestAnimationFrame(() =>
-        document.getElementById(destination)?.focus({ preventScroll: true }),
-      );
-      return () => window.cancelAnimationFrame(frame);
-    }
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const background = Array.from(
-      root.current?.querySelectorAll<HTMLElement>(
-        ".hero, section, .cta, footer",
-      ) || [],
-    ).map((element) => ({ element, inert: element.inert }));
-    background.forEach(({ element }) => {
-      element.inert = true;
-    });
-    const focusFrame = window.requestAnimationFrame(() =>
-      panel.current?.querySelector<HTMLAnchorElement>("a")?.focus(),
-    );
-    const close = () => {
-      setMenuOpen(false);
-      menuButton.current?.focus();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        close();
-      }
-      if (event.key !== "Tab") return;
-      const focusable = [
-        menuButton.current,
-        ...Array.from(
-          panel.current?.querySelectorAll<HTMLAnchorElement>("a") || [],
-        ),
-      ].filter(Boolean) as HTMLElement[];
-      const first = focusable[0],
-        last = focusable.at(-1);
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      }
-      if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    const onResize = () => {
-      if (window.innerWidth > 900) setMenuOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      background.forEach(({ element, inert }) => {
-        element.inert = inert;
-      });
-      document.body.style.overflow = originalOverflow;
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [menuOpen]);
-
-  const closeMenu = (event: MouseEvent<HTMLAnchorElement>) => {
-    const href = event.currentTarget.getAttribute("href");
-    pendingDestination.current = href?.startsWith("#") ? href.slice(1) : null;
-    setMenuOpen(false);
-  };
   return (
-    <div className="b1-home" ref={root}>
+    <div className="b1-home">
       {setupComplete && (
         <p className="setup-notice" role="status">
           Your password is set.{" "}
@@ -171,86 +30,9 @@ export default function B1HomePage() {
         </p>
       )}
       <div className="b1-dark">
-        <nav
-          aria-label="Main navigation"
-          className={menuOpen ? "menu-open" : undefined}
-        >
-          <div className="wrap">
-            <a href="/" aria-label="alphaSource AI home">
-              <img
-                src="/brand/b1/logo-light.png"
-                alt="alphaSource AI"
-                width="466"
-                height="120"
-                style={{ width: "auto" }}
-              />
-            </a>
-            <div className="pillnav">
-              {navigation.map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  data-analytics-cta={label}
-                  data-analytics-placement="primary-nav"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-            <div className="navr">
-              <a
-                className="btn btn-o"
-                href="#contact"
-                data-analytics-cta="Get in Touch"
-                data-analytics-placement="primary-nav"
-              >
-                Get in touch
-              </a>
-              <button
-                ref={menuButton}
-                type="button"
-                className="menu-btn"
-                aria-label={menuOpen ? "Close menu" : "Open menu"}
-                aria-expanded={menuOpen}
-                aria-controls="b1-mobile-panel"
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                <span />
-                <span />
-              </button>
-            </div>
-          </div>
-        </nav>
-        <div
-          ref={panel}
-          className={`mpanel${menuOpen ? " open" : ""}`}
-          id="b1-mobile-panel"
-          aria-label="Mobile navigation"
-          aria-hidden={!menuOpen}
-          inert={!menuOpen}
-        >
-          {navigation.map(([label, href]) => (
-            <a
-              key={label}
-              href={href}
-              onClick={closeMenu}
-              data-analytics-cta={label}
-              data-analytics-placement="mobile-nav"
-            >
-              {label}
-            </a>
-          ))}
-          <a className="btn btn-g" href="#contact" onClick={closeMenu}>
-            Get in touch →
-          </a>
-        </div>
         <header className="hero wrap">
           <div className="glow" />
           <img className="mark" src="/brand/b1/alpha.png" alt="" />
-          <span className="chip">
-            <i />
-            AI-powered solutions
-          </span>
           <h1>
             Unleash your <span className="gt">talent.</span>
           </h1>
@@ -270,7 +52,7 @@ export default function B1HomePage() {
             </a>
             <a
               className="btn btn-o"
-              href="#screen"
+              href="/alphascreen"
               data-testid="hero-cta-secondary"
               data-analytics-cta="Explore alphaScreen"
               data-analytics-placement="home-hero"
@@ -503,81 +285,6 @@ export default function B1HomePage() {
           </div>
         </div>
       </main>
-      <footer>
-        <div className="wrap">
-          <div className="fg">
-            <div>
-              <img
-                src="/brand/b1/logo-light.png"
-                alt="alphaSource AI"
-                style={{ height: 26 }}
-              />
-              <p style={{ marginTop: 16, maxWidth: "34ch" }}>
-                Agentic AI that enhances human judgment, helping teams reclaim
-                time and spot potential in every talent interaction.
-              </p>
-            </div>
-            <div>
-              <h3>Explore</h3>
-              {explore.map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  data-analytics-cta={label}
-                  data-analytics-placement="footer"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-            <div>
-              <h3>Product</h3>
-              {product.map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  data-analytics-cta={label}
-                  data-analytics-placement="footer"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-            <div>
-              <h3>Contact</h3>
-              <a href="mailto:info@alphasourceai.com">info@alphasourceai.com</a>
-              <a href="tel:+16055998008">
-                AI customer support · (605) 599-8008
-              </a>
-              <a
-                href="#contact"
-                style={{ color: "var(--mint)" }}
-                data-analytics-cta="Request a Demo"
-                data-analytics-placement="footer-contact"
-              >
-                Request a demo →
-              </a>
-            </div>
-          </div>
-          <div className="legal">
-            <span>
-              © {new Date().getFullYear()} alphaSource AI. All rights reserved.
-            </span>
-            <span>
-              <a href="/privacy/">Privacy policy</a>
-              <a href="/terms/">Terms &amp; conditions</a>
-              <a href="/sales-sms-consent/">SMS consent</a>
-            </span>
-          </div>
-          <div className="access-links">
-            <a href="/support?signin=client">Client sign in</a>
-            <a href="/support?signin=admin">Admin sign in</a>
-            <button type="button" onClick={openTrackingPreferences}>
-              Privacy choices
-            </button>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
