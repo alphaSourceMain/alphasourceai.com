@@ -12,6 +12,7 @@ test("one static pricing band replaces redundant hero and section header",()=>{
  assert.match(page,/<p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support\.<\/p>/);
  assert.match(page,/<AlphaScreenLockup treatment="teal" wordmarkTone="white"/);
  assert.match(page,/markClassName="h-10 w-10" wordmarkClassName="text-\[38px\]"/);
+ assert.match(css,/\.pr-band__wm \[data-alphascreen-wordmark\] \{ color: #fff !important; line-height: 1;/);
  assert.doesNotMatch(page,/AlphaScreenBreathingLockup|Start with the membership|Included interview volume|>Memberships<|pricing-hero/);
  assert.ok(page.indexOf('className="pr-dock"')<page.indexOf('id="packages"'));
  assert.equal((page.match(/setCardCommitmentMonths\(months\)/g)||[]).length,1);

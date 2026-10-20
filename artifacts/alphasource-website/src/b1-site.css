@@ -724,7 +724,7 @@
 }
 .b1-public-scope .pr-band__inner { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
 .b1-public-scope .pr-band__wm { display: flex; justify-content: center; margin-bottom: 14px; }
-.b1-public-scope .pr-band__wm [data-alphascreen-wordmark] { color: #fff !important; }
+.b1-public-scope .pr-band__wm [data-alphascreen-wordmark] { color: #fff !important; line-height: 1; }
 .b1-public-scope .b1-pricing-page .pr-band h1 {
   max-width: 860px; margin: 0 auto 12px; font-size: 52px; line-height: 1.05;
   font-weight: 900; letter-spacing: -.5px; color: #fff;
