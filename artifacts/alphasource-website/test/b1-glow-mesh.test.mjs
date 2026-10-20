@@ -43,13 +43,13 @@ test("mesh remains confined to approved hero, panels and public404 surfaces",()=
  assert.match(site,/\.b1-public-scope \.b1-mesh-panel::before/);
  assert.match(site,/z-index: -1; pointer-events: none/);
  assert.match(site,/opacity: \.10/);
- assert.doesNotMatch(site,/\.b1-night-band::before/);
+ assert.doesNotMatch(site,/\.b1-night-band::before\s*\{\s*content:\s*""/); // No generic mesh on every night band.
  assert.match(site,/\.b1-public-scope \.not-found-page \.text-8xl/);
  assert.match(site,/linear-gradient\(90deg,#22D3B6,#22B8E8\)/);
- assert.equal((home.match(/b1-mesh-panel/g)||[]).length,1);
- for(const name of ["AboutPage","AlphaScreenPage"])
-   assert.equal((read("src/pages/"+name+".tsx").match(/b1-mesh-panel/g)||[]).length,1);
- assert.equal((read("src/pages/AlphaScreenPricingPage.tsx").match(/b1-mesh-panel/g)||[]).length,2);
+ assert.equal((home.match(/b1-mesh-panel/g)||[]).length,3); // Meet, outer contact, unchanged inner demo.
+ assert.equal((read("src/pages/AboutPage.tsx").match(/b1-mesh-panel/g)||[]).length,1);
+ assert.equal((read("src/pages/AlphaScreenPage.tsx").match(/b1-mesh-panel/g)||[]).length,2); // Memberships plus enhanced demo.
+ assert.equal((read("src/pages/AlphaScreenPricingPage.tsx").match(/b1-mesh-panel/g)||[]).length,1); // Enterprise only, not contact.
 });
 test("desktop alpha is raised and centered beside the first title line without changing mobile rules",()=>{
  assert.match(home,/className="hero-title-first-line">Unleash your<\/span>/);

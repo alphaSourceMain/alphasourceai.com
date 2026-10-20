@@ -964,9 +964,9 @@
 .b1-home .card h3, .b1-home .c1 h3 { font-size: 24px; margin: 32px 0 14px; line-height: 1.3; }
 .b1-home .card p { line-height: 1.7; }
 .b1-home .card .ico { color: var(--as-accent); }
-.b1-home .c1 { background: var(--deep); color: #fff; justify-content: initial; }
-.b1-home .c1 p { color: var(--soft); }
-.b1-home .c1 .ico { color: #7ef0d0; }
+.b1-home .c1 { background: var(--as-surface); color: var(--ink); justify-content: initial; }
+.b1-home .c1 p { color: var(--ink2); }
+.b1-home .c1 .ico { color: var(--as-accent); }
 .b1-home .step { background: var(--as-surface); border-color: var(--as-border); padding: 30px; }
 .b1-home .step h3 { line-height: 1.4; }
 .b1-home .step p { line-height: 1.7; }

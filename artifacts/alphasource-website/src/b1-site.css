@@ -1,6 +1,11 @@
 /* Sitewide B1 presentation. The homepage keeps its own stylesheet. */
 
 .b1-public-scope {
+  --b1-lilac: #A380F6;
+  --b1-lilac-ink: #7657C8;
+  --b1-navy-page: #050a1f;
+  --b1-navy-card: #0b1336;
+  --b1-header-height: 85px; /* 84px inner row + the shared 1px border */
   --b1-night: #050a1f;
   --b1-deep: #0b1336;
   --b1-ink: #0a1547;
@@ -498,8 +503,8 @@
 }
 
 .b1-public-scope .dark {
-  --as-page: #050a1f;
-  --as-surface: #0b1336;
+  --as-page: var(--b1-navy-page);
+  --as-surface: var(--b1-navy-card);
   --as-surface-muted: #101946;
   --as-border: rgba(255,255,255,0.10);
   --as-text: #F8FAFC;
@@ -541,7 +546,7 @@
 .b1-public-scope .dark .gradient-hero-bg {
   background:
     radial-gradient(circle at 88% 0%, rgba(24, 180, 240, 0.24), transparent 36%),
-    linear-gradient(180deg, #050a1f 0%, #0b1336 100%);
+    var(--b1-navy-page);
 }
 
 .b1-public-scope .public-hero-gradient {
@@ -549,7 +554,7 @@
 }
 
 .b1-public-scope .dark .public-hero-gradient {
-  background: linear-gradient(90deg, #050a1f 0%, #0b1336 48%, #102044 100%);
+  background: var(--b1-navy-page);
 }
 
 .b1-public-scope .gradient-lilac-glow {
@@ -742,7 +747,7 @@
   display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid rgba(10,21,71,.1);
   border-radius: 16px; padding: 8px 8px 8px 18px; box-shadow: 0 10px 30px rgba(5,10,31,.25);
 }
-.b1-public-scope .pr-dock__label { font: 800 11px Inter,sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #087565; white-space: nowrap; }
+.b1-public-scope .pr-dock__label { font: 800 11px Inter,sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--b1-lilac-ink); white-space: nowrap; }
 /* Keep the existing toggle's light palette inside the dock in either theme. */
 .b1-public-scope .public-site-shell .b1-pricing-page .pr-dock > div { background: #f8f9fd !important; }
 .b1-public-scope .public-site-shell .b1-pricing-page .pr-dock button { white-space: nowrap; color: #4a5373 !important; }
@@ -752,7 +757,7 @@
 .b1-public-scope .b1-price-card { border-radius: 24px; padding: 30px; box-shadow: none !important; }
 .b1-public-scope .b1-price-card > p { min-height: 48px; }
 .b1-public-scope .b1-price-card > div:first-child { min-height: 80px; }
-.b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(button) { background: linear-gradient(120deg,#19e3b1,#18b4f0) !important; color: #050a1f !important; box-shadow: none !important; }
+.b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(button) { background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat, linear-gradient(120deg,#19e3b1,#18b4f0) !important; color: #050a1f !important; box-shadow: none !important; }
 .b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(a) { color: var(--as-text) !important; }
 .b1-public-scope .b1-price-card :is(p[style*="color"],div[style*="color"]) { color: var(--as-accent) !important; }
 .b1-public-scope .b1-price-enterprise :is(h2,p,span) { color: #f8fafc !important; }
@@ -762,8 +767,8 @@
 .b1-public-scope .b1-pricing-page #pricing-demo .b1-night-band p:first-child { color: #5eead4 !important; }
 .b1-public-scope .b1-alphascreen-page > section:first-child { padding-top: 0; }
 .b1-public-scope .b1-alphascreen-page > section:first-child > div:last-child { padding-top: 64px; padding-bottom: 64px; }
-.b1-public-scope .b1-patent-lockup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 0; }
-.b1-public-scope .b1-patent-lockup [data-testid="alphascreen-patent-subscript"] { position: static; margin: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--as-border); font-size: 11px; color: var(--as-accent); }
+.b1-public-scope .b1-patent-lockup { display: inline-flex; flex-wrap: nowrap; align-items: flex-end; gap: 10px; padding-bottom: 0; }
+.b1-public-scope .public-site-shell main .b1-screen-hero .b1-patent-lockup [data-testid="alphascreen-patent-subscript"] { position: static; align-self: flex-end; margin: 0 0 10px; padding: 0; border-radius: 0; border: 0; background: none; font-size: 11px; font-weight: 800; color: var(--b1-lilac) !important; }
 .b1-public-scope .b1-legal-page > div:first-child { padding-top: 64px; padding-bottom: 40px; }
 .b1-public-scope .b1-legal-page .b1-legal-section { margin-bottom: 24px; padding-bottom: 24px; }
 @media (max-width: 1279px) {
@@ -808,3 +813,119 @@
 .b1-public-scope .public-site-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 .b1-public-scope .public-site-shell main select { height: 48px; }
 .b1-public-scope .public-site-rest main > div > :is(section,header,div):first-child:is([class~="pt-28"],[class~="pt-32"],[class~="pt-16"]) { padding-top: 40px; }
+
+/* Add-on 2: public-only surfaces. Sections are the page; cards are the surface.
+   Specific hero treatments below retain radial accents, never a lighter navy fill. */
+.b1-public-scope .public-site-rest.dark main [class~="bg-[#F8F9FD]"],
+.b1-public-scope .public-site-rest.dark main [class~="bg-gray-50"] {
+  /* Override the existing public palette adapter, not signed-in global tokens.
+     Named section/root rules below distinguish page backgrounds from surfaces. */
+  background-color: var(--as-surface) !important;
+}
+.b1-public-scope .public-site-rest.dark main > [class~="min-h-screen"],
+.b1-public-scope .public-site-rest.dark main :is(.b1-page-section,.b1-legal-page,.b1-pricing-page,.not-found-page) {
+  background-color: var(--b1-navy-page) !important;
+}
+.b1-public-scope .public-site-rest.dark :is(.b1-price-card,.b1-demo-surface,.b1-contact-sales-card,.b1-story-card) {
+  background-color: var(--b1-navy-card) !important;
+  background-image: none !important;
+  border: 1px solid var(--as-border) !important;
+}
+.b1-public-scope .public-site-rest.dark main section > .absolute.gradient-lilac-glow { background-color: transparent; }
+.b1-public-scope .b1-patent-text { display: inline-block; padding: 0; border: 0; background: none; font-size: 12px; line-height: 1.5; font-weight: 700; color: var(--b1-lilac-ink); }
+.b1-public-scope .dark .b1-patent-text,
+.b1-public-scope .b1-patent-on-dark { color: var(--b1-lilac); }
+.b1-public-scope .b1-eyebrow { font-size: 12px; font-weight: 800; text-transform: uppercase !important; letter-spacing: .12em !important; color: var(--b1-lilac-ink); }
+.b1-public-scope .dark .b1-eyebrow,
+.b1-public-scope .b1-eyebrow-on-dark { color: var(--b1-lilac); }
+.b1-public-scope .b1-mesh-label {
+  display: inline-block; font-size: 20px; font-weight: 800; letter-spacing: .02em;
+  /* Both stops exceed AA on light surfaces (the suggested bright stops do not). */
+  background: linear-gradient(90deg,rgb(8 117 101 / .95),rgb(7 105 135 / .95)) 0 0 / 100% 100%,url(/brand/b1/mesh-text.svg) 0 0 / auto 100% repeat-x;
+  background-color: #043d41;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.b1-public-scope .dark .b1-mesh-label { background: url(/brand/b1/mesh-text.svg) 0 0 / auto 100% repeat-x,linear-gradient(90deg,#22D3B6,#22B8E8); -webkit-background-clip: text; background-clip: text; }
+.b1-public-scope .b1-mesh-top-right::before {
+  opacity: .11; -webkit-mask-image: radial-gradient(120% 90% at 100% 0%,#000,transparent 70%);
+  mask-image: radial-gradient(120% 90% at 100% 0%,#000,transparent 70%);
+}
+.b1-public-scope .b1-home-contact-mesh::before { opacity: .11; }
+.b1-public-scope .b1-screen-demo-mesh::before {
+  opacity: .15; background-size: 420px;
+  -webkit-mask-image: radial-gradient(140% 110% at 0% 100%,#000 0%,transparent 75%);
+  mask-image: radial-gradient(140% 110% at 0% 100%,#000 0%,transparent 75%);
+}
+.b1-public-scope .b1-screen-memberships::before {
+  opacity: .06; -webkit-mask-image: radial-gradient(100% 100% at 100% 0%,#000,transparent 70%);
+  mask-image: radial-gradient(100% 100% at 100% 0%,#000,transparent 70%);
+}
+.b1-public-scope #contact { scroll-margin-top: calc(var(--b1-header-height) + 16px); }
+.b1-public-scope .b1-workflow-lockup { position: relative; display: inline-flex; align-items: flex-end; gap: 10px; margin-bottom: 24px; }
+.b1-public-scope .b1-workflow-lockup .b1-patent-text { margin-bottom: 3px; font-size: 12px; white-space: nowrap; }
+.b1-public-scope .b1-workflow-hero [data-analytics-cta="Compare alphaScreen memberships"] {
+  background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat,linear-gradient(#0A1547,#0A1547);
+  background-blend-mode: soft-light,normal;
+  color: #fff !important; opacity: 1;
+}
+.b1-public-scope .b1-workflow-hero [data-analytics-cta="Compare alphaScreen memberships"]:is(:hover,:focus-visible,:active) {
+  background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat,linear-gradient(#0A1547,#0A1547); background-blend-mode: soft-light,normal; color: #fff !important; opacity: 1;
+}
+.b1-public-scope .b1-enterprise-contact,
+.b1-public-scope .b1-enterprise-contact:is(:focus-visible,:active) {
+  background: var(--b1-lilac) !important; color: var(--b1-navy-page) !important; border: 0;
+}
+.b1-public-scope .b1-enterprise-contact:hover { background: #956BF2 !important; }
+.b1-public-scope .b1-enterprise-contact svg { color: inherit; }
+.b1-public-scope .b1-pricing-page #pricing-demo .b1-night-band::before { content: none; }
+.b1-public-scope .b1-screen-hero,
+.b1-public-scope .public-site-rest.dark main section.b1-screen-hero {
+  background: radial-gradient(60% 120% at 90% 0%,rgba(24,180,240,.16),transparent 65%),radial-gradient(50% 100% at 0% 100%,rgba(150,115,235,.12),transparent 65%),var(--b1-navy-page) !important;
+  color: white;
+}
+.b1-public-scope .public-site-shell main .b1-screen-hero [data-alphascreen-wordmark],
+.b1-public-scope .public-site-shell main .b1-screen-hero .b1-screen-headline { color: white !important; }
+.b1-public-scope .public-site-shell main .b1-screen-hero .b1-screen-subline { color: var(--b1-lilac) !important; }
+.b1-public-scope .public-site-shell main .b1-screen-hero .b1-screen-body { color: rgba(255,255,255,.72) !important; }
+.b1-public-scope .public-site-shell main .b1-screen-hero .b1-screen-date { color: rgba(255,255,255,.5) !important; }
+.b1-public-scope .b1-screen-hero .b1-screen-pricing,
+.b1-public-scope .b1-screen-hero .b1-screen-pricing:is(:hover,:focus-visible,:active) {
+  background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat,var(--b1-g) !important;
+  color: #0A1547 !important;
+}
+.b1-public-scope .public-site-shell main .b1-screen-ghost,
+.b1-public-scope .public-site-shell main .b1-screen-ghost:is(:hover,:focus-visible,:active) {
+  background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.2); color: white !important;
+}
+.b1-public-scope .b1-video-card {
+  background: transparent; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(127,227,214,.35),0 0 28px rgba(127,227,214,.22),0 0 70px rgba(150,115,235,.28);
+}
+.b1-public-scope .b1-video-footer { background: rgba(255,255,255,.04); }
+.b1-public-scope .public-site-shell main .b1-video-footer p { color: rgba(255,255,255,.8) !important; }
+.b1-public-scope .public-site-shell main .b1-video-footer a { background: white !important; color: #0A1547 !important; border-color: transparent; }
+.b1-public-scope .b1-explore-links { color: var(--as-text-muted); font-size: 14px; }
+.b1-public-scope .b1-explore-links a { color: var(--as-text-muted); text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px; }
+.b1-public-scope .b1-explore-links a:is(:hover,:focus-visible) { text-decoration-color: var(--b1-lilac); }
+.b1-public-scope .b1-home .c1::after { content: none; }
+.b1-public-scope .b1-home .c1 .ico { background: none; }
+.b1-public-scope .b1-home .screen .b1-patent-text { margin-top: 10px; }
+@media (max-width: 768px) {
+  .b1-public-scope .b1-patent-lockup { position: relative; padding-bottom: 20px; }
+  .b1-public-scope .public-site-shell main .b1-screen-hero .b1-patent-lockup [data-testid="alphascreen-patent-subscript"] { position: absolute; right: 0; bottom: 0; margin: 0; }
+  .b1-public-scope .b1-video-card { box-shadow: 0 0 0 1px rgba(127,227,214,.35),0 0 28px rgba(127,227,214,.22),0 0 40px rgba(150,115,235,.28); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:has(.b1-public-scope .public-site-shell) { scroll-behavior: auto; }
+}
+
+/* Jason's follow-up: these four heroes remain navy in Light and Dark alike. */
+.b1-public-scope .public-site-shell main .b1-inner-dark-hero,
+.b1-public-scope .public-site-rest.dark main .b1-inner-dark-hero {
+  background: radial-gradient(60% 120% at 90% 0%,rgba(24,180,240,.16),transparent 65%),radial-gradient(50% 100% at 0% 100%,rgba(150,115,235,.12),transparent 65%),var(--b1-navy-page) !important;
+  color: #fff;
+}
+.b1-public-scope .b1-inner-dark-hero > :is(.gradient-hero-bg,.gradient-lilac-glow) { display: none; }
+.b1-public-scope .public-site-shell main .b1-inner-dark-hero :is(h1,[data-alphascreen-wordmark]) { color: #fff !important; }
+.b1-public-scope .public-site-shell main .b1-inner-dark-hero p { color: #c8d3e9 !important; }
+.b1-public-scope .public-site-shell main .b1-inner-dark-hero .b1-patent-text { color: var(--b1-lilac); }

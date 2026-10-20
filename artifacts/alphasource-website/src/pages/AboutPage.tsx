@@ -17,7 +17,7 @@ const fadeUp = {
 
 function HeroSection() {
   return (
-    <section className="relative pt-32 pb-20 overflow-hidden">
+    <section className="b1-page-section b1-inner-dark-hero relative pt-32 pb-20 overflow-hidden">
       <div className="absolute inset-0 gradient-hero-bg" />
       <div className="absolute inset-0 gradient-lilac-glow" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
@@ -27,10 +27,6 @@ function HeroSection() {
           transition={{ duration: 0.6 }}
           className="text-center max-w-3xl mx-auto"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#A380F6]/30 text-sm font-medium text-[#A380F6] mb-6 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#A380F6]" />
-            About Us
-          </div>
           <h1 className="text-5xl lg:text-6xl font-black text-[#0A1547] leading-[1.05] tracking-tight mb-6">
             Meet the alphaSource Team
           </h1>
@@ -62,7 +58,7 @@ function TeamSection() {
   ];
 
   return (
-    <section className="py-24 bg-white">
+    <section className="b1-page-section py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
           {team.map((member, i) => (
@@ -128,7 +124,7 @@ function MissionSection() {
   ];
 
   return (
-    <section className="py-24 bg-[#F8F9FD]">
+    <section className="b1-page-section py-24 bg-[#F8F9FD]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-start">
           <motion.div
@@ -137,7 +133,7 @@ function MissionSection() {
             viewport={{ once: true, amount: 0.3 }}
             variants={fadeUp}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#A380F6]/10 text-sm font-medium text-[#A380F6] mb-5">
+            <div className="b1-mesh-label mb-5">
               Our Mission
             </div>
             <h2 className="text-4xl font-black text-[#0A1547] leading-tight mb-6">
@@ -190,7 +186,7 @@ function MissionSection() {
 
 function StorySection() {
   return (
-    <section className="py-24 bg-white">
+    <section className="b1-page-section py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-[1fr_1fr] gap-10 lg:gap-16 items-start">
 
@@ -200,7 +196,7 @@ function StorySection() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.3 }}
             variants={fadeUp}
-            className="relative overflow-hidden rounded-3xl p-10 lg:p-12"
+            className="b1-story-card relative overflow-hidden rounded-3xl p-10 lg:p-12"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div
@@ -227,7 +223,7 @@ function StorySection() {
             custom={1}
             variants={fadeUp}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0A1547]/8 text-sm font-medium text-[#0A1547] mb-5">
+            <div className="b1-mesh-label mb-5">
               Our Story
             </div>
             <h2 className="text-4xl font-black text-[#0A1547] leading-tight mb-8">
@@ -274,7 +270,7 @@ function StorySection() {
 
 function TechnologySection() {
   return (
-    <section className="py-24 bg-[#F8F9FD]">
+    <section className="b1-page-section py-24 bg-[#F8F9FD]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <motion.div
@@ -283,7 +279,7 @@ function TechnologySection() {
             viewport={{ once: true, amount: 0.3 }}
             variants={fadeUp}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#A380F6]/10 text-sm font-medium text-[#A380F6] mb-5">
+            <div className="b1-mesh-label mb-5">
               Technology
             </div>
             <h2 className="text-4xl font-black text-[#0A1547] leading-tight mb-5">
@@ -341,7 +337,7 @@ function TechnologySection() {
 
 function CTASection() {
   return (
-    <section id="contact" className="py-24 bg-[#F8F9FD]">
+    <section id="contact" className="b1-page-section py-24 bg-[#F8F9FD]">
       <div className="max-w-5xl mx-auto px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -352,7 +348,7 @@ function CTASection() {
           style={{ boxShadow: "0 12px 48px rgba(10,21,71,0.13), 0 0 0 1px rgba(10,21,71,0.06)" }}
         >
           <div
-            className="b1-night-band b1-mesh-panel lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
+            className="b1-night-band b1-demo-surface b1-mesh-panel lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div>

@@ -13,8 +13,6 @@ import {
 } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { trackEvent } from "@/lib/analytics";
-import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
-import PatentPendingBadge from "@/components/PatentPendingBadge";
 import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 import { MembershipTermsSelector } from "@/components/MembershipTermsSelector";
@@ -803,7 +801,7 @@ function EnterpriseCard() {
         <div className="hidden min-h-11 lg:block" aria-hidden="true" />
         <a
           href="#pricing-demo"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-[#0A1547]"
+          className="b1-enterprise-contact flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black"
           data-analytics-cta="Talk to Sales"
           data-analytics-placement="pricing-enterprise"
           data-analytics-target="#pricing-demo"
@@ -2198,11 +2196,11 @@ export default function AlphaScreenPricingPage() {
         <div className="pr-band__inner">
           <div className="pr-band__wm">
             <AlphaScreenLockup treatment="teal" wordmarkTone="white" wordmarkWeight="extralight"
-              markClassName="h-10 w-10" wordmarkClassName="text-[38px]" />
+              markClassName="h-10 w-10" wordmarkClassName="text-[42px]" />
           </div>
           <h1 id="pricing-title">Choose the membership that fits your <span className="pr-gt">hiring needs.</span></h1>
           <p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.</p>
-          <div className="pr-band__meta"><PatentPendingBadge className="pr-pill" /><span>Last updated {PUBLIC_CONTENT_LAST_UPDATED}</span></div>
+          <div className="pr-band__meta"><span className="b1-patent-text b1-patent-on-dark">Patent Pending</span></div>
         </div>
         <div className="pr-dock" role="group" aria-label="Billing term">
           <span className="pr-dock__label">Billing term</span>
@@ -2218,7 +2216,7 @@ export default function AlphaScreenPricingPage() {
         </div>
       </section>
 
-      <section id="packages" className="bg-white py-16 lg:py-20">
+      <section id="packages" className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <LoadingNotice state={loadState} />
           <div className="grid gap-5 lg:grid-cols-3">
@@ -2317,7 +2315,7 @@ export default function AlphaScreenPricingPage() {
         </div>
       ) : null}
 
-      <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid gap-8">
             <div className="max-w-3xl">
@@ -2348,9 +2346,9 @@ export default function AlphaScreenPricingPage() {
         </div>
       </section>
 
-      <section id="pricing-demo" className="bg-white py-16 lg:py-20">
+      <section id="pricing-demo" className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto grid max-w-6xl gap-8 px-6 lg:grid-cols-[0.9fr_1fr] lg:items-start lg:px-8">
-          <div className="b1-night-band b1-mesh-panel rounded-3xl p-8 lg:p-10">
+          <div className="b1-night-band b1-contact-sales-card rounded-3xl p-8 lg:p-10">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Contact Sales</p>
             <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
               Need a custom rollout or Enterprise volume?

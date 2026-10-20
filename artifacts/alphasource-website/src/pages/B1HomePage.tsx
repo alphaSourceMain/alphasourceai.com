@@ -136,14 +136,12 @@ export default function B1HomePage() {
         </section>
         <section id="screen" tabIndex={-1} style={{ paddingTop: 0 }}>
           <div className="wrap">
-            <div className="screen r">
+            <div className="screen r b1-mesh-panel b1-mesh-top-right">
               <div>
-                <span className="badge">
-                  Featured solution · Patent pending
-                </span>
                 <h2 style={{ color: "#fff" }}>
                   Meet <span className="gt">alphaScreen</span>
                 </h2>
+                <span className="b1-patent-text b1-patent-on-dark">Patent pending</span>
                 <p>
                   Our AI-powered interview and candidate evaluation product for
                   teams that need a clearer, more consistent screening process.
@@ -255,7 +253,7 @@ export default function B1HomePage() {
             </div>
           </div>
         </section>
-        <div className="b1-dark cta" id="contact" tabIndex={-1}>
+        <div className="b1-dark cta b1-mesh-panel b1-home-contact-mesh" id="contact" tabIndex={-1}>
           <div
             className="glow"
             style={{ left: -200, right: "auto", top: -100 }}

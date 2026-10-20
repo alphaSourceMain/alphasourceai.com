@@ -23,14 +23,15 @@ test("one restrained reusable badge carries the approved visible claim", () => {
 });
 
 test("required product marketing placements keep one restrained notice per source surface", () => {
-  for (const source of [home, pricing, retail]) {
+  for (const source of [home, retail]) {
     assert.match(source, /import PatentPendingBadge from "@\/components\/PatentPendingBadge"/);
     assert.equal((source.match(/<PatentPendingBadge\b/g) || []).length, 1);
   }
   assert.doesNotMatch(alphaScreen, /import PatentPendingBadge|<PatentPendingBadge\b|AI Interview Agent/);
   assert.match(alphaScreen, /data-testid="alphascreen-patent-subscript"[\s\S]*Patent Pending/);
   assert.match(home, /alphaScreen[\s\S]*<PatentPendingBadge className="min-h-6/);
-  assert.match(pricing, /<AlphaScreenLockup[\s\S]*<PatentPendingBadge className="pr-pill"/);
+  assert.match(pricing, /<AlphaScreenLockup[\s\S]*<span className="b1-patent-text b1-patent-on-dark">Patent Pending<\/span>/);
+  assert.doesNotMatch(pricing, /PatentPendingBadge/);
   assert.match(retail, /\{eyebrow\}[\s\S]*<PatentPendingBadge/);
 });
 

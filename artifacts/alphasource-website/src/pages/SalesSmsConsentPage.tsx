@@ -71,7 +71,7 @@ export default function SalesSmsConsentPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-[#0A1547] p-7 text-white sm:p-9">
+        <section className="b1-demo-surface rounded-3xl bg-[#0A1547] p-7 text-white sm:p-9">
           <h2 className="text-xl font-black">Business and policy information</h2>
           <div className="mt-5 grid gap-5 text-sm font-semibold leading-relaxed text-white/75 sm:grid-cols-2">
             <div>

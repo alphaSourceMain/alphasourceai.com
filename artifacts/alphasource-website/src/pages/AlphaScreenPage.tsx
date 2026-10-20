@@ -17,15 +17,7 @@ const fadeUp = {
 
 function HeroSection() {
   return (
-    <section className="relative pt-16 overflow-hidden">
-      <div className="absolute inset-0 gradient-hero-bg" />
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(24,180,240,0.18) 1px, transparent 0)`,
-          backgroundSize: "40px 40px",
-        }}
-      />
+    <section className="b1-page-section b1-screen-hero relative pt-16 overflow-hidden">
 
       <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-20 lg:py-24 w-full">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-start lg:gap-16">
@@ -57,8 +49,7 @@ function HeroSection() {
               initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.6 }}
-              className="text-2xl font-semibold mb-5"
-              style={{ color: "#A380F6" }}
+              className="b1-screen-headline text-2xl font-semibold mb-5"
             >
               Providing a clearer picture of more candidates.
             </motion.p>
@@ -67,7 +58,7 @@ function HeroSection() {
               initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
-              className="text-lg text-[#0A1547]/60 leading-relaxed mb-4"
+              className="b1-screen-subline text-lg leading-relaxed mb-4"
             >
               Freeing up your time to focus on what you do best.
             </motion.p>
@@ -76,7 +67,7 @@ function HeroSection() {
               initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.6 }}
-              className="text-base text-[#0A1547]/50 leading-relaxed mb-8"
+              className="b1-screen-body text-base leading-relaxed mb-8"
             >
               A membership-based AI interview agent that lets you create job roles and conduct automated screening interviews with AI avatars. The platform leverages advanced AI to comprehensively evaluate candidates — with flexible scheduling so candidates can interview anytime, day or night.
             </motion.p>
@@ -85,7 +76,7 @@ function HeroSection() {
               initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.27, duration: 0.6 }}
-              className="mb-8 text-sm font-semibold text-[#0A1547]/42"
+              className="b1-screen-date mb-8 text-sm font-semibold"
             >
               Last updated {PUBLIC_CONTENT_LAST_UPDATED}
             </motion.p>
@@ -98,8 +89,7 @@ function HeroSection() {
             >
               <a
                 href="/alphascreen/pricing"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-white rounded-full transition-all hover:opacity-90 hover:shadow-lg active:scale-95"
-                style={{ backgroundColor: "#A380F6" }}
+                className="b1-screen-pricing b1-mesh-button inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold rounded-full"
                 data-testid="alphascreen-view-pricing"
                 data-analytics-cta="View Pricing"
                 data-analytics-placement="alphascreen-hero"
@@ -109,7 +99,7 @@ function HeroSection() {
               </a>
               <a
                 href="#how-it-works"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-6 py-3.5 text-base font-semibold text-[#0A1547] transition-all hover:border-[#A380F6] hover:text-[#A380F6] hover:shadow-sm active:scale-95"
+                className="b1-screen-ghost inline-flex items-center justify-center gap-2 rounded-full border px-6 py-3.5 text-base font-semibold"
                 data-testid="alphascreen-how-it-works"
                 data-analytics-cta="See how it works"
                 data-analytics-placement="alphascreen-hero"
@@ -127,19 +117,8 @@ function HeroSection() {
             className="lg:mt-4"
           >
             <div
-              className="bg-white rounded-2xl overflow-hidden"
-              style={{ boxShadow: "0 24px 64px rgba(10,21,71,0.14), 0 0 0 1px rgba(10,21,71,0.06)" }}
+              className="b1-video-card"
             >
-              <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center gap-3">
-                <div className="flex gap-1.5 flex-shrink-0">
-                  <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
-                  <div className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
-                  <div className="w-3 h-3 rounded-full bg-[#28C840]" />
-                </div>
-                <div className="flex-1 text-center">
-                  <span className="text-xs font-semibold text-gray-400">alphaScreen Demo</span>
-                </div>
-              </div>
               <video
                 src="/alphascreen-demo.mp4"
                 autoPlay
@@ -148,7 +127,7 @@ function HeroSection() {
                 playsInline
                 className="w-full block"
               />
-              <div className="flex flex-col gap-3 border-t border-[#0A1547]/8 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="b1-video-footer flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-semibold leading-relaxed text-[#0A1547]/55">
                   Want to see it with your hiring workflow?
                 </p>
@@ -207,7 +186,7 @@ function DirectAnswerSection() {
   ];
 
   return (
-    <section className="bg-[#F8F9FD] py-16 lg:py-20">
+    <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -264,12 +243,13 @@ function DirectAnswerSection() {
           </a>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="b1-explore-links mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="font-bold">Explore alphaScreen</span>
           {relatedLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="rounded-full border border-[#0A1547]/10 bg-white px-3 py-2 text-xs font-black text-[#0A1547]/65 transition-colors hover:border-[#A380F6]/45 hover:text-[#A380F6]"
+              className="text-sm font-semibold"
               data-analytics-cta={link.label}
               data-analytics-placement="alphascreen-direct-answers"
             >
@@ -297,7 +277,7 @@ function PricingSignupSection() {
   ];
 
   return (
-    <section className="bg-white py-16 lg:py-20">
+    <section className="b1-page-section b1-screen-memberships b1-mesh-panel bg-white py-16 lg:py-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
           <motion.div
@@ -379,7 +359,7 @@ function PricingSignupSection() {
 
 function SmartSection() {
   return (
-    <section className="b1-night-band py-24 bg-[#0A1547]">
+    <section className="b1-page-section b1-night-band py-24 bg-[#0A1547]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
@@ -445,7 +425,7 @@ function SmartSection() {
             variants={fadeUp}
             className="order-2"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-sm font-medium text-white mb-6">
+            <div className="b1-eyebrow b1-eyebrow-on-dark mb-6">
               Smart
             </div>
             <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-5">
@@ -467,7 +447,7 @@ function SmartSection() {
 
 function AboutAlphaScreenSection() {
   return (
-    <section className="py-24 bg-white">
+    <section className="b1-page-section py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <motion.div
@@ -476,7 +456,7 @@ function AboutAlphaScreenSection() {
             viewport={{ once: true, amount: 0.3 }}
             variants={fadeUp}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#A380F6]/10 text-sm font-medium text-[#A380F6] mb-5">
+            <div className="b1-eyebrow mb-5">
               About alphaScreen
             </div>
             <h2 className="text-4xl lg:text-5xl font-black text-[#0A1547] leading-tight mb-5">
@@ -601,7 +581,7 @@ function HowItWorksSection() {
   ];
 
   return (
-    <section id="how-it-works" className="py-24 bg-[#F8F9FD]">
+    <section id="how-it-works" className="b1-page-section py-24 bg-[#F8F9FD]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -610,7 +590,7 @@ function HowItWorksSection() {
           variants={fadeUp}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0A1547]/8 text-sm font-medium text-[#0A1547] mb-5">
+          <div className="b1-eyebrow mb-5">
             How It Works
           </div>
           <h2 className="text-4xl lg:text-5xl font-black text-[#0A1547] leading-tight">
@@ -661,7 +641,7 @@ function HowItWorksSection() {
 
 function DemoSection() {
   return (
-    <section id="request-demo" className="py-24 bg-white">
+    <section id="request-demo" className="b1-page-section py-24 bg-white">
       <div className="max-w-5xl mx-auto px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -672,7 +652,7 @@ function DemoSection() {
           style={{ boxShadow: "0 12px 48px rgba(10,21,71,0.13), 0 0 0 1px rgba(10,21,71,0.06)" }}
         >
           <div
-            className="b1-night-band b1-mesh-panel lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
+            className="b1-night-band b1-demo-surface b1-mesh-panel b1-screen-demo-mesh lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div>

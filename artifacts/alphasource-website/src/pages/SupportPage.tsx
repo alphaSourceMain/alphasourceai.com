@@ -38,7 +38,7 @@ const supportLinks = [
 export default function SupportPage() {
   return (
     <div className="min-h-screen bg-[#F8F9FD]">
-      <section className="relative overflow-hidden pt-32 pb-16">
+      <section className="b1-inner-dark-hero relative overflow-hidden pt-32 pb-16">
         <div className="absolute inset-0 gradient-hero-bg" />
         <div className="relative mx-auto max-w-5xl px-6 lg:px-8">
           <motion.div initial="hidden" animate="visible" variants={fadeUp}>

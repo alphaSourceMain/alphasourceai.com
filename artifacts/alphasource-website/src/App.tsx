@@ -25,6 +25,7 @@ import { TrackingConsentProvider } from "@/context/TrackingConsentContext";
 import { ClientProvider } from "@/context/ClientContext";
 import { AdminClientProvider } from "@/context/AdminClientContext";
 import Navbar from "@/components/Navbar";
+import { mountPublicHashScroll } from "@/lib/publicHashScroll.mjs";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
 import PageAnalytics from "@/components/PageAnalytics";
@@ -222,6 +223,7 @@ function PublicSiteShell({ children }: { children: ReactNode }) {
   const { resolvedMode } = useAppearance();
   const [location] = useLocation();
   const isHomePage = location === "/";
+  useEffect(() => mountPublicHashScroll(window, document), [location]);
 
   return (
     <div

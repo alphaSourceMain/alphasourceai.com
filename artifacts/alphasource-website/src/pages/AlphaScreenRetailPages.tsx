@@ -79,14 +79,16 @@ function PageHero({
   title,
   body,
   children,
+  workflow = false,
 }: {
   eyebrow: string;
   title: string;
   body: string;
   children?: ReactNode;
+  workflow?: boolean;
 }) {
   return (
-    <section className="relative overflow-hidden bg-[#F8F9FD] pt-28">
+    <section className={`b1-page-section relative overflow-hidden bg-[#F8F9FD] pt-28 ${workflow ? "b1-workflow-hero b1-inner-dark-hero" : ""}`}>
       <div
         className="absolute inset-0 opacity-25"
         style={{
@@ -96,12 +98,16 @@ function PageHero({
       />
       <div className="relative mx-auto max-w-7xl px-6 pb-14 pt-10 lg:px-8 lg:pb-18">
         <motion.div initial="hidden" animate="visible" variants={fadeUp} className="max-w-4xl">
+          <div className={workflow ? "b1-workflow-lockup" : "contents"}>
           <AlphaScreenLockup
             treatment="gradient"
-            className="mb-6"
+            className={workflow ? "" : "mb-6"}
             markClassName="h-10 w-10"
             wordmarkClassName="text-2xl"
           />
+          {workflow && <span className="b1-patent-text">Patent Pending</span>}
+          </div>
+          {!workflow && <>
           <div className="mb-6 flex flex-wrap items-center gap-2">
             <span className="inline-flex min-h-7 items-center gap-2 rounded-full border border-[#A380F6]/25 bg-white px-3 py-1.5 text-sm font-bold text-[#A380F6] shadow-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-[#02D99D]" />
@@ -109,6 +115,7 @@ function PageHero({
             </span>
             <PatentPendingBadge />
           </div>
+          </>}
           <h1 className="max-w-4xl text-4xl font-black leading-[1.05] tracking-normal text-[#0A1547] lg:text-6xl">
             {title}
           </h1>
@@ -130,7 +137,7 @@ function CtaRow() {
         data-analytics-cta="Compare alphaScreen memberships"
         data-analytics-placement="alphascreen-retail-page"
       >
-        Compare memberships
+        <span>Compare memberships</span>
         <ArrowRight className="h-4 w-4" />
       </a>
       <a
@@ -147,7 +154,7 @@ function CtaRow() {
 
 function RelatedLinks({ current }: { current: string }) {
   return (
-    <section className="bg-white py-12">
+    <section className="b1-page-section bg-white py-12">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-5">
           <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#A380F6]">Related alphaScreen pages</p>
@@ -219,6 +226,7 @@ export function AlphaScreenHowItWorksPage() {
   return (
     <div className="bg-white">
       <PageHero
+        workflow
         eyebrow="alphaScreen workflow"
         title="How alphaScreen self-serve signup and screening work."
         body="A simple public workflow for moving from membership selection to structured candidate review, while keeping agreement review, payment, setup, and hiring decisions clear."
@@ -226,7 +234,7 @@ export function AlphaScreenHowItWorksPage() {
         <CtaRow />
       </PageHero>
 
-      <section className="bg-white py-16 lg:py-20">
+      <section className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Step by step</p>
@@ -249,7 +257,7 @@ export function AlphaScreenHowItWorksPage() {
         </div>
       </section>
 
-      <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">After signup</p>
@@ -285,7 +293,7 @@ export function AlphaScreenSecurityPage() {
         <CtaRow />
       </PageHero>
 
-      <section className="bg-white py-16 lg:py-20">
+      <section className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">What alphaScreen handles</p>
@@ -304,7 +312,7 @@ export function AlphaScreenSecurityPage() {
         </div>
       </section>
 
-      <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
             <div>
@@ -333,7 +341,7 @@ export function AlphaScreenSecurityPage() {
         </div>
       </section>
 
-      <section className="bg-white py-12">
+      <section className="b1-page-section bg-white py-12">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6">
             <h2 className="text-2xl font-black text-[#0A1547]">Need a security or privacy answer before buying?</h2>
@@ -364,7 +372,7 @@ export function AlphaScreenCandidateExperiencePage() {
         <CtaRow />
       </PageHero>
 
-      <section className="bg-white py-16 lg:py-20">
+      <section className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Candidate journey</p>
@@ -382,7 +390,7 @@ export function AlphaScreenCandidateExperiencePage() {
         </div>
       </section>
 
-      <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Buyer questions</p>
@@ -416,7 +424,7 @@ export function AlphaScreenDentalGroupsPage() {
         <CtaRow />
       </PageHero>
 
-      <section className="bg-white py-16 lg:py-20">
+      <section className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Strong fit use case</p>
@@ -435,7 +443,7 @@ export function AlphaScreenDentalGroupsPage() {
         </div>
       </section>
 
-      <section className="bg-[#F8F9FD] py-16 lg:py-20">
+      <section className="b1-page-section bg-[#F8F9FD] py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
             <div>
@@ -533,7 +541,7 @@ export function AlphaScreenRoiPage() {
         <CtaRow />
       </PageHero>
 
-      <section className="bg-white py-16 lg:py-20">
+      <section className="b1-page-section bg-white py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid items-stretch gap-8 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-6">
