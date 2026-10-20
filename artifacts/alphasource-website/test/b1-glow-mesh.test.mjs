@@ -50,3 +50,9 @@ test("mesh remains confined to approved hero, panels and public404 surfaces",()=
  for(const name of ["AboutPage","AlphaScreenPage","AlphaScreenPricingPage"])
    assert.equal((read("src/pages/"+name+".tsx").match(/b1-mesh-panel/g)||[]).length,1);
 });
+test("desktop alpha is raised and centered beside the first title line without changing mobile rules",()=>{
+ assert.match(home,/className="hero-title-first-line">Unleash your<\/span>/);
+ assert.match(css,/@media \(min-width: 901px\) \{\s*\.b1-home \.as-alpha \{[\s\S]*--hero-title-edge:[\s\S]*left: calc\(\(100% \+ var\(--hero-title-edge\)\) \/ 2 - 200px\);\s*right: auto;\s*top: 100px;/);
+ assert.match(css,/width: 220px;\s*right: -40px;\s*top: 96px;\s*opacity: 0.28/);
+ assert.doesNotMatch(home,/ResizeObserver|useLayoutEffect/);
+});

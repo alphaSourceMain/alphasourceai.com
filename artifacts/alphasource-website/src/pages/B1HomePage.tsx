@@ -40,7 +40,7 @@ export default function B1HomePage() {
             <img className="as-alpha-mark" src="/brand/b1/alpha-v4.svg" alt="" fetchPriority="high" />
           </div>
           <h1>
-            Unleash your <span className="gt">talent.</span>
+            <span className="hero-title-first-line">Unleash your</span>{" "}<span className="gt">talent.</span>
           </h1>
           <p>
             Custom AI tools that give your team hours back. We don't replace

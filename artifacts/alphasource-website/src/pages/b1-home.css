@@ -1015,6 +1015,16 @@
   .b1-home .as-alpha-sweep { display: none; }
   .b1-home .as-alpha-glow--base { opacity: .4; }
 }
+@media (min-width: 901px) {
+  .b1-home .as-alpha {
+    /* Center the mark in the space between the Sora title line and the viewport edge.
+       The line is 6.32em at the existing responsive heading size; no resize JS or motion. */
+    --hero-title-edge: calc(max(0px, (100% - 1240px) / 2) + 6.32 * clamp(48px, 7vw, 100px));
+    left: calc((100% + var(--hero-title-edge)) / 2 - 200px);
+    right: auto;
+    top: 100px;
+  }
+}
 .b1-home .access-links { color: #b3c0dd; }
 @media (max-width: 900px) {
   .b1-home .hero { padding-top: 64px; }
