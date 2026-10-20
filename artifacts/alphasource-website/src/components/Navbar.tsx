@@ -26,6 +26,8 @@ export default function Navbar() {
   const setupSpotlightDescriptionId = useId();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const signInInFlightRef = useRef(false);
+  const mobileButtonRef = useRef<HTMLButtonElement>(null);
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
   const { login, loginWithPasskey, clientLoginLoading, clientLoginError } = useAuth();
   const queryLoginRef = useRef(false);
   const search = useSearch();
@@ -49,11 +51,35 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!mobileOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const background = Array.from(document.querySelectorAll<HTMLElement>(".public-site-shell main, .public-site-shell footer, [data-testid=tracking-consent-banner]"))
+      .map(element => ({ element, inert: element.inert }));
+    background.forEach(({ element }) => { element.inert = true; });
+    const frame = window.requestAnimationFrame(() => mobilePanelRef.current?.querySelector<HTMLAnchorElement>("a")?.focus());
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        mobileButtonRef.current?.focus();
+      }
+      if (event.key !== "Tab") return;
+      const controls = [mobileButtonRef.current, ...Array.from(mobilePanelRef.current?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)") || [])]
+        .filter((element): element is HTMLElement => !!element && !!element.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     };
+    const onResize = () => { if (window.innerWidth >= 1280) setMobileOpen(false); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      background.forEach(({ element, inert }) => { element.inert = inert; });
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
   }, [mobileOpen]);
 
   useEffect(() => {
@@ -390,6 +416,7 @@ export default function Navbar() {
 
             {/* Mobile hamburger */}
             <button
+              ref={mobileButtonRef}
               className={`xl:hidden p-2 rounded-lg text-white ${setupSpotlightVisible ? "hidden" : ""}`}
               onClick={() => setMobileOpen(!mobileOpen)}
               data-testid="nav-mobile-menu-button"
@@ -407,7 +434,7 @@ export default function Navbar() {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div id="site-mobile-panel" className="b1-mobile-panel xl:hidden">
+          <div ref={mobilePanelRef} id="site-mobile-panel" role="dialog" aria-modal="true" aria-label="Navigation and client sign in" className="b1-mobile-panel xl:hidden">
             <div className="mb-3 px-3">
               <AppearanceSelector alwaysShowLabel />
             </div>

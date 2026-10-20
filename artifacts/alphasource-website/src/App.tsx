@@ -698,7 +698,7 @@ function Router() {
       <Seo location={location} />
       <PageAnalytics location={location} />
       <IDPixelLoader location={location} />
-      {content}
+      {isDashboard || isAdmin || isSales || location === "/" ? content : <div className="b1-public-scope">{content}</div>}
     </>
   );
 }

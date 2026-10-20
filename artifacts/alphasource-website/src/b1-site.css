@@ -1,6 +1,6 @@
 /* Sitewide B1 presentation. The homepage keeps its own stylesheet. */
 
-html.b1-theme {
+.b1-public-scope {
   --b1-night: #050a1f;
   --b1-deep: #0b1336;
   --b1-ink: #0a1547;
@@ -13,205 +13,185 @@ html.b1-theme {
   --b1-g: linear-gradient(120deg, #19e3b1, #18b4f0);
 }
 
-html.b1-theme body {
+.b1-public-scope {
   font-family: Raleway, system-ui, sans-serif;
   background: var(--b1-mist);
 }
 
-html.b1-theme :where(h1, h2, h3, h4) {
+.b1-public-scope :where(h1, h2, h3, h4) {
   font-family: Sora, Raleway, sans-serif;
   letter-spacing: -0.03em;
 }
 
-html.b1-theme .b1-home :where(h1, h2, h3, h4) {
-  font-family: Sora, sans-serif;
-}
-
-html.b1-theme .public-site-rest {
+.b1-public-scope .public-site-rest {
   background: var(--b1-mist);
   color: var(--b1-ink);
 }
 
-html.b1-theme .public-site-rest.dark {
+.b1-public-scope .public-site-rest.dark {
   background: var(--b1-night);
   color: #fff;
 }
 
-html.b1-theme .public-site-rest:not(.dark) main,
-html.b1-theme .public-site-rest:not(.dark) .flex-1 {
+.b1-public-scope .public-site-rest:not(.dark) main,
+.b1-public-scope .public-site-rest:not(.dark) .flex-1 {
   background: var(--b1-mist);
 }
 
-html.b1-theme .bg-\[\#F8F9FD\],
-html.b1-theme .bg-\[\#F4F6FB\] {
+.b1-public-scope .bg-\[\#F8F9FD\],
+.b1-public-scope .bg-\[\#F4F6FB\] {
   background-color: var(--b1-mist) !important;
 }
 
-html.b1-theme .dark .bg-\[\#F8F9FD\],
-html.b1-theme .dark .bg-\[\#F4F6FB\] {
+.b1-public-scope .dark .bg-\[\#F8F9FD\],
+.b1-public-scope .dark .bg-\[\#F4F6FB\] {
   background-color: var(--b1-deep) !important;
 }
 
-html.b1-theme .public-site-rest:not(.dark) main :where([class~="rounded-2xl"], [class~="rounded-xl"]).bg-white,
-html.b1-theme .public-site-rest:not(.dark) main :where([class~="rounded-2xl"][class~="bg-white"], [class~="rounded-3xl"][class~="bg-white"]) {
+.b1-public-scope .public-site-rest:not(.dark) main :where([class~="rounded-2xl"], [class~="rounded-xl"]).bg-white,
+.b1-public-scope .public-site-rest:not(.dark) main :where([class~="rounded-2xl"][class~="bg-white"], [class~="rounded-3xl"][class~="bg-white"]) {
   border-color: var(--b1-line);
   border-radius: 24px;
 }
 
-html.b1-theme .as-app-shell > aside,
-html.b1-theme .as-app-shell aside.fixed {
-  background-color: var(--b1-night) !important;
-  border-right-color: rgba(255, 255, 255, 0.08) !important;
+.b1-public-scope .text-\[\#A380F6\],
+.b1-public-scope .text-\[\#7C5FCC\],
+.b1-public-scope .text-\[\#8B68E8\],
+.b1-public-scope .text-\[\#5D43CC\],
+.b1-public-scope .text-\[\#7251c5\],
+.b1-public-scope .text-\[\#7252C7\],
+.b1-public-scope .text-\[\#7554CE\],
+.b1-public-scope .text-\[\#7554ce\],
+.b1-public-scope .text-\[\#6B4FC0\],
+.b1-public-scope .text-\[\#3F2B96\],
+.b1-public-scope .text-\[\#653bd5\],
+.b1-public-scope .text-\[\#7655cc\],
+.b1-public-scope .text-\[\#926dea\] {
+  color: #076987 !important;
 }
 
-html.b1-theme .text-\[\#A380F6\],
-html.b1-theme .text-\[\#7C5FCC\],
-html.b1-theme .text-\[\#8B68E8\],
-html.b1-theme .text-\[\#5D43CC\],
-html.b1-theme .text-\[\#7251c5\],
-html.b1-theme .text-\[\#7252C7\],
-html.b1-theme .text-\[\#7554CE\],
-html.b1-theme .text-\[\#7554ce\],
-html.b1-theme .text-\[\#6B4FC0\],
-html.b1-theme .text-\[\#3F2B96\],
-html.b1-theme .text-\[\#653bd5\],
-html.b1-theme .text-\[\#7655cc\],
-html.b1-theme .text-\[\#926dea\] {
-  color: #0b87b0 !important;
-}
-
-html.b1-theme .text-\[\#BBA4FF\] {
+.b1-public-scope .text-\[\#BBA4FF\] {
   color: #7ef0d0 !important;
 }
 
-html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#A380F6\],
-html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#7C5FCC\],
-html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#BBA4FF\] {
-  color: #8ef6dc !important;
+.b1-public-scope .hover\:text-\[\#A380F6\]:hover,
+.b1-public-scope .hover\:text-\[\#7C5FCC\]:hover {
+  color: #076987 !important;
 }
 
-html.b1-theme .hover\:text-\[\#A380F6\]:hover,
-html.b1-theme .hover\:text-\[\#7C5FCC\]:hover {
-  color: #0b87b0 !important;
-}
-
-html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .hover\:text-\[\#A380F6\]:hover {
-  color: #fff !important;
-}
-
-html.b1-theme .bg-\[\#A380F6\],
-html.b1-theme .bg-\[\#9272EB\],
-html.b1-theme .bg-\[\#9270E8\],
-html.b1-theme .bg-\[\#8060DC\],
-html.b1-theme .bg-\[\#7C5FCC\],
-html.b1-theme .bg-\[\#7252C7\],
-html.b1-theme .bg-\[\#6242B5\],
-html.b1-theme .bg-\[\#5D43CC\],
-html.b1-theme .hover\:bg-\[\#A380F6\]:hover,
-html.b1-theme .hover\:bg-\[\#9270E8\]:hover,
-html.b1-theme .hover\:bg-\[\#8060DC\]:hover,
-html.b1-theme .hover\:bg-\[\#6242B5\]:hover {
+.b1-public-scope .bg-\[\#A380F6\],
+.b1-public-scope .bg-\[\#9272EB\],
+.b1-public-scope .bg-\[\#9270E8\],
+.b1-public-scope .bg-\[\#8060DC\],
+.b1-public-scope .bg-\[\#7C5FCC\],
+.b1-public-scope .bg-\[\#7252C7\],
+.b1-public-scope .bg-\[\#6242B5\],
+.b1-public-scope .bg-\[\#5D43CC\],
+.b1-public-scope .hover\:bg-\[\#A380F6\]:hover,
+.b1-public-scope .hover\:bg-\[\#9270E8\]:hover,
+.b1-public-scope .hover\:bg-\[\#8060DC\]:hover,
+.b1-public-scope .hover\:bg-\[\#6242B5\]:hover {
   background-color: transparent !important;
   background-image: var(--b1-g) !important;
   color: var(--b1-night) !important;
 }
 
-html.b1-theme .bg-\[\#A380F6\]\/10,
-html.b1-theme .bg-\[\#A380F6\]\/8,
-html.b1-theme .bg-\[\#A380F6\]\/12,
-html.b1-theme .hover\:bg-\[\#A380F6\]\/10:hover,
-html.b1-theme .hover\:bg-\[\#A380F6\]\/20:hover {
+.b1-public-scope .bg-\[\#A380F6\]\/10,
+.b1-public-scope .bg-\[\#A380F6\]\/8,
+.b1-public-scope .bg-\[\#A380F6\]\/12,
+.b1-public-scope .hover\:bg-\[\#A380F6\]\/10:hover,
+.b1-public-scope .hover\:bg-\[\#A380F6\]\/20:hover {
   background-image: none !important;
   background-color: rgba(25, 227, 177, 0.14) !important;
   color: inherit !important;
 }
 
-html.b1-theme .bg-\[\#A380F6\]\/20,
-html.b1-theme .bg-\[\#A380F6\]\/25 {
+.b1-public-scope .bg-\[\#A380F6\]\/20,
+.b1-public-scope .bg-\[\#A380F6\]\/25 {
   background-image: none !important;
   background-color: rgba(24, 180, 240, 0.18) !important;
   color: inherit !important;
 }
 
-html.b1-theme .border-\[\#A380F6\],
-html.b1-theme .border-\[\#A380F6\]\/20,
-html.b1-theme .border-\[\#A380F6\]\/25,
-html.b1-theme .border-\[\#A380F6\]\/30,
-html.b1-theme .border-\[\#A380F6\]\/40,
-html.b1-theme .border-\[\#A380F6\]\/45,
-html.b1-theme .border-\[\#A380F6\]\/55,
-html.b1-theme .border-\[\#A380F6\]\/60,
-html.b1-theme .border-\[\#A380F6\]\/70,
-html.b1-theme .border-\[\#A380F6\]\/80,
-html.b1-theme .hover\:border-\[\#A380F6\]:hover,
-html.b1-theme .hover\:border-\[\#A380F6\]\/45:hover,
-html.b1-theme .hover\:border-\[\#A380F6\]\/55:hover,
-html.b1-theme .hover\:border-\[\#A380F6\]\/60:hover,
-html.b1-theme .hover\:border-\[\#A380F6\]\/70:hover,
-html.b1-theme .hover\:border-\[\#A380F6\]\/80:hover,
-html.b1-theme .focus\:border-\[\#A380F6\]:focus {
+.b1-public-scope .border-\[\#A380F6\],
+.b1-public-scope .border-\[\#A380F6\]\/20,
+.b1-public-scope .border-\[\#A380F6\]\/25,
+.b1-public-scope .border-\[\#A380F6\]\/30,
+.b1-public-scope .border-\[\#A380F6\]\/40,
+.b1-public-scope .border-\[\#A380F6\]\/45,
+.b1-public-scope .border-\[\#A380F6\]\/55,
+.b1-public-scope .border-\[\#A380F6\]\/60,
+.b1-public-scope .border-\[\#A380F6\]\/70,
+.b1-public-scope .border-\[\#A380F6\]\/80,
+.b1-public-scope .hover\:border-\[\#A380F6\]:hover,
+.b1-public-scope .hover\:border-\[\#A380F6\]\/45:hover,
+.b1-public-scope .hover\:border-\[\#A380F6\]\/55:hover,
+.b1-public-scope .hover\:border-\[\#A380F6\]\/60:hover,
+.b1-public-scope .hover\:border-\[\#A380F6\]\/70:hover,
+.b1-public-scope .hover\:border-\[\#A380F6\]\/80:hover,
+.b1-public-scope .focus\:border-\[\#A380F6\]:focus {
   border-color: rgba(24, 180, 240, 0.45) !important;
 }
 
-html.b1-theme .focus\:ring-\[\#A380F6\]\/25:focus,
-html.b1-theme .focus\:ring-\[\#A380F6\]\/30:focus,
-html.b1-theme .focus\:ring-\[\#A380F6\]\/35:focus,
-html.b1-theme .focus\:ring-\[\#A380F6\]\/40:focus,
-html.b1-theme .focus\:ring-\[\#A380F6\]\/45:focus,
-html.b1-theme .focus\:ring-\[\#A380F6\]\/60:focus,
-html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/40:focus-visible,
-html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/45:focus-visible,
-html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/60:focus-visible {
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/25:focus,
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/30:focus,
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/35:focus,
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/40:focus,
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/45:focus,
+.b1-public-scope .focus\:ring-\[\#A380F6\]\/60:focus,
+.b1-public-scope .focus-visible\:ring-\[\#A380F6\]\/40:focus-visible,
+.b1-public-scope .focus-visible\:ring-\[\#A380F6\]\/45:focus-visible,
+.b1-public-scope .focus-visible\:ring-\[\#A380F6\]\/60:focus-visible {
   --tw-ring-color: rgba(24, 180, 240, 0.45) !important;
 }
 
-html.b1-theme .hover\:bg-purple-50:hover,
-html.b1-theme .bg-purple-50 {
+.b1-public-scope .hover\:bg-purple-50:hover,
+.b1-public-scope .bg-purple-50 {
   background-color: rgba(25, 227, 177, 0.1) !important;
 }
 
-html.b1-theme [style*="background-color:#A380F6"],
-html.b1-theme [style*="background-color: #A380F6"],
-html.b1-theme [style*="background-color:#a380f6"],
-html.b1-theme [style*="background-color: rgb(163, 128, 246)"],
-html.b1-theme [style*="background-color:rgb(163, 128, 246)"] {
+.b1-public-scope [style*="background-color:#A380F6"],
+.b1-public-scope [style*="background-color: #A380F6"],
+.b1-public-scope [style*="background-color:#a380f6"],
+.b1-public-scope [style*="background-color: rgb(163, 128, 246)"],
+.b1-public-scope [style*="background-color:rgb(163, 128, 246)"] {
   background-color: transparent !important;
   background-image: var(--b1-g) !important;
   color: var(--b1-night) !important;
 }
 
-html.b1-theme [style*="color:#A380F6"],
-html.b1-theme [style*="color: #A380F6"],
-html.b1-theme [style*="color:#a380f6"],
-html.b1-theme [style*="color:#7C5FCC"],
-html.b1-theme [style*="color: #7C5FCC"],
-html.b1-theme [style*="color: rgb(163, 128, 246)"] {
-  color: #0b87b0 !important;
+.b1-public-scope [style*="color:#A380F6"],
+.b1-public-scope [style*="color: #A380F6"],
+.b1-public-scope [style*="color:#a380f6"],
+.b1-public-scope [style*="color:#7C5FCC"],
+.b1-public-scope [style*="color: #7C5FCC"],
+.b1-public-scope [style*="color: rgb(163, 128, 246)"] {
+  color: #076987 !important;
 }
 
-html.b1-theme .public-site-rest [class~="uppercase"] {
+.b1-public-scope .public-site-rest [class~="uppercase"] {
   text-transform: none;
   letter-spacing: -0.02em;
 }
 
-html.b1-theme :is(aside, footer, nav) [style*="color:#A380F6"],
-html.b1-theme :is(aside, footer, nav) [style*="color: #A380F6"] {
+.b1-public-scope :is(aside, footer, nav) [style*="color:#A380F6"],
+.b1-public-scope :is(aside, footer, nav) [style*="color: #A380F6"] {
   color: #8ef6dc !important;
 }
 
-html.b1-theme .bg-\[\#070E36\],
-html.b1-theme .bg-\[\#070D2E\],
-html.b1-theme .bg-\[\#071033\],
-html.b1-theme .bg-\[\#080E2E\],
-html.b1-theme .bg-\[\#111E57\],
-html.b1-theme .dark\:bg-\[\#070E36\],
-html.b1-theme .dark\:bg-\[\#080E2E\],
-html.b1-theme .dark\:bg-\[\#111E57\],
-html.b1-theme .dark\:bg-\[\#0D1A4A\] {
+.b1-public-scope .bg-\[\#070E36\],
+.b1-public-scope .bg-\[\#070D2E\],
+.b1-public-scope .bg-\[\#071033\],
+.b1-public-scope .bg-\[\#080E2E\],
+.b1-public-scope .bg-\[\#111E57\],
+.b1-public-scope .dark\:bg-\[\#070E36\],
+.b1-public-scope .dark\:bg-\[\#080E2E\],
+.b1-public-scope .dark\:bg-\[\#111E57\],
+.b1-public-scope .dark\:bg-\[\#0D1A4A\] {
   background-color: var(--b1-night) !important;
 }
 
-html.b1-theme .b1-nav {
+.b1-public-scope .b1-nav {
   position: fixed;
   inset: 0 0 auto;
   z-index: 50;
@@ -220,7 +200,7 @@ html.b1-theme .b1-nav {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-html.b1-theme .b1-nav .b1-nav-inner {
+.b1-public-scope .b1-nav .b1-nav-inner {
   max-width: 1240px;
   margin: 0 auto;
   padding: 0 32px;
@@ -231,12 +211,12 @@ html.b1-theme .b1-nav .b1-nav-inner {
   gap: 16px;
 }
 
-html.b1-theme .b1-nav img {
+.b1-public-scope .b1-nav img {
   height: 28px;
   width: auto;
 }
 
-html.b1-theme .b1-pillnav {
+.b1-public-scope .b1-pillnav {
   display: flex;
   gap: 4px;
   align-items: center;
@@ -246,7 +226,7 @@ html.b1-theme .b1-pillnav {
   padding: 5px;
 }
 
-html.b1-theme .b1-pillnav a {
+.b1-public-scope .b1-pillnav a {
   padding: 8px 14px;
   border-radius: 999px;
   font-size: 14px;
@@ -256,13 +236,13 @@ html.b1-theme .b1-pillnav a {
   background: transparent;
 }
 
-html.b1-theme .b1-pillnav a:hover,
-html.b1-theme .b1-pillnav a[aria-current="page"] {
+.b1-public-scope .b1-pillnav a:hover,
+.b1-public-scope .b1-pillnav a[aria-current="page"] {
   color: #fff !important;
   background: rgba(255, 255, 255, 0.08);
 }
 
-html.b1-theme .b1-btn-g {
+.b1-public-scope .b1-btn-g {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -276,11 +256,11 @@ html.b1-theme .b1-btn-g {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-html.b1-theme .b1-btn-g:hover {
+.b1-public-scope .b1-btn-g:hover {
   transform: translateY(-2px);
 }
 
-html.b1-theme .b1-nav button[aria-label^="Appearance"] {
+.b1-public-scope .b1-nav button[aria-label^="Appearance"] {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
   color: #fff !important;
@@ -288,7 +268,7 @@ html.b1-theme .b1-nav button[aria-label^="Appearance"] {
   box-shadow: none;
 }
 
-html.b1-theme .b1-mobile-panel {
+.b1-public-scope .b1-mobile-panel {
   position: fixed;
   inset: 84px 0 0;
   z-index: 40;
@@ -298,7 +278,7 @@ html.b1-theme .b1-mobile-panel {
   padding: 12px 28px 48px;
 }
 
-html.b1-theme .b1-mobile-panel .b1-mobile-link {
+.b1-public-scope .b1-mobile-panel .b1-mobile-link {
   display: block;
   padding: 16px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -311,18 +291,18 @@ html.b1-theme .b1-mobile-panel .b1-mobile-link {
   border-radius: 0;
 }
 
-html.b1-theme .b1-mobile-panel .b1-mobile-link:hover {
+.b1-public-scope .b1-mobile-panel .b1-mobile-link:hover {
   color: #fff !important;
 }
 
-html.b1-theme .b1-footer {
+.b1-public-scope .b1-footer {
   background: var(--b1-night) !important;
   color: var(--b1-soft);
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-html.b1-theme .b1-footer h4,
-html.b1-theme .b1-footer .b1-foot-label {
+.b1-public-scope .b1-footer h4,
+.b1-public-scope .b1-footer .b1-foot-label {
   font-family: Sora, sans-serif !important;
   letter-spacing: -0.02em !important;
   text-transform: none !important;
@@ -331,45 +311,322 @@ html.b1-theme .b1-footer .b1-foot-label {
   color: #fff !important;
 }
 
-html.b1-theme .b1-footer a {
+.b1-public-scope .b1-footer a {
   color: var(--b1-soft);
 }
 
-html.b1-theme .b1-footer a:hover {
+.b1-public-scope .b1-footer a:hover {
   color: #fff;
 }
 
-html.b1-theme .public-site-rest input,
-html.b1-theme .public-site-rest textarea,
-html.b1-theme .public-site-rest select,
-html.b1-theme .as-app-shell input,
-html.b1-theme .as-app-shell textarea,
-html.b1-theme .as-app-shell select {
+.b1-public-scope .public-site-rest input,
+.b1-public-scope .public-site-rest textarea,
+.b1-public-scope .public-site-rest select {
   font-family: Raleway, system-ui, sans-serif;
 }
 
-html.b1-theme .tracking-consent-surface {
+.b1-public-scope .tracking-consent-surface {
   background: #fff;
   border-color: var(--b1-line);
   color: var(--b1-ink);
 }
 
 @media (max-width: 1279px) {
-  html.b1-theme .b1-pillnav {
+  .b1-public-scope .b1-pillnav {
     display: none;
   }
 }
 
 @media (max-width: 720px) {
-  html.b1-theme .b1-nav .b1-nav-inner {
+  .b1-public-scope .b1-nav .b1-nav-inner {
     padding: 0 20px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.b1-theme .b1-btn-g,
-  html.b1-theme .b1-btn-g:hover {
+  .b1-public-scope .b1-btn-g,
+.b1-public-scope .b1-btn-g:hover {
     transition: none;
     transform: none;
   }
 }
+
+.b1-public-scope {
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+
+  /* Light page background */
+  --background: 220 33% 97%;
+  --foreground: 228 68% 16%;
+
+  --border: 220 20% 88%;
+  --input: 220 20% 88%;
+  --ring: 196 88% 52%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 228 68% 16%;
+  --card-border: 220 20% 90%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 228 68% 16%;
+  --popover-border: 220 20% 90%;
+
+  /* B1 mint/sky as primary */
+  --primary: 166 80% 49%;
+  --primary-foreground: 230 72% 7%;
+
+  --secondary: 220 33% 95%;
+  --secondary-foreground: 228 68% 16%;
+
+  --muted: 220 20% 93%;
+  --muted-foreground: 228 30% 45%;
+
+  --accent: 196 88% 52%;
+  --accent-foreground: 230 72% 7%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --app-font-sans: 'Raleway', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: Menlo, monospace;
+  --radius: 1rem;
+
+  --shadow-2xs: 0px 1px 2px 0px rgba(10,21,71, 0.06);
+  --shadow-xs: 0px 1px 3px 0px rgba(10,21,71, 0.08);
+  --shadow-sm: 0px 2px 4px 0px rgba(10,21,71, 0.07), 0px 1px 2px -1px rgba(10,21,71,0.04);
+  --shadow: 0px 4px 8px 0px rgba(10,21,71, 0.08), 0px 2px 4px -1px rgba(10,21,71,0.04);
+  --shadow-md: 0px 8px 16px 0px rgba(10,21,71, 0.09), 0px 4px 8px -2px rgba(10,21,71,0.05);
+  --shadow-lg: 0px 16px 32px 0px rgba(10,21,71, 0.10), 0px 8px 16px -4px rgba(10,21,71,0.06);
+  --shadow-xl: 0px 24px 48px 0px rgba(10,21,71, 0.12), 0px 12px 24px -6px rgba(10,21,71,0.07);
+  --shadow-2xl: 0px 40px 80px 0px rgba(10,21,71, 0.14);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+.b1-public-scope .dark {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  --background: 228 68% 10%;
+  --foreground: 210 40% 96%;
+
+  --border: 228 40% 20%;
+  --input: 228 40% 20%;
+  --ring: 196 88% 52%;
+
+  --card: 228 50% 13%;
+  --card-foreground: 210 40% 96%;
+  --card-border: 228 40% 22%;
+
+  --popover: 228 50% 13%;
+  --popover-foreground: 210 40% 96%;
+  --popover-border: 228 40% 22%;
+
+  --primary: 166 80% 49%;
+  --primary-foreground: 230 72% 7%;
+
+  --secondary: 228 40% 18%;
+  --secondary-foreground: 210 40% 96%;
+
+  --muted: 228 40% 16%;
+  --muted-foreground: 210 20% 65%;
+
+  --accent: 166 70% 62%;
+  --accent-foreground: 230 72% 7%;
+
+  --destructive: 0 62% 55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.3);
+  --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,0.35);
+  --shadow-sm: 0px 2px 4px 0px rgba(0,0,0,0.3), 0px 1px 2px -1px rgba(0,0,0,0.2);
+  --shadow: 0px 4px 8px 0px rgba(0,0,0,0.3), 0px 2px 4px -1px rgba(0,0,0,0.2);
+  --shadow-md: 0px 8px 16px 0px rgba(0,0,0,0.35), 0px 4px 8px -2px rgba(0,0,0,0.2);
+  --shadow-lg: 0px 16px 32px 0px rgba(0,0,0,0.4), 0px 8px 16px -4px rgba(0,0,0,0.25);
+  --shadow-xl: 0px 24px 48px 0px rgba(0,0,0,0.45), 0px 12px 24px -6px rgba(0,0,0,0.3);
+  --shadow-2xl: 0px 40px 80px 0px rgba(0,0,0,0.5);
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+.b1-public-scope {
+  --navy: #0A1547;
+  --navy-deep: #0b1336;
+  --lilac: #18b4f0;
+  --teal: #18b4f0;
+  --green: #19e3b1;
+  --white: #FFFFFF;
+
+  --as-page: #f4f6fb;
+  --as-surface: #FFFFFF;
+  --as-surface-muted: #f4f6fb;
+  --as-border: #e6e9f2;
+  --as-text: #0A1547;
+  --as-text-muted: #4a5373;
+  --as-text-subtle: rgba(10,21,71,0.38);
+  --as-accent: #076987;
+  --as-accent-soft: rgba(24,180,240,0.10);
+  --as-accent-soft-strong: rgba(25,227,177,0.18);
+  --as-hover: rgba(10,21,71,0.04);
+  --as-shadow: 0 24px 50px -24px rgba(10,21,71,0.18);
+
+  --alphascreen-navy: #0A1547;
+  --alphascreen-lilac: #18b4f0;
+  --alphascreen-cyan: #02ABE0;
+  --alphascreen-green: #02D99D;
+}
+
+.b1-public-scope .dark {
+  --as-page: #050a1f;
+  --as-surface: #0b1336;
+  --as-surface-muted: #101946;
+  --as-border: rgba(255,255,255,0.10);
+  --as-text: #F8FAFC;
+  --as-text-muted: #9fb0d3;
+  --as-text-subtle: rgba(159,176,211,0.55);
+  --as-accent: #7ef0d0;
+  --as-accent-soft: rgba(25,227,177,0.14);
+  --as-accent-soft-strong: rgba(24,180,240,0.22);
+  --as-hover: rgba(255,255,255,0.06);
+  --as-shadow: 0 18px 42px rgba(0,0,0,0.28);
+}
+
+.b1-public-scope .public-site-rest.dark main .prose {
+  --tw-prose-body: var(--as-text-muted);
+  --tw-prose-headings: var(--as-text);
+  --tw-prose-lead: var(--as-text-muted);
+  --tw-prose-links: #7ef0d0;
+  --tw-prose-bold: var(--as-text);
+  --tw-prose-counters: var(--as-text-subtle);
+  --tw-prose-bullets: var(--as-text-subtle);
+  --tw-prose-hr: var(--as-border);
+  --tw-prose-quotes: var(--as-text);
+  --tw-prose-quote-borders: var(--as-border);
+  --tw-prose-captions: var(--as-text-subtle);
+  --tw-prose-code: var(--as-text);
+  --tw-prose-pre-code: var(--as-text-muted);
+  --tw-prose-pre-bg: var(--as-surface-muted);
+  --tw-prose-th-borders: var(--as-border);
+  --tw-prose-td-borders: var(--as-border);
+}
+
+.b1-public-scope .gradient-hero-bg {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(24, 180, 240, 0.18), transparent 36%),
+    radial-gradient(circle at 8% 90%, rgba(25, 227, 177, 0.12), transparent 32%),
+    linear-gradient(180deg, #f7f9fd 0%, #f4f6fb 100%);
+}
+
+.b1-public-scope .dark .gradient-hero-bg {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(24, 180, 240, 0.24), transparent 36%),
+    linear-gradient(180deg, #050a1f 0%, #0b1336 100%);
+}
+
+.b1-public-scope .public-hero-gradient {
+  background: linear-gradient(90deg, #f4f6fb 0%, #eef6fb 48%, #e7f7f3 100%);
+}
+
+.b1-public-scope .dark .public-hero-gradient {
+  background: linear-gradient(90deg, #050a1f 0%, #0b1336 48%, #102044 100%);
+}
+
+.b1-public-scope .gradient-lilac-glow {
+  background: radial-gradient(
+    ellipse at 70% 30%,
+    rgba(24, 180, 240, 0.12) 0%,
+    transparent 62%
+  );
+}
+
+.b1-public-scope .dark .gradient-lilac-glow {
+  background: radial-gradient(
+    ellipse at 70% 30%,
+    rgba(25, 227, 177, 0.16) 0%,
+    transparent 62%
+  );
+}
+
+.b1-public-scope .text-gradient-lilac {
+  background: linear-gradient(120deg, #19e3b1 0%, #18b4f0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.b1-public-scope .alphascreen-membership-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(25, 227, 177, 0.55);
+  background: #050a1f;
+  box-shadow: 0 18px 42px rgba(5, 10, 31, 0.22), 0 0 0 1px rgba(24, 180, 240, 0.16);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.b1-public-scope .alphascreen-membership-cta::before {
+  content: "";
+  position: absolute;
+  inset: -85%;
+  z-index: 0;
+  background: conic-gradient(
+    from 0deg,
+    rgba(25, 227, 177, 0) 0deg,
+    rgba(25, 227, 177, 0) 74deg,
+    rgba(25, 227, 177, 0.95) 104deg,
+    rgba(24, 180, 240, 0.75) 128deg,
+    rgba(25, 227, 177, 0) 166deg,
+    rgba(25, 227, 177, 0) 360deg
+  );
+  animation: alphascreen-membership-border 7.5s linear infinite;
+  opacity: 0.9;
+}
+
+.b1-public-scope .alphascreen-membership-cta::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: 1;
+  border-radius: 0.65rem;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(24, 180, 240, 0.22), transparent 38%),
+    linear-gradient(135deg, #050a1f 0%, #0b1336 58%, #071033 100%);
+  pointer-events: none;
+}
+
+.b1-public-scope .alphascreen-membership-cta:hover,
+.b1-public-scope .alphascreen-membership-cta:focus-visible {
+  border-color: rgba(25, 227, 177, 0.85);
+  box-shadow: 0 20px 48px rgba(5, 10, 31, 0.28), 0 0 0 1px rgba(24, 180, 240, 0.34);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b1-public-scope .alphascreen-membership-cta::before {
+    animation: none;
+    background: linear-gradient(135deg, rgba(25, 227, 177, 0.95), rgba(24, 180, 240, 0.4), rgba(25, 227, 177, 0.75));
+  }
+}
+
+/* Guest-only accessibility corrections; protected app markup remains untouched. */
+.b1-public-scope .not-found-page { padding-top: 84px; }
+.b1-public-scope .b1-nav:has(.b1-mobile-panel) { z-index: 100; }
+.b1-public-scope .b1-mobile-panel button:not(.b1-btn-g),
+.b1-public-scope .b1-footer [class~="text-[#A380F6]"],
+.b1-public-scope .b1-footer [style*="color: #A380F6"] { color: #d7e0f4 !important; }
+.b1-public-scope .b1-mobile-panel p[class*="text-[#0A1547]/40"] { color: var(--b1-soft); }
+.b1-public-scope .b1-mobile-panel :is(input, button, a):focus-visible { outline: 2px solid #19e3b1; outline-offset: 2px; }

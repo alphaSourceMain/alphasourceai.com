@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -82,7 +83,11 @@ test("B1 visual system covers shared chrome and the rest of the site", () => {
   const site = read("src/b1-site.css");
   const entry = read("src/main.tsx");
   assert.match(entry, /import "\.\/b1-site\.css"/);
-  assert.match(read("index.html"), /class="b1-theme"/);
+  assert.doesNotMatch(read("index.html"), /class="b1-theme"/);
+  assert.match(site, /\.b1-public-scope \{[\s\S]*--b1-night/);
+  assert.doesNotMatch(site, /html|\.as-app-shell|--sidebar|--chart/);
+  assert.match(app, /isDashboard \|\| isAdmin \|\| isSales \|\| location === "\/" \? content : <div className="b1-public-scope">/);
+  assert.match(read("src/pages/sales/SalesSignInPage.tsx"), /className="b1-public-scope/);
   assert.match(site, /--b1-night: #050a1f/);
   assert.match(site, /--b1-mint: #19e3b1/);
   assert.match(site, /--b1-sky: #18b4f0/);
@@ -99,4 +104,15 @@ test("public routes, contact form, and sign-in affordances remain wired", () => 
   assert.match(home, /<LeadCaptureForm/);
   assert.match(home, /formId="home-contact"/);
   assert.match(navbar, /data-testid="nav-login-button"/);
+});
+
+test("signed-in global styles and boot HTML retain the accepted B1 baseline", () => {
+  const hash = path => createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex");
+  assert.equal(hash("src/index.css"), "cb500560a599cf1ed1a86b5fbeff5467e336b8b19db7392288d627439f01c57a");
+  assert.equal(hash("index.html"), "9d9209a12321e8930d33db6110156529f7f060fd0b40039752334c881ce5d9b8");
+  assert.doesNotMatch(read("src/pages/sales/SalesApp.tsx"), /b1-public-scope/);
+  assert.match(navbar, /document.body.style.overflow = "hidden"/);
+  assert.match(navbar, /document.body.style.overflow = previousOverflow/);
+  assert.match(navbar, /mobileButtonRef.current\?\.focus\(/);
+  assert.match(navbar, /event.key !== "Tab"/);
 });

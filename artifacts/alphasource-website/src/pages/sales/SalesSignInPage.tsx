@@ -48,11 +48,11 @@ export default function SalesSignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] px-4 py-10" style={{ fontFamily: "'Raleway', sans-serif" }}>
+    <div className="b1-public-scope min-h-screen bg-[#F4F6FB] px-4 py-10" style={{ fontFamily: "'Raleway', sans-serif" }}>
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md items-center">
         <div className="w-full rounded-2xl border border-[#0A1547]/[0.07] bg-white p-6 shadow-[0_24px_70px_rgba(10,21,71,0.10)] sm:p-8">
           <DashboardBrand mode="light" variant="full" />
-          <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-[#0b87b0]">
+          <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-[#076987]">
             <LockKeyhole className="h-3.5 w-3.5" /> Sales workspace
           </div>
           <h1 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[#0A1547]">{resetMode ? "Reset your password" : "Sign in to continue"}</h1>
@@ -74,7 +74,7 @@ export default function SalesSignInPage() {
               {resetMode ? (resetLoading ? "Requesting…" : "Send reset link") : (salesLoginLoading ? "Verifying access…" : "Sign in")}
               {!salesLoginLoading && !resetLoading ? <ArrowRight className="h-4 w-4" /> : null}
             </button>
-            <button type="button" disabled={resetLoading} onClick={() => { setResetMode(!resetMode); setResetError(""); setResetSent(false); }} className="text-xs font-bold text-[#0b87b0] hover:underline disabled:cursor-not-allowed disabled:opacity-55">
+            <button type="button" disabled={resetLoading} onClick={() => { setResetMode(!resetMode); setResetError(""); setResetSent(false); }} className="text-xs font-bold text-[#076987] hover:underline disabled:cursor-not-allowed disabled:opacity-55">
               {resetMode ? "Back to sales sign in" : "Forgot password?"}
             </button>
           </form>
