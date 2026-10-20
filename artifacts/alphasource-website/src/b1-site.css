@@ -899,6 +899,9 @@
 }
 .b1-public-scope .b1-video-card {
   background: transparent; border-radius: 20px; overflow: hidden;
+}
+.b1-public-scope .b1-video-card,
+.b1-public-scope .public-site-shell.dark .b1-home .screen {
   box-shadow: 0 0 0 1px rgba(127,227,214,.35),0 0 28px rgba(127,227,214,.22),0 0 70px rgba(150,115,235,.28);
 }
 .b1-public-scope .b1-video-footer { background: rgba(255,255,255,.04); }
@@ -913,7 +916,8 @@
 @media (max-width: 768px) {
   .b1-public-scope .b1-patent-lockup { position: relative; padding-bottom: 20px; }
   .b1-public-scope .public-site-shell main .b1-screen-hero .b1-patent-lockup [data-testid="alphascreen-patent-subscript"] { position: absolute; right: 0; bottom: 0; margin: 0; }
-  .b1-public-scope .b1-video-card { box-shadow: 0 0 0 1px rgba(127,227,214,.35),0 0 28px rgba(127,227,214,.22),0 0 40px rgba(150,115,235,.28); }
+  .b1-public-scope .b1-video-card,
+  .b1-public-scope .public-site-shell.dark .b1-home .screen { box-shadow: 0 0 0 1px rgba(127,227,214,.35),0 0 28px rgba(127,227,214,.22),0 0 40px rgba(150,115,235,.28); }
 }
 @media (prefers-reduced-motion: reduce) {
   :root:has(.b1-public-scope .public-site-shell) { scroll-behavior: auto; }

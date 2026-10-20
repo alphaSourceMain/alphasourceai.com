@@ -39,6 +39,14 @@ test('mesh exclusions and solid enterprise CTA are explicit in every interaction
  assert.doesNotMatch(pricing,/b1-night-band b1-mesh-panel rounded-3xl/);
  assert.match(home,/screen r b1-mesh-panel b1-mesh-top-right/);
 });
+test('homepage Meet alphaScreen shares the video glow only in dark mode',()=>{
+ const shared=/\.b1-public-scope \.b1-video-card,\s*\.b1-public-scope \.public-site-shell\.dark \.b1-home \.screen \{\s*box-shadow: ([^;]+);/g;
+ const shadows=[...css.matchAll(shared)].map(m=>m[1]);
+ assert.equal(shadows.length,2,'desktop and mobile share the exact video edge');
+ assert.match(shadows[0],/0 0 70px rgba\(150,115,235,\.28\)/);
+ assert.match(shadows[1],/0 0 40px rgba\(150,115,235,\.28\)/);
+ assert.match(shadows[0],/0 0 0 1px rgba\(127,227,214,\.35\)/);
+});
 function luminance(hex){return hex.match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((a,x,i)=>a+x*[.2126,.7152,.0722][i],0)}
 test('lilac pairs and maximum light-label mesh contribution meet AA',()=>{
  const ratio=(a,b)=>(Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
