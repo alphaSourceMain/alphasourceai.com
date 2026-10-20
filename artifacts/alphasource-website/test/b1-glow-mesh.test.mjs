@@ -47,8 +47,9 @@ test("mesh remains confined to approved hero, panels and public404 surfaces",()=
  assert.match(site,/\.b1-public-scope \.not-found-page \.text-8xl/);
  assert.match(site,/linear-gradient\(90deg,#22D3B6,#22B8E8\)/);
  assert.equal((home.match(/b1-mesh-panel/g)||[]).length,1);
- for(const name of ["AboutPage","AlphaScreenPage","AlphaScreenPricingPage"])
+ for(const name of ["AboutPage","AlphaScreenPage"])
    assert.equal((read("src/pages/"+name+".tsx").match(/b1-mesh-panel/g)||[]).length,1);
+ assert.equal((read("src/pages/AlphaScreenPricingPage.tsx").match(/b1-mesh-panel/g)||[]).length,2);
 });
 test("desktop alpha is raised and centered beside the first title line without changing mobile rules",()=>{
  assert.match(home,/className="hero-title-first-line">Unleash your<\/span>/);

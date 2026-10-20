@@ -7,18 +7,19 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pricing = readFileSync(resolve(root, "src/pages/AlphaScreenPricingPage.tsx"), "utf8");
 
-test("pricing hero preview uses the approved navy and duotone treatment", () => {
-  assert.match(pricing, /border-white\/10 bg-\[#0A1547\][\s\S]*AlphaScreenMark geometry="08" treatment="duotone"/);
-  assert.match(pricing, /alphaScreen memberships[\s\S]*Included interview volume/);
+test("pricing hero uses the approved static teal lockup on the dark band", () => {
+  assert.match(pricing, /<section className="pr-band" aria-labelledby="pricing-title"/);
+  assert.match(pricing, /<AlphaScreenLockup treatment="teal" wordmarkTone="white"/);
+  assert.doesNotMatch(pricing, /alphaScreen memberships|Included interview volume/);
 });
 
-test("pricing hero preview preserves plan volume and interview time caps", () => {
-  assert.match(pricing, /\["Essential", "20 interviews, 10-minute cap"\]/);
-  assert.match(pricing, /\["Pro", "30 interviews, 12-minute cap"\]/);
+test("plan cards retain volume and time caps after removing the hero summary", () => {
+  assert.ok(pricing.includes('value={`${included} interviews per role`}'));
+  assert.ok(pricing.includes('value={`${duration}-minute interviews`}'));
 });
 
-test("pricing hero preview keeps uniform rows and approved Enterprise copy", () => {
-  assert.match(pricing, /\["Enterprise", "Talk to sales for a custom plan"\]/);
-  assert.match(pricing, /grid min-h-16 grid-cols-\[1fr_auto\] items-center/);
+test("Enterprise card remains present without a duplicate volume summary", () => {
+  assert.match(pricing, /<EnterpriseCard \/>/);
+  assert.match(pricing, /Fully customizable to your organization/);
   assert.doesNotMatch(pricing, /Custom membership/);
 });

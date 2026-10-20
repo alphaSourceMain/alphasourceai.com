@@ -9,14 +9,13 @@ import {
   Layers3,
   Mail,
   MessageSquareText,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { trackEvent } from "@/lib/analytics";
 import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
 import PatentPendingBadge from "@/components/PatentPendingBadge";
-import { AlphaScreenBreathingLockup, AlphaScreenMark } from "@/components/AlphaScreenBrand";
+import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 import { MembershipTermsSelector } from "@/components/MembershipTermsSelector";
 import { membershipMoney, selectedMembershipOffer, membershipTermStartCopy, type MembershipOfferSelection } from "@/lib/membershipTerms";
@@ -2214,82 +2213,18 @@ export default function AlphaScreenPricingPage() {
 
   return (
     <div className="b1-pricing-page bg-white">
-      <section className="relative overflow-hidden bg-[#F8F9FD] pt-28">
-        <div className="absolute inset-0 opacity-25" style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(10,21,71,0.14) 1px, transparent 0)",
-          backgroundSize: "36px 36px",
-        }} />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-6 pb-16 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-20">
-          <div>
-            <div className="mb-6">
-              <AlphaScreenBreathingLockup
-                treatment="teal"
-                markClassName="h-12 w-12 lg:h-14 lg:w-14"
-                wordmarkClassName="text-4xl lg:text-5xl"
-              />
-            </div>
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-              <PatentPendingBadge />
-            </div>
-            <h1 className="max-w-3xl text-5xl font-black leading-[1.04] tracking-normal text-[#0A1547] lg:text-6xl">
-              Start with the membership that fits your hiring volume.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#0A1547]/65">
-              Choose Essential or Pro for structured AI-assisted candidate screening, or talk to sales for Enterprise volume and rollout support.
-            </p>
-            <p className="mt-4 text-sm font-semibold text-[#0A1547]/45">
-              Last updated {PUBLIC_CONTENT_LAST_UPDATED}
-            </p>
-            <a
-              href="#pricing-demo"
-              className="mt-8 inline-flex items-center justify-center gap-2 rounded-full border border-[#0A1547]/12 bg-white px-5 py-3 text-sm font-black text-[#0A1547] transition-colors hover:border-[#A380F6] hover:text-[#A380F6]"
-              data-analytics-cta="Request a Demo"
-              data-analytics-placement="pricing-hero"
-              data-analytics-target="#pricing-demo"
-            >
-              Request a demo
-            </a>
+      <section className="pr-band" aria-labelledby="pricing-title">
+        <div className="pr-band__inner">
+          <div className="pr-band__wm">
+            <AlphaScreenLockup treatment="teal" wordmarkTone="white" wordmarkWeight="extralight"
+              markClassName="h-10 w-10" wordmarkClassName="text-3xl" />
           </div>
-
-          <div className="rounded-lg border border-white/10 bg-[#0A1547] p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <AlphaScreenMark geometry="08" treatment="duotone" alt="" aria-hidden="true" className="h-9 w-9" />
-                <div>
-                  <p className="text-sm font-black text-white">alphaScreen memberships</p>
-                  <p className="text-xs font-bold text-white/55">Included interview volume</p>
-                </div>
-              </div>
-              <ShieldCheck className="h-5 w-5 text-[#02D99D]" />
-            </div>
-            <div className="mt-5 grid gap-3">
-              {[
-                ["Essential", "20 interviews, 10-minute cap"],
-                ["Pro", "30 interviews, 12-minute cap"],
-                ["Enterprise", "Talk to sales for a custom plan"],
-              ].map(([name, detail]) => (
-                <div key={name} className="grid min-h-16 grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-[#F8F9FD] px-4 py-3">
-                  <p className="text-sm font-black text-[#0A1547]">{name}</p>
-                  <p className="self-center text-right text-xs font-black text-[#0A1547]/60">{detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h1 id="pricing-title">Choose the membership that fits your <span className="pr-gt">hiring needs.</span></h1>
+          <p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.</p>
+          <div className="pr-band__meta"><PatentPendingBadge className="pr-pill" /><span>Last updated {PUBLIC_CONTENT_LAST_UPDATED}</span></div>
         </div>
-      </section>
-
-      <section id="packages" className="bg-white py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mb-8 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div className="max-w-3xl">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Memberships</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
-                Choose the membership that fits your hiring needs.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#0A1547]/60">
-                Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.
-              </p>
-            </div>
+        <div className="pr-dock" role="group" aria-label="Billing term">
+          <span className="pr-dock__label">Billing term</span>
             {!retailCatalog ? <div className="rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
               {(["monthly", "annual"] as BillingCadenceKey[]).map((cadence) => (
                 <button
@@ -2315,7 +2250,11 @@ export default function AlphaScreenPricingPage() {
                   cardCommitmentMonths === months ? "bg-[#0A1547] text-white" : "text-[#0A1547]/65 hover:text-[#A380F6]"
                 }`}>{months} months</button>)}
             </div>}
-          </div>
+        </div>
+      </section>
+
+      <section id="packages" className="bg-white py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <LoadingNotice state={loadState} />
           <div className="grid gap-5 lg:grid-cols-3">
             {planCards.map((plan) => (
@@ -2447,7 +2386,7 @@ export default function AlphaScreenPricingPage() {
 
       <section id="pricing-demo" className="bg-white py-16 lg:py-20">
         <div className="mx-auto grid max-w-6xl gap-8 px-6 lg:grid-cols-[0.9fr_1fr] lg:items-start lg:px-8">
-          <div>
+          <div className="b1-night-band b1-mesh-panel rounded-3xl p-8 lg:p-10">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[#02ABE0]">Contact Sales</p>
             <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547] lg:text-4xl">
               Need a custom rollout or Enterprise volume?

@@ -255,6 +255,17 @@
   transform: translateY(-2px);
 }
 
+/* Only the shared header triggers receive button mesh, not modal submits. */
+.b1-public-scope .b1-nav .b1-nav-signin,
+.b1-public-scope .b1-nav .b1-nav-signin:is(:hover,:focus-visible,:active) {
+  background-image: url(/brand/b1/mesh-btn.svg), var(--b1-g);
+  background-size: cover, 100% 100%;
+  background-repeat: no-repeat;
+}
+.b1-public-scope .b1-nav .b1-nav-signin:focus-visible {
+  outline: 2px solid #7ef0d0; outline-offset: 4px;
+}
+
 .b1-public-scope .b1-nav button[aria-label^="Appearance"] {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
@@ -699,9 +710,45 @@
 .b1-public-scope.b1-auth-dialog [class~="text-[#02D99D]"] { color: #086b50; }
 .b1-public-scope.b1-auth-dialog[data-theme="dark"] :is([class~="text-[#02D99D]"],[class~="text-[#A380F6]"]) { color: #7ef0d0 !important; }
 .b1-public-scope.b1-auth-dialog .b1-auth-close { position: absolute; top: 18px; right: 18px; padding: 8px; color: inherit; }
-.b1-public-scope .b1-pricing-page > section:first-child { padding-top: 0; background: var(--as-page); }
-.b1-public-scope .b1-pricing-page > section:first-child > div:last-child { padding-top: 64px; padding-bottom: 64px; gap: 48px; }
-.b1-public-scope .b1-pricing-page #packages { background: var(--as-page); }
+.b1-public-scope .b1-pricing-page .pr-band {
+  position: relative; isolation: isolate; overflow: visible; color: #fff; text-align: center;
+  padding: 100px 0 84px;
+  background: radial-gradient(60% 120% at 85% 0%,rgba(34,184,232,.16),transparent 60%),
+    radial-gradient(50% 100% at 10% 100%,rgba(122,95,190,.18),transparent 60%),#050a1f;
+}
+.b1-public-scope .pr-band::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: url(/brand/b1/mesh-text.svg) 0 0 / 520px auto repeat; opacity: .10;
+  -webkit-mask-image: radial-gradient(80% 120% at 100% 0%,#000,transparent 70%);
+  mask-image: radial-gradient(80% 120% at 100% 0%,#000,transparent 70%);
+}
+.b1-public-scope .pr-band__inner { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+.b1-public-scope .pr-band__wm { display: flex; justify-content: center; margin-bottom: 14px; }
+.b1-public-scope .pr-band__wm [data-alphascreen-wordmark] { color: #fff !important; }
+.b1-public-scope .b1-pricing-page .pr-band h1 {
+  max-width: 860px; margin: 0 auto 12px; font-size: 52px; line-height: 1.05;
+  font-weight: 900; letter-spacing: -.5px; color: #fff;
+}
+.b1-public-scope .pr-gt {
+  background-image: url(/brand/b1/mesh-text.svg),linear-gradient(90deg,#22D3B6,#22B8E8);
+  background-size: auto 100%,100% 100%; background-repeat: repeat-x,no-repeat;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.b1-public-scope .pr-band__sub { max-width: 640px; margin: 0 auto; font-size: 17px; line-height: 1.6; color: #c8d3e9 !important; }
+.b1-public-scope .pr-band__meta { margin-top: 14px; font-size: 13px; color: #b3c0dd; display: flex; gap: 10px; justify-content: center; align-items: center; }
+.b1-public-scope .b1-pricing-page .pr-band .pr-pill { font: 800 11px/1 Inter,sans-serif; padding: 6px 10px; border-radius: 999px; color: #5eead4 !important; background: rgba(34,211,182,.12) !important; border: 1px solid rgba(34,211,182,.4); }
+.b1-public-scope .pr-dock {
+  position: absolute; left: 50%; bottom: 0; transform: translate(-50%,50%); z-index: 5;
+  display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid rgba(10,21,71,.1);
+  border-radius: 16px; padding: 8px 8px 8px 18px; box-shadow: 0 10px 30px rgba(5,10,31,.25);
+}
+.b1-public-scope .pr-dock__label { font: 800 11px Inter,sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #087565; white-space: nowrap; }
+/* Keep the existing toggle's light palette inside the dock in either theme. */
+.b1-public-scope .public-site-shell .b1-pricing-page .pr-dock > div { background: #f8f9fd !important; }
+.b1-public-scope .public-site-shell .b1-pricing-page .pr-dock button { white-space: nowrap; color: #4a5373 !important; }
+.b1-public-scope .public-site-shell .b1-pricing-page .pr-dock button:is([aria-pressed="true"],[class~="bg-[#0A1547]"]) { background: #0a1547 !important; color: #fff !important; }
+.b1-public-scope .pr-dock button:focus-visible { outline-color: #087565 !important; outline-offset: 3px; }
+.b1-public-scope .b1-pricing-page #packages { background: var(--as-page); padding-top: 64px; }
 .b1-public-scope .b1-price-card { border-radius: 24px; padding: 30px; box-shadow: none !important; }
 .b1-public-scope .b1-price-card > p { min-height: 48px; }
 .b1-public-scope .b1-price-card > div:first-child { min-height: 80px; }
@@ -725,13 +772,34 @@
 @media (max-width: 640px) {
  .b1-public-scope .b1-nav .b1-nav-inner { gap: 8px; padding: 0 16px; }
  .b1-public-scope .b1-nav-actions { gap: 8px; margin-left: 0; flex: 1; justify-content: space-between; }
- .b1-public-scope .b1-pricing-page > section:first-child > div:last-child,
  .b1-public-scope .b1-alphascreen-page > section:first-child > div:last-child { padding-top: 40px; padding-bottom: 40px; }
- .b1-public-scope .b1-pricing-page h1 { font-size: 38px; }
 }
+@media (max-width: 768px) {
+ .b1-public-scope .b1-pricing-page .pr-band { padding: 92px 0 72px; }
+ .b1-public-scope .b1-pricing-page .pr-band h1 { font-size: 34px; }
+ .b1-public-scope .pr-band__sub { font-size: 15px; }
+ .b1-public-scope .pr-band__meta { flex-wrap: wrap; }
+ .b1-public-scope .pr-dock { width: calc(100% - 32px); max-width: 420px; justify-content: space-between; padding: 8px 8px 8px 14px; gap: 10px; }
+}
+@media (max-width: 420px) {
+ .b1-public-scope .pr-dock { flex-direction: column; align-items: stretch; padding: 10px; gap: 8px; transform: translate(-50%,60%); }
+ .b1-public-scope .pr-dock__label { text-align: center; }
+ .b1-public-scope .pr-dock > div { display: flex; justify-content: space-between; }
+ .b1-public-scope .pr-dock button { padding-inline: 12px; }
+ .b1-public-scope .b1-pricing-page #packages { padding-top: 80px; }
+}
+/* Public decorative animation is confined to the existing home hero sweep. */
+.b1-public-scope .public-site-rest main *,
+.b1-public-scope .public-site-rest main *::before,
+.b1-public-scope .public-site-rest main *::after { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
  .b1-public-scope .public-site-shell main *, .b1-public-scope .public-site-shell main *::before,
  .b1-public-scope .public-site-shell main *::after { animation: none !important; transition: none !important; transform: none !important; scroll-behavior: auto !important; }
+ /* Dock centering is layout, not motion. Preserve it under the global reset. */
+ .b1-public-scope .public-site-shell main .pr-dock { transform: translate(-50%,50%) !important; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 420px) {
+ .b1-public-scope .public-site-shell main .pr-dock { transform: translate(-50%,60%) !important; }
 }
 
 .b1-public-scope .public-site-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),

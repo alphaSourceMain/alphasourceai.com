@@ -44,7 +44,7 @@ assert.match(dashboardBrand, /AlphaScreenLockup/, "dashboard chrome must use the
 assert.match(dashboardBrand, /treatment="teal"/, "dashboard chrome must use the field-free teal mark");
 assert.match(home, /AlphaScreenBreathingMark/, "the task-bound processing example must use the breathing mark");
 assert.match(overview, /AlphaScreenBreathingLockup[\s\S]*treatment="teal"/, "the alphaScreen overview hero must use the breathing 8C/9C lockup");
-assert.match(pricing, /AlphaScreenBreathingLockup[\s\S]*treatment="teal"/, "the pricing hero must use the breathing 8C/9C lockup");
+assert.match(pricing, /AlphaScreenLockup treatment="teal" wordmarkTone="white"/, "the pricing band must use the existing static teal lockup with white text");
 assert.match(retail, /AlphaScreenLockup/, "alphaScreen retail heroes must use the official lockup");
 assert.match(candidateHeader, /wordmarkWeight="extralight"/, "candidate flows must use the 8C full-name treatment");
 assert.doesNotMatch(navbar, /AlphaScreenLockup|AlphaScreenMark/, "the corporate navbar must remain alphaSource branded");

@@ -30,7 +30,7 @@ test("required product marketing placements keep one restrained notice per sourc
   assert.doesNotMatch(alphaScreen, /import PatentPendingBadge|<PatentPendingBadge\b|AI Interview Agent/);
   assert.match(alphaScreen, /data-testid="alphascreen-patent-subscript"[\s\S]*Patent Pending/);
   assert.match(home, /alphaScreen[\s\S]*<PatentPendingBadge className="min-h-6/);
-  assert.match(pricing, /<AlphaScreenBreathingLockup[\s\S]*<PatentPendingBadge/);
+  assert.match(pricing, /<AlphaScreenLockup[\s\S]*<PatentPendingBadge className="pr-pill"/);
   assert.match(retail, /\{eyebrow\}[\s\S]*<PatentPendingBadge/);
 });
 
