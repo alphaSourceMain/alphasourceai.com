@@ -48,3 +48,9 @@ test("B1 text and placeholder tokens meet AA at their light and dark surfaces",(
  const a=luminance(text),b=luminance(bg);assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5,text+"/"+bg);
  }
 });
+
+test("legacy accent utility mappings use the theme-aware public token",()=>{
+ assert.ok(site.includes("color: var(--as-accent) !important;"));
+ assert.doesNotMatch(site,/color: #076987 !important/);
+ assert.match(site,/--as-accent: #7ef0d0/);
+});

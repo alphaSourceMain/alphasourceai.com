@@ -67,7 +67,7 @@
 .b1-public-scope .text-\[\#653bd5\],
 .b1-public-scope .text-\[\#7655cc\],
 .b1-public-scope .text-\[\#926dea\] {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .text-\[\#BBA4FF\] {
@@ -76,7 +76,7 @@
 
 .b1-public-scope .hover\:text-\[\#A380F6\]:hover,
 .b1-public-scope .hover\:text-\[\#7C5FCC\]:hover {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .bg-\[\#A380F6\],
@@ -166,7 +166,7 @@
 .b1-public-scope [style*="color:#7C5FCC"],
 .b1-public-scope [style*="color: #7C5FCC"],
 .b1-public-scope [style*="color: rgb(163, 128, 246)"] {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .public-site-rest [class~="uppercase"] {
