@@ -2217,7 +2217,7 @@ export default function AlphaScreenPricingPage() {
         <div className="pr-band__inner">
           <div className="pr-band__wm">
             <AlphaScreenLockup treatment="teal" wordmarkTone="white" wordmarkWeight="extralight"
-              markClassName="h-10 w-10" wordmarkClassName="text-3xl" />
+              markClassName="h-10 w-10" wordmarkClassName="text-[38px]" />
           </div>
           <h1 id="pricing-title">Choose the membership that fits your <span className="pr-gt">hiring needs.</span></h1>
           <p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.</p>
