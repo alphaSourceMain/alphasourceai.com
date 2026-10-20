@@ -67,7 +67,7 @@
 .b1-public-scope .text-\[\#653bd5\],
 .b1-public-scope .text-\[\#7655cc\],
 .b1-public-scope .text-\[\#926dea\] {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .text-\[\#BBA4FF\] {
@@ -76,7 +76,7 @@
 
 .b1-public-scope .hover\:text-\[\#A380F6\]:hover,
 .b1-public-scope .hover\:text-\[\#7C5FCC\]:hover {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .bg-\[\#A380F6\],
@@ -166,7 +166,7 @@
 .b1-public-scope [style*="color:#7C5FCC"],
 .b1-public-scope [style*="color: #7C5FCC"],
 .b1-public-scope [style*="color: rgb(163, 128, 246)"] {
-  color: #076987 !important;
+  color: var(--as-accent) !important;
 }
 
 .b1-public-scope .public-site-rest [class~="uppercase"] {
@@ -179,10 +179,10 @@
 .b1-public-scope .bg-\[\#071033\],
 .b1-public-scope .bg-\[\#080E2E\],
 .b1-public-scope .bg-\[\#111E57\],
-.b1-public-scope .dark\:bg-\[\#070E36\],
-.b1-public-scope .dark\:bg-\[\#080E2E\],
-.b1-public-scope .dark\:bg-\[\#111E57\],
-.b1-public-scope .dark\:bg-\[\#0D1A4A\] {
+.b1-public-scope .dark .dark\:bg-\[\#070E36\],
+.b1-public-scope .dark .dark\:bg-\[\#080E2E\],
+.b1-public-scope .dark .dark\:bg-\[\#111E57\],
+.b1-public-scope .dark .dark\:bg-\[\#0D1A4A\] {
   background-color: var(--b1-night) !important;
 }
 
@@ -625,3 +625,98 @@
 .b1-public-scope .b1-footer [style*="color: #A380F6"] { color: #d7e0f4 !important; }
 .b1-public-scope .b1-mobile-panel p[class*="text-[#0A1547]/40"] { color: var(--b1-soft); }
 .b1-public-scope .b1-mobile-panel :is(input, button, a):focus-visible { outline: 2px solid #19e3b1; outline-offset: 2px; }
+
+/* Shared B1 public shell. Never applied to signed-in dashboard roots. */
+.b1-public-scope { --as-text-subtle: #4a5373; }
+.b1-public-scope .dark { --as-text-subtle: #b3c0dd; --as-text-muted: #b3c0dd; }
+.b1-public-scope .public-site-shell { padding-top: 84px; color: var(--as-text); background: var(--as-page); }
+.b1-public-scope .b1-nav .b1-nav-inner { max-width: 1440px; gap: 12px; }
+.b1-public-scope .b1-pillnav { gap: 2px; flex: none; justify-content: flex-start; border-radius: 18px; }
+.b1-public-scope .b1-pillnav a { padding: 10px 11px; font-size: 13px; white-space: nowrap; color: #c8d3e9 !important; }
+.b1-public-scope .b1-nav-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.b1-public-scope .b1-nav [aria-label^="Appearance"] span,
+.b1-public-scope .b1-nav [aria-label^="Appearance"] svg { color: #d7e0f4 !important; }
+.b1-public-scope .b1-mobile-toggle { display: none; color: #fff; padding: 10px; border: 1px solid #67789d; border-radius: 12px; }
+.b1-public-scope .b1-mobile-panel { z-index: 100; }
+.b1-public-scope .b1-setup-hint { position: absolute; top: 55px; right: 0; width: 300px; padding: 20px; background: #fff; color: #0a1547; border-radius: 16px; box-shadow: 0 10px 40px #0004; }
+.b1-public-scope .public-site-rest main [class*="text-[#0A1547]/"],
+.b1-public-scope .public-site-rest main [class*="text-gray-"],
+.b1-public-scope .public-site-rest main [class*="text-slate-"] { color: var(--as-text-muted) !important; }
+.b1-public-scope .public-site-shell main :is([class~="text-[#02ABE0]"], [class~="text-[#02D99D]"], [class~="text-[#7657C8]"]) { color: var(--as-accent) !important; }
+.b1-public-scope .public-site-shell.dark main :is([class~="text-[#A380F6]"], [style*="color: rgb(163, 128, 246)"], [style*="color: #A380F6"]) { color: #7ef0d0 !important; }
+.b1-public-scope .public-site-rest main [class~="text-[#0A1547]"] { color: var(--as-text) !important; }
+.b1-public-scope .public-site-shell main .prose { color: var(--as-text-muted); --tw-prose-body: var(--as-text-muted); --tw-prose-headings: var(--as-text); }
+.b1-public-scope .public-site-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.b1-public-scope .public-site-shell main select,
+.b1-public-scope .public-site-shell main textarea {
+  min-height: 48px; border: 1px solid #75829d; border-radius: 12px;
+  background: var(--as-surface); color: var(--as-text); font: inherit; padding: 12px 14px;
+}
+.b1-public-scope .public-site-shell main :is(input,textarea)::placeholder { color: var(--as-text-muted); opacity: 1; }
+.b1-public-scope .public-site-shell main :is(input,select,textarea):focus-visible,
+.b1-public-scope :is(a,button):focus-visible { outline: 2px solid var(--as-accent); outline-offset: 3px; }
+.b1-public-scope .b1-footer :is(p,button,a) { color: #b3c0dd; }
+.b1-public-scope .b1-footer a:hover, .b1-public-scope .b1-footer button:hover { color: white !important; }
+.b1-public-scope .b1-night-band { background: #050a1f !important; color: #fff; }
+.b1-public-scope .b1-night-band :is(p,[class*="text-[#0A1547]/"],[class*="text-white/"]) { color: #c8d3e9 !important; }
+.b1-public-scope .b1-night-band :is(h2,h3,[class~="text-[#0A1547]"]) { color: #fff !important; }
+/* Portal styling is explicitly scoped on the content, not on document/body. */
+.b1-public-scope.b1-auth-dialog {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 120; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto;
+  padding: 32px; border: 1px solid #75829d; border-radius: 24px; background: #fff; color: #0a1547;
+  box-shadow: 0 30px 100px #050a1f66; color-scheme: light;
+}
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] { background: #0b1336; color: #f8fafc; color-scheme: dark; --as-accent: #7ef0d0; }
+.b1-public-scope.b1-auth-dialog .b1-auth-title { font: 600 24px/1.3 Sora, sans-serif; color: inherit; padding-right: 24px; }
+.b1-public-scope.b1-auth-dialog .b1-auth-description { margin: 10px 0 24px; color: #4a5373; font-size: 14px; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] .b1-auth-description { color: #b3c0dd; }
+.b1-public-scope.b1-auth-dialog input { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 12px; border: 1px solid #75829d; background: #f4f6fb; color: #0a1547; }
+.b1-public-scope.b1-auth-dialog input::placeholder { color: #4a5373; opacity: 1; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] input { background: #101a38; color: #fff; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] input::placeholder { color: #b3c0dd; }
+.b1-public-scope.b1-auth-dialog [class*="text-[#0A1547]/"] { color: #4a5373; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] [class*="text-[#0A1547]/"] { color: #b3c0dd; }
+.b1-public-scope.b1-auth-dialog [class*="text-red-"] { color: #b91c1c; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] [class*="text-red-"] { color: #ffb5b5; }
+.b1-public-scope.b1-auth-dialog [class~="text-[#02D99D]"] { color: #086b50; }
+.b1-public-scope.b1-auth-dialog[data-theme="dark"] :is([class~="text-[#02D99D]"],[class~="text-[#A380F6]"]) { color: #7ef0d0 !important; }
+.b1-public-scope.b1-auth-dialog .b1-auth-close { position: absolute; top: 18px; right: 18px; padding: 8px; color: inherit; }
+.b1-public-scope .b1-pricing-page > section:first-child { padding-top: 0; background: var(--as-page); }
+.b1-public-scope .b1-pricing-page > section:first-child > div:last-child { padding-top: 64px; padding-bottom: 64px; gap: 48px; }
+.b1-public-scope .b1-pricing-page #packages { background: var(--as-page); }
+.b1-public-scope .b1-price-card { border-radius: 24px; padding: 30px; box-shadow: none !important; }
+.b1-public-scope .b1-price-card > p { min-height: 48px; }
+.b1-public-scope .b1-price-card > div:first-child { min-height: 80px; }
+.b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(button) { background: linear-gradient(120deg,#19e3b1,#18b4f0) !important; color: #050a1f !important; box-shadow: none !important; }
+.b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(a) { color: var(--as-text) !important; }
+.b1-public-scope .b1-price-card :is(p[style*="color"],div[style*="color"]) { color: var(--as-accent) !important; }
+.b1-public-scope .b1-price-enterprise :is(h2,p,span) { color: #f8fafc !important; }
+.b1-public-scope .b1-price-enterprise p:first-child { color: #7ef0d0 !important; }
+.b1-public-scope .b1-alphascreen-page > section:first-child { padding-top: 0; }
+.b1-public-scope .b1-alphascreen-page > section:first-child > div:last-child { padding-top: 64px; padding-bottom: 64px; }
+.b1-public-scope .b1-patent-lockup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 0; }
+.b1-public-scope .b1-patent-lockup [data-testid="alphascreen-patent-subscript"] { position: static; margin: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--as-border); font-size: 11px; color: var(--as-accent); }
+.b1-public-scope .b1-legal-page > div:first-child { padding-top: 64px; padding-bottom: 40px; }
+.b1-public-scope .b1-legal-page .b1-legal-section { margin-bottom: 24px; padding-bottom: 24px; }
+@media (max-width: 1279px) {
+ .b1-public-scope .b1-mobile-toggle { display: block; }
+ .b1-public-scope .b1-pillnav { display: none; }
+ .b1-public-scope .b1-nav .b1-nav-inner { padding: 0 20px; }
+ .b1-public-scope .b1-mobile-link { font-size: 22px; padding: 14px 0; }
+}
+@media (max-width: 640px) {
+ .b1-public-scope .b1-nav .b1-nav-inner { gap: 8px; padding: 0 16px; }
+ .b1-public-scope .b1-nav-actions { gap: 8px; margin-left: 0; flex: 1; justify-content: space-between; }
+ .b1-public-scope .b1-pricing-page > section:first-child > div:last-child,
+ .b1-public-scope .b1-alphascreen-page > section:first-child > div:last-child { padding-top: 40px; padding-bottom: 40px; }
+ .b1-public-scope .b1-pricing-page h1 { font-size: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .b1-public-scope .public-site-shell main *, .b1-public-scope .public-site-shell main *::before,
+ .b1-public-scope .public-site-shell main *::after { animation: none !important; transition: none !important; transform: none !important; scroll-behavior: auto !important; }
+}
+
+.b1-public-scope .public-site-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.b1-public-scope .public-site-shell main select { height: 48px; }
+.b1-public-scope .public-site-rest main > div > :is(section,header,div):first-child:is([class~="pt-28"],[class~="pt-32"],[class~="pt-16"]) { padding-top: 40px; }

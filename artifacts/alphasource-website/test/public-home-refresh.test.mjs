@@ -18,17 +18,17 @@ const b1 = read("src/pages/b1-home.css");
 const about = read("src/pages/AboutPage.tsx");
 const alphaScreen = read("src/pages/AlphaScreenPage.tsx");
 
-test("non-home public routes retain appearance while approved B1 homepage stays fixed", () => {
+test("all public marketing routes including home share appearance and chrome", () => {
   assert.match(appearance, /value: "light"/);
   assert.match(appearance, /value: "dark"/);
   assert.match(appearance, /value: "system"/);
   assert.match(appearance, /alwaysShowLabel/);
   assert.match(navbar, /<AppearanceSelector \/>/);
-  assert.match(navbar, /<AppearanceSelector alwaysShowLabel \/>/);
   assert.doesNotMatch(navbar, /isHomePage && <AppearanceSelector/);
-  assert.match(app, /data-theme=\{isHomePage \? "light" : resolvedMode\}/);
+  assert.match(app, /data-theme=\{resolvedMode\}/);
+  assert.doesNotMatch(app, /location !== "\/" && <(?:Navbar|Footer)/);
   assert.match(app, /public-site-rest/);
-  assert.match(app, /!isHomePage && resolvedMode === "dark"/);
+  assert.match(app, /resolvedMode === "dark"/);
 });
 
 test("approved rest-of-site treatment keeps the footer and theme provider-neutral", () => {
@@ -54,29 +54,25 @@ test("live homepage follows approved B1 structure, supplied assets and exact cop
   assert.match(home, /className="hero wrap"/);
   assert.match(home, /className="stats"/);
   assert.match(home, /<main id="home-content">/);
-  assert.match(home, /<\/main>\s*<footer>/);
+  assert.doesNotMatch(home, /<footer|<nav/);
+  assert.match(footer, /aria-label="LinkedIn"/);
+  assert.match(footer, /aria-label="Facebook"/);
   assert.match(home, /Illustrative workflow/);
-  assert.match(home, /\/brand\/b1\/logo-light\.png/);
+  assert.doesNotMatch(navbar, /nav-logo|<img/);
   assert.match(home, /\/brand\/b1\/alpha\.png/);
   assert.match(home, /Unleash your/);
   assert.doesNotMatch(home, /dangerouslySetInnerHTML|<iframe/);
 });
 
-test("B1 reference motion and mobile menu preserve reduced motion and focus boundaries", () => {
-  assert.match(b1, /animation:\s*b1-float 9s ease-in-out infinite/);
-  assert.match(b1, /@keyframes b1-float/);
-  assert.doesNotMatch(b1, /@keyframes float|html:has|scrollbar-width/);
+test("B1 reveals fail open and shared mobile navigation preserves focus boundaries", () => {
   assert.match(b1, /prefers-reduced-motion:\s*reduce/);
-  assert.match(home, /IntersectionObserver/);
-  assert.match(home, /inert=\{!menuOpen\}/);
-  assert.match(home, /event.key === "Escape"/);
-  assert.match(home, /event.key !== "Tab"/);
-  assert.match(home, /element.inert = inert/);
-  assert.match(home, /window.cancelAnimationFrame/);
-  assert.match(home, /if \(!menuOpen\) \{[\s\S]*?const destination = pendingDestination.current;[\s\S]*?document.getElementById\(destination\)\?\.focus/);
-  const closeHandler = home.slice(home.indexOf("const closeMenu ="), home.indexOf("  return (", home.indexOf("const closeMenu =")));
-  assert.match(closeHandler, /pendingDestination.current =/);
-  assert.doesNotMatch(closeHandler, /requestAnimationFrame|\.focus\(/);
+  assert.match(b1, /\.b1-home \.r \{\s*opacity: 1/);
+  assert.doesNotMatch(home, /IntersectionObserver|menuOpen|<nav|AI-powered solutions/);
+  assert.match(navbar, /event.key === "Escape"/);
+  assert.match(navbar, /event.key !== "Tab"/);
+  assert.match(navbar, /element.inert = inert/);
+  assert.match(navbar, /window.cancelAnimationFrame/);
+  assert.match(app, /MotionConfig reducedMotion="user"/);
 });
 
 test("B1 visual system covers shared chrome and the rest of the site", () => {
@@ -88,7 +84,7 @@ test("B1 visual system covers shared chrome and the rest of the site", () => {
   assert.doesNotMatch(site, /html|\.as-app-shell|--sidebar|--chart/);
   assert.doesNotMatch(site, /:is\(aside, footer, nav\)/);
   assert.match(site, /\.b1-footer a:hover \{\s*color: #fff !important/);
-  assert.match(app, /isDashboard \|\| isAdmin \|\| isSales \|\| location === "\/" \? content : <div className="b1-public-scope">/);
+  assert.match(app, /isDashboard \|\| isAdmin \|\| isSales \|\| isInterview \|\| isAutomationApproval \|\| isAutomationDigestApproval \? content : <div className="b1-public-scope">/);
   assert.match(read("src/pages/sales/SalesSignInPage.tsx"), /className="b1-public-scope/);
   assert.match(site, /--b1-night: #050a1f/);
   assert.match(site, /--b1-mint: #19e3b1/);

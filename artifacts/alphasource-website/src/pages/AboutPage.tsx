@@ -7,7 +7,7 @@ import { alphaSourceSymbol } from "@/assets/branding";
 const EASE_OUT = "easeOut" as const;
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
+  hidden: { opacity: 1, y: 28 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,
@@ -22,7 +22,7 @@ function HeroSection() {
       <div className="absolute inset-0 gradient-lilac-glow" />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="text-center max-w-3xl mx-auto"
@@ -86,7 +86,7 @@ function TeamSection() {
               </div>
               <div className="px-6 pb-6 pt-3 text-center">
                 <h3 className="text-lg font-bold text-[#0A1547] mb-0.5">{member.name}</h3>
-                <div className="text-sm font-semibold mb-3" style={{ color: member.color }}>
+                <div className="text-sm font-semibold mb-3" style={{ color: "var(--as-accent)" }}>
                   {member.role}
                 </div>
                 <p className="text-sm text-[#0A1547]/60 leading-relaxed">{member.bio}</p>
@@ -166,7 +166,7 @@ function MissionSection() {
             {values.map((val, i) => (
               <motion.div
                 key={val.label}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 1, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1, duration: 0.5 }}
@@ -250,7 +250,7 @@ function StorySection() {
               ].map((beat, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, x: 12 }}
+                  initial={{ opacity: 1, x: 12 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1, duration: 0.5 }}
@@ -311,7 +311,7 @@ function TechnologySection() {
             ].map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 1, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.15, duration: 0.5 }}
@@ -352,7 +352,7 @@ function CTASection() {
           style={{ boxShadow: "0 12px 48px rgba(10,21,71,0.13), 0 0 0 1px rgba(10,21,71,0.06)" }}
         >
           <div
-            className="lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
+            className="b1-night-band lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div>

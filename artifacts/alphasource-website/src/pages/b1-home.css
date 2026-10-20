@@ -500,9 +500,8 @@
   margin-left: 18px;
 }
 .b1-home .r {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: 1s cubic-bezier(0.2, 0.7, 0.2, 1);
+  opacity: 1;
+  transform: none;
 }
 .b1-home .r.in {
   opacity: 1;
@@ -959,4 +958,33 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Unified public shell: visible by default; motion never gates content. */
+.b1-home .r, .b1-home .r.in { opacity: 1; transform: none; transition: none; }
+.b1-home { --ink: var(--as-text); --ink2: var(--as-text-muted); --mist: var(--as-page); background: var(--as-page); color: var(--as-text); }
+.b1-home .hero { padding-top: 88px; }
+.b1-home .kick { background: none; -webkit-text-fill-color: currentColor; color: var(--as-accent); }
+.b1-home .b1-dark .kick, .b1-home .screen .kick { color: #7ef0d0; }
+.b1-home .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 24px; }
+.b1-home .card { grid-column: auto; display: flex; flex-direction: column; min-height: 280px; padding: 36px; background: var(--as-surface); border: 1px solid var(--as-border); }
+.b1-home .card h3, .b1-home .c1 h3 { font-size: 24px; margin: 32px 0 14px; line-height: 1.3; }
+.b1-home .card p { line-height: 1.7; }
+.b1-home .card .ico { color: var(--as-accent); }
+.b1-home .c1 { background: var(--deep); color: #fff; justify-content: initial; }
+.b1-home .c1 p { color: var(--soft); }
+.b1-home .c1 .ico { color: #7ef0d0; }
+.b1-home .step { background: var(--as-surface); border-color: var(--as-border); padding: 30px; }
+.b1-home .step h3 { line-height: 1.4; }
+.b1-home .step p { line-height: 1.7; }
+.b1-home .ico, .b1-home .term .lbl { color: #b3c0dd; }
+.b1-home .b1-dark input::placeholder, .b1-home .b1-dark textarea::placeholder { color: #b3c0dd; opacity: 1; }
+.b1-home .b1-dark input, .b1-home .b1-dark textarea { background: #101a38; border-color: #67789d; }
+.b1-home .form-field input { height: auto; }
+.b1-home .access-links { color: #b3c0dd; }
+@media (max-width: 900px) {
+  .b1-home .hero { padding-top: 64px; }
+  .b1-home .bento { grid-template-columns: 1fr; grid-auto-rows: auto; }
+  .b1-home .card { min-height: 0; padding: 28px; }
+  .b1-home .card h3 { margin-top: 24px; }
 }

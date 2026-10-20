@@ -1,11 +1,11 @@
 import { useState, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Check, KeyRound, LogIn, Menu, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PASSKEYS_ENABLED, supabase } from "@/lib/supabaseClient";
 import { buildPwResetUrl } from "@/lib/urlConfig";
-import { alphaSourceLogoDark } from "@/assets/branding";
+import PublicSignInPanel from "@/components/PublicSignInPanel";
 import AppearanceSelector from "@/components/AppearanceSelector";
 
 export default function Navbar() {
@@ -24,7 +24,7 @@ export default function Navbar() {
   const [setupSpotlightVisible, setSetupSpotlightVisible] = useState(false);
   const [location, setLocation] = useLocation();
   const setupSpotlightDescriptionId = useId();
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const loginButtonRef = useRef<HTMLButtonElement>(null);
   const signInInFlightRef = useRef(false);
   const mobileButtonRef = useRef<HTMLButtonElement>(null);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -39,8 +39,7 @@ export default function Navbar() {
       return;
     }
     queryLoginRef.current = true;
-    if (window.innerWidth < 1280) setMobileOpen(true);
-    else setLoginOpen(true);
+    setLoginOpen(true);
   }, [location, search]);
 
   useEffect(() => {
@@ -81,16 +80,6 @@ export default function Navbar() {
       window.removeEventListener("resize", onResize);
     };
   }, [mobileOpen]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setLoginOpen(false);
-      }
-    };
-    if (loginOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [loginOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -192,143 +181,55 @@ export default function Navbar() {
     { label: "About", href: "/about/" },
     { label: "alphaScreen", href: "/alphascreen" },
     { label: "How It Works", href: "/alphascreen/how-it-works" },
-    { label: "Get in Touch", href: "/#contact" },
+    { label: "Pricing", href: "/alphascreen/pricing" },
     { label: "FAQ", href: "/faq" },
+    { label: "Support", href: "/support" },
+    { label: "Get in touch", href: "/#contact" },
   ];
-  const pageDimOverlay = setupSpotlightVisible && typeof document !== "undefined"
-    ? createPortal(
-        <button
-          type="button"
-          aria-label="Dismiss sign-in guidance"
-          className="fixed inset-0 z-40 cursor-default bg-slate-900/35 backdrop-grayscale"
-          onClick={() => setSetupSpotlightVisible(false)}
-        />,
-        document.body,
-      )
-    : null;
-
-  return (
-    <>
-      {pageDimOverlay}
-      <nav
-        className={`b1-nav overflow-visible ${scrolled ? "shadow-[0_12px_40px_-24px_rgba(0,0,0,0.65)]" : ""}`}
-        aria-label="Main navigation"
-      >
-        {setupSpotlightVisible && (
-          <button
-            type="button"
-            aria-label="Dismiss sign-in guidance"
-            className="absolute inset-0 z-10 cursor-default bg-slate-900/30 backdrop-grayscale"
-            onClick={() => setSetupSpotlightVisible(false)}
-          />
-        )}
-        <div className="b1-nav-inner">
-            {/* Logo — existing light artwork on the night bar. */}
-            <Link
-              href="/"
-              className="flex items-center gap-0"
-              data-testid="nav-logo"
-            >
-              <img
-                src={alphaSourceLogoDark}
-                alt="alphaSource AI"
-                className="h-7 w-auto"
-              />
-            </Link>
-
-            {/* Desktop Links */}
-            <div className="b1-pillnav hidden xl:flex">
-              {navLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="transition-colors"
-                  aria-current={location === link.href ? "page" : undefined}
-                  data-testid={`nav-link-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  data-analytics-cta={link.label}
-                data-analytics-placement="primary-nav"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-
-            {/* Log In button + popout */}
-            <div
-              className={`${setupSpotlightVisible ? "relative z-30 flex" : "hidden"} items-center gap-3 xl:flex`}
-              ref={dropdownRef}
-            >
-              <AppearanceSelector />
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (setupSpotlightVisible) setSetupSpotlightVisible(false);
-                    setLoginOpen(!loginOpen);
-                  }}
-                  className={`b1-btn-g relative h-10 px-4 text-sm sm:px-5 ${
-                    setupSpotlightVisible
-                      ? "shadow-[0_0_0_6px_rgba(25,227,177,0.28)]"
-                      : ""
-                  }`}
-                  data-testid="nav-login-button"
-                  aria-describedby={
-                    setupSpotlightVisible
-                      ? setupSpotlightDescriptionId
-                      : undefined
-                  }
-                >
-                  <LogIn aria-hidden="true" className="h-3.5 w-3.5" />
-                  Sign In
-                </button>
-
-              {setupSpotlightVisible && (
-                <div
-                  role="status"
-                  id={setupSpotlightDescriptionId}
-                  className="absolute right-0 top-full z-40 mt-3 w-72 rounded-lg border border-[#A380F6]/35 bg-white p-4 shadow-xl sm:w-80"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#02D99D]/10 text-[#02D99D]">
-                        <Check
-                          aria-hidden="true"
-                          className="h-4 w-4"
-                          strokeWidth={2.5}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black leading-snug text-[#0A1547]">
-                          Your password is set.
-                        </p>
-                        <p className="mt-1 text-xs font-semibold leading-relaxed text-[#0A1547]/65">
-                          Use Sign In to access your alphaScreen dashboard.
-                        </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSetupSpotlightVisible(false)}
-                        className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[#0A1547]/10 text-[#0A1547]/55 transition-colors hover:border-[#A380F6] hover:text-[#A380F6] focus:outline-none focus:ring-2 focus:ring-[#A380F6]"
-                        aria-label="Dismiss sign-in guidance"
-                      >
-                        <X aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {loginOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 p-6 z-50 dark:bg-[#111E57] dark:border-[#2A3568]">
-                    <div className="mb-5">
-                      <h3 className="text-base font-black text-[#0A1547] mb-1 dark:text-white">
-                        Sign In to alphaSource
-                      </h3>
-                      <p className="text-xs text-[#0A1547]/50 dark:text-white/55">
-                        Access your client dashboard
-                      </p>
-                    </div>
-
+  const openSignIn = () => { setSetupSpotlightVisible(false); setMobileOpen(false); setLoginOpen(true); };
+  const pageDimOverlay = setupSpotlightVisible && typeof document !== "undefined" ? createPortal(
+    <button type="button" aria-label="Dismiss sign-in guidance" className="fixed inset-0 z-40 cursor-default bg-slate-900/35"
+      onClick={() => setSetupSpotlightVisible(false)} />, document.body) : null;
+  return <>
+    {pageDimOverlay}
+    <nav className={`b1-nav ${scrolled ? "shadow-lg" : ""}`} aria-label="Main navigation">
+      <div className="b1-nav-inner">
+        <div className="b1-pillnav">
+          {navLinks.map(link => <a key={link.label} href={link.href}
+            aria-current={location.replace(/\/$/, "") === link.href.replace(/\/$/, "") ? "page" : undefined}
+            data-testid={`nav-link-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
+            data-analytics-cta={link.label} data-analytics-placement="primary-nav">{link.label}</a>)}
+        </div>
+        <div className={`b1-nav-actions ${setupSpotlightVisible ? "relative z-50" : ""}`}>
+          <AppearanceSelector />
+          <button ref={loginButtonRef} type="button" onClick={openSignIn} className="b1-btn-g h-10 px-4 text-sm"
+            aria-haspopup="dialog" data-testid="nav-login-button"
+            aria-describedby={setupSpotlightVisible ? setupSpotlightDescriptionId : undefined}>
+            <LogIn aria-hidden="true" size={16} /> Sign In
+          </button>
+          {setupSpotlightVisible && <p role="status" id={setupSpotlightDescriptionId} className="b1-setup-hint">
+            <Check aria-hidden="true" size={18} /> Your password is set. Use Sign In to access your alphaScreen dashboard.
+          </p>}
+        </div>
+        <button ref={mobileButtonRef} className="b1-mobile-toggle" type="button"
+          onClick={() => setMobileOpen(!mobileOpen)} data-testid="nav-mobile-menu-button"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} aria-controls="site-mobile-panel">
+          {mobileOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+        </button>
+      </div>
+      {mobileOpen && <div ref={mobilePanelRef} id="site-mobile-panel" role="dialog" aria-modal="true" aria-label="Navigation" className="b1-mobile-panel">
+        {navLinks.map(link => <a key={link.label} href={link.href} className="b1-mobile-link"
+          onClick={() => setMobileOpen(false)} data-analytics-cta={link.label} data-analytics-placement="mobile-nav">{link.label}</a>)}
+        <button type="button" className="b1-btn-g mt-6 w-full p-3" onClick={openSignIn}>Sign In</button>
+      </div>}
+    </nav>
+    <PublicSignInPanel open={loginOpen} onOpenChange={setLoginOpen} title="Sign In to alphaSource"
+      description="Access your client dashboard" returnFocus={() => loginButtonRef.current?.focus()}>
                     <form onSubmit={handleSignIn} className="space-y-3">
                     <input
                       type="email"
+                      aria-label="Client email address"
+                      autoComplete="username"
                       placeholder="Email address"
                       value={email}
                       onChange={(e) => {
@@ -339,6 +240,8 @@ export default function Navbar() {
                       />
                       <input
                         type="password"
+                        aria-label="Client password"
+                        autoComplete="current-password"
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -409,116 +312,7 @@ export default function Navbar() {
                         Get in touch
                       </a>
                     </p>
-                </div>
-              )}
-            </div>
-            </div>
 
-            {/* Mobile hamburger */}
-            <button
-              ref={mobileButtonRef}
-              className={`xl:hidden p-2 rounded-lg text-white ${setupSpotlightVisible ? "hidden" : ""}`}
-              onClick={() => setMobileOpen(!mobileOpen)}
-              data-testid="nav-mobile-menu-button"
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileOpen}
-              aria-controls="site-mobile-panel"
-            >
-              {mobileOpen ? (
-                <X aria-hidden="true" className="h-[22px] w-[22px]" />
-              ) : (
-                <Menu aria-hidden="true" className="h-[22px] w-[22px]" />
-              )}
-            </button>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div ref={mobilePanelRef} id="site-mobile-panel" role="dialog" aria-modal="true" aria-label="Navigation and client sign in" className="b1-mobile-panel xl:hidden">
-            <div className="mb-3 px-3">
-              <AppearanceSelector alwaysShowLabel />
-            </div>
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="b1-mobile-link"
-                onClick={() => setMobileOpen(false)}
-                data-analytics-cta={link.label}
-                data-analytics-placement="mobile-nav"
-            >
-                {link.label}
-              </a>
-            ))}
-            <div className="pt-3 border-t border-gray-100 mt-3 dark:border-[#2A3568]">
-              <p className="text-xs font-semibold text-[#0A1547]/40 uppercase tracking-wider mb-3 px-3 dark:text-white/45">
-                Client Login
-              </p>
-              <form onSubmit={handleSignIn} className="space-y-2 px-3">
-                <input
-                  type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => {
-                    setEmail(e.target.value);
-                    setEmailError("");
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[#0A1547] text-sm placeholder-gray-400 focus:outline-none dark:bg-[#0D1A4A] dark:border-[#2A3568] dark:text-white dark:placeholder:text-white/35"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[#0A1547] text-sm placeholder-gray-400 focus:outline-none dark:bg-[#0D1A4A] dark:border-[#2A3568] dark:text-white dark:placeholder:text-white/35"
-                />
-                <button
-                  type="submit"
-                disabled={clientLoginLoading || !email || !password}
-                className="b1-btn-g w-full py-2.5 text-sm"
-              >
-                {clientLoginLoading ? "Signing in..." : "Sign In"}
-              </button>
-              <button
-                  type="button"
-                  onClick={startReset}
-                  className="text-xs text-[#A380F6] hover:underline"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    font: "inherit",
-                  }}
-                >
-                  Forgot password?
-                </button>
-                {PASSKEYS_ENABLED && (
-                  <button type="button" disabled={clientLoginLoading} onClick={() => void handlePasskeySignIn()} className="flex w-full items-center justify-center gap-2 rounded-full border border-[#A380F6]/40 px-4 py-2.5 text-sm font-semibold text-[#0A1547] dark:text-white">
-                    <KeyRound className="h-4 w-4" />
-                    Sign in with a passkey
-                  </button>
-                )}
-              {clientLoginError && (
-                <p className="text-xs text-red-500">{clientLoginError}</p>
-              )}
-              {passkeyNotice && (
-                <p role="status" className="text-xs text-[#0A1547]/60 dark:text-white/65">{passkeyNotice}</p>
-              )}
-              {emailError && (
-                <p className="text-xs text-red-500">{emailError}</p>
-              )}
-              {resetError && (
-                <p className="text-xs text-red-500">{resetError}</p>
-              )}
-              {resetSuccess && (
-                <p className="text-xs text-[#02D99D]">{resetSuccess}</p>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
-    </nav>
-    </>
-  );
+    </PublicSignInPanel>
+  </>;
 }

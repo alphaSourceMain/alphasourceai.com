@@ -2,12 +2,12 @@ import { motion } from "framer-motion";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#F8F9FD]">
+    <div className="b1-legal-page min-h-screen bg-[#F8F9FD]">
       <div className="relative pt-32 pb-16 overflow-hidden">
         <div className="absolute inset-0 gradient-hero-bg" />
         <div className="relative max-w-4xl mx-auto px-6 lg:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 1, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
 
       <div className="max-w-4xl mx-auto px-6 lg:px-8 pb-24">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
           className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 lg:p-12 prose prose-sm max-w-none"
@@ -172,7 +172,7 @@ function Section({
   last?: boolean;
 }) {
   return (
-    <div className={`${last ? "" : "mb-10 pb-10 border-b border-gray-100"}`}>
+    <div className={`b1-legal-section ${last ? "" : "mb-10 pb-10 border-b border-gray-100"}`}>
       <h2 className="text-lg font-black text-[#0A1547] mb-4 flex items-baseline gap-3">
         <span
           className="text-sm font-bold px-2 py-0.5 rounded-md flex-shrink-0"

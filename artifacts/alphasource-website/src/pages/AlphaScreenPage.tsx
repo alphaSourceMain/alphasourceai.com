@@ -7,7 +7,7 @@ import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
 const EASE_OUT = "easeOut" as const;
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
+  hidden: { opacity: 1, y: 28 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,
@@ -32,12 +32,12 @@ function HeroSection() {
           {/* Left — text */}
           <div>
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 1, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               className="mb-4"
             >
-              <h1 className="relative inline-flex max-w-full items-end pb-4 lg:pb-0">
+              <h1 className="b1-patent-lockup relative inline-flex max-w-full items-end pb-4 lg:pb-0">
                 <AlphaScreenBreathingLockup
                   treatment="teal"
                   className="gap-2 min-[360px]:gap-2.5 sm:gap-3.5"
@@ -54,7 +54,7 @@ function HeroSection() {
             </motion.div>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.6 }}
               className="text-2xl font-semibold mb-5"
@@ -64,7 +64,7 @@ function HeroSection() {
             </motion.p>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
               className="text-lg text-[#0A1547]/60 leading-relaxed mb-4"
@@ -73,7 +73,7 @@ function HeroSection() {
             </motion.p>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.6 }}
               className="text-base text-[#0A1547]/50 leading-relaxed mb-8"
@@ -82,7 +82,7 @@ function HeroSection() {
             </motion.p>
 
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.27, duration: 0.6 }}
               className="mb-8 text-sm font-semibold text-[#0A1547]/42"
@@ -91,7 +91,7 @@ function HeroSection() {
             </motion.p>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
               className="flex flex-col sm:flex-row gap-4"
@@ -121,7 +121,7 @@ function HeroSection() {
 
           {/* Right — video */}
           <motion.div
-            initial={{ opacity: 0, x: 30, scale: 0.97 }}
+            initial={{ opacity: 1, x: 30, scale: 0.97 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ delay: 0.3, duration: 0.7, ease: "easeOut" }}
             className="lg:mt-4"
@@ -379,7 +379,7 @@ function PricingSignupSection() {
 
 function SmartSection() {
   return (
-    <section className="py-24 bg-[#0A1547]">
+    <section className="b1-night-band py-24 bg-[#0A1547]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
@@ -415,7 +415,7 @@ function SmartSection() {
               ].map((card, i) => (
                 <motion.div
                   key={card.title}
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 1, x: -20 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1, duration: 0.5 }}
@@ -541,7 +541,7 @@ function AboutAlphaScreenSection() {
                   <div key={metric.label}>
                     <div className="flex justify-between items-center mb-1.5">
                       <span className="text-xs font-medium text-[#0A1547]/70">{metric.label}</span>
-                      <span className="text-xs font-bold" style={{ color: metric.color }}>{metric.score}%</span>
+                      <span className="text-xs font-bold" style={{ color: "var(--as-accent)" }}>{metric.score}%</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <motion.div
@@ -558,7 +558,7 @@ function AboutAlphaScreenSection() {
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-[#0A1547]/50">Recommendation</span>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#02D99D20", color: "#02D99D" }}>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#02D99D20", color: "var(--as-accent)" }}>
                       Advance to Interview
                     </span>
                   </div>
@@ -631,7 +631,7 @@ function HowItWorksSection() {
             {steps.map((step, i) => (
               <motion.div
                 key={step.number}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 1, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.12, duration: 0.5 }}
@@ -641,7 +641,7 @@ function HowItWorksSection() {
                 {/* Circle number */}
                 <div
                   className="relative z-10 w-12 h-12 rounded-full bg-white border-2 flex items-center justify-center text-sm font-black mb-6 flex-shrink-0"
-                  style={{ borderColor: step.color, color: step.color }}
+                  style={{ borderColor: step.color, color: "var(--as-accent)" }}
                 >
                   {step.number}
                 </div>
@@ -672,7 +672,7 @@ function DemoSection() {
           style={{ boxShadow: "0 12px 48px rgba(10,21,71,0.13), 0 0 0 1px rgba(10,21,71,0.06)" }}
         >
           <div
-            className="lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
+            className="b1-night-band lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div>
@@ -716,7 +716,7 @@ function DemoSection() {
 
 export default function AlphaScreenPage() {
   return (
-    <div>
+    <div className="b1-alphascreen-page">
       <HeroSection />
       <PricingSignupSection />
       <SmartSection />
