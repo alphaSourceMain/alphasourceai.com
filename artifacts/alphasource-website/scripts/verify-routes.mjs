@@ -51,13 +51,19 @@ const notFoundHtml = readRequiredFile(path.join(distRoot, "404.html"), "404 shel
 assertIncludes(notFoundHtml, '<div id="root"', "404 React shell");
 if (manifest.catchAll) errors.push("Unknown routes must not be rewritten to HTTP 200.");
 const redirectRules = readRedirectRules();
-const expectedRules = [
+const manifestRules = [
   ...manifest.publicRedirects,
   ...manifest.publicRewrites,
   ...manifest.spaShellRewrites,
   ...manifest.dynamicSpaRewrites,
   ...(manifest.catchAll ? [manifest.catchAll] : []),
-].map(formatRouteRule);
+];
+for (const rule of manifestRules) {
+  if (rule.source === rule.destination) {
+    errors.push(`Render rejects self-rewrites: ${rule.source}`);
+  }
+}
+const expectedRules = manifestRules.map(formatRouteRule);
 
 if (redirectRules.length !== expectedRules.length) {
   errors.push(`_redirects rule count mismatch: expected ${expectedRules.length}, found ${redirectRules.length}`);

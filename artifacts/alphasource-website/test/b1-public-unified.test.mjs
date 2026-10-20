@@ -42,6 +42,15 @@ test("public motion is fail-open without flattening disabled or decorative opaci
  assert.match(site,/prefers-reduced-motion/);
  assert.match(site,/\.b1-public-scope \.dark \.dark\\:bg-/);
 });
+test("Render rules never rewrite a physical file to itself",()=>{
+ const m=JSON.parse(read("render-routes.json"));
+ const rules=[...m.publicRedirects,...m.publicRewrites,...m.spaShellRewrites,...m.dynamicSpaRewrites];
+ assert.equal(rules.length,150);
+ assert.ok(rules.every(r=>r.source!==r.destination));
+ assert.ok(!rules.some(r=>r.source==="/checkout/subscription-success/index.html"));
+ assert.ok(m.spaShellRoutes.includes("/checkout/subscription-success"),"physical file must still be generated");
+ assert.match(read("scripts/verify-routes.mjs"),/Render rejects self-rewrites/);
+});
 function luminance(hex){const c=hex.match(/[0-9a-f]{2}/gi).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;}
 test("B1 text and placeholder tokens meet AA at their light and dark surfaces",()=>{
  for(const [text,bg]of [["4a5373","ffffff"],["4a5373","f4f6fb"],["076987","f4f6fb"],["b3c0dd","101a38"],["b3c0dd","050a1f"],["7ef0d0","0b1336"],["f8fafc","0b1336"]]){

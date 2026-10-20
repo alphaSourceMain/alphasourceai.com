@@ -184,11 +184,6 @@
       "source": "/checkout/subscription-success/",
       "destination": "/checkout/subscription-success/index.html",
       "status": 200
-    },
-    {
-      "source": "/checkout/subscription-success/index.html",
-      "destination": "/checkout/subscription-success/index.html",
-      "status": 200
     }
   ],
   "dynamicSpaRewrites": [
