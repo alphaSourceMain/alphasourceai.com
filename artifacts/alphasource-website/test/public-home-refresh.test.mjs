@@ -86,6 +86,8 @@ test("B1 visual system covers shared chrome and the rest of the site", () => {
   assert.doesNotMatch(read("index.html"), /class="b1-theme"/);
   assert.match(site, /\.b1-public-scope \{[\s\S]*--b1-night/);
   assert.doesNotMatch(site, /html|\.as-app-shell|--sidebar|--chart/);
+  assert.doesNotMatch(site, /:is\(aside, footer, nav\)/);
+  assert.match(site, /\.b1-footer a:hover \{\s*color: #fff !important/);
   assert.match(app, /isDashboard \|\| isAdmin \|\| isSales \|\| location === "\/" \? content : <div className="b1-public-scope">/);
   assert.match(read("src/pages/sales/SalesSignInPage.tsx"), /className="b1-public-scope/);
   assert.match(site, /--b1-night: #050a1f/);

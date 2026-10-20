@@ -174,11 +174,6 @@
   letter-spacing: -0.02em;
 }
 
-.b1-public-scope :is(aside, footer, nav) [style*="color:#A380F6"],
-.b1-public-scope :is(aside, footer, nav) [style*="color: #A380F6"] {
-  color: #8ef6dc !important;
-}
-
 .b1-public-scope .bg-\[\#070E36\],
 .b1-public-scope .bg-\[\#070D2E\],
 .b1-public-scope .bg-\[\#071033\],
@@ -316,7 +311,7 @@
 }
 
 .b1-public-scope .b1-footer a:hover {
-  color: #fff;
+  color: #fff !important;
 }
 
 .b1-public-scope .public-site-rest input,
