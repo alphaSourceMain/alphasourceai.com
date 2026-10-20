@@ -52,7 +52,7 @@ export default function SalesSignInPage() {
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md items-center">
         <div className="w-full rounded-2xl border border-[#0A1547]/[0.07] bg-white p-6 shadow-[0_24px_70px_rgba(10,21,71,0.10)] sm:p-8">
           <DashboardBrand mode="light" variant="full" />
-          <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#A380F6]">
+          <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-[#0b87b0]">
             <LockKeyhole className="h-3.5 w-3.5" /> Sales workspace
           </div>
           <h1 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[#0A1547]">{resetMode ? "Reset your password" : "Sign in to continue"}</h1>
@@ -70,11 +70,11 @@ export default function SalesSignInPage() {
             {!resetMode && salesLoginError ? <p role="alert" className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700">{salesLoginError}</p> : null}
             {resetMode && resetError ? <p role="alert" className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700">{resetError}</p> : null}
             {resetMode && resetSent ? <p role="status" className="rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800">If this email has an account, a reset link is on its way.</p> : null}
-            <button type="submit" disabled={salesLoginLoading || resetLoading || (resetMode && resetSent)} className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#0A1547] text-sm font-black text-white transition hover:bg-[#111f5f] disabled:cursor-not-allowed disabled:opacity-55">
+            <button type="submit" disabled={salesLoginLoading || resetLoading || (resetMode && resetSent)} className="b1-btn-g flex h-11 w-full items-center justify-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-55">
               {resetMode ? (resetLoading ? "Requesting…" : "Send reset link") : (salesLoginLoading ? "Verifying access…" : "Sign in")}
               {!salesLoginLoading && !resetLoading ? <ArrowRight className="h-4 w-4" /> : null}
             </button>
-            <button type="button" disabled={resetLoading} onClick={() => { setResetMode(!resetMode); setResetError(""); setResetSent(false); }} className="text-xs font-bold text-[#7251c5] hover:underline disabled:cursor-not-allowed disabled:opacity-55">
+            <button type="button" disabled={resetLoading} onClick={() => { setResetMode(!resetMode); setResetError(""); setResetSent(false); }} className="text-xs font-bold text-[#0b87b0] hover:underline disabled:cursor-not-allowed disabled:opacity-55">
               {resetMode ? "Back to sales sign in" : "Forgot password?"}
             </button>
           </form>

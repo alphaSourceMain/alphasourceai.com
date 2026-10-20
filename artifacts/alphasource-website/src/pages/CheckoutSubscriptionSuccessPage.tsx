@@ -284,7 +284,7 @@ export default function CheckoutSubscriptionSuccessPage() {
         : "Refresh this page shortly for the next step.";
 
   return (
-    <section className="min-h-[calc(100vh-160px)] bg-[#F8F9FD] px-6 py-16 lg:py-20">
+    <section className="min-h-[calc(100vh-84px)] bg-[#F8F9FD] px-6 pb-16 pt-28 lg:pb-20 lg:pt-32">
       <div className="mx-auto max-w-4xl">
         <div className="rounded-lg border border-[#0A1547]/10 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start">

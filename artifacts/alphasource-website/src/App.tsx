@@ -643,7 +643,7 @@ function Router() {
     content = (
       <AppearanceProvider>
         <PublicSiteShell>
-          <div className="min-h-screen flex flex-col bg-white text-[#0A1547] transition-colors duration-300 dark:bg-[#080E2E] dark:text-white">
+          <div className="min-h-screen flex flex-col bg-[#f4f6fb] text-[#0A1547] transition-colors duration-300 dark:bg-[#050a1f] dark:text-white">
             {location !== "/" && <Navbar />}
             <PublicMain className="flex-1">
               <Switch>

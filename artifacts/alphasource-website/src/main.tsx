@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/react";
 import App from "./App";
 import { initSentry, isSentryEnabled } from "./lib/sentry";
 import "./index.css";
+import "./b1-site.css";
 
 type AlphaSourceBootState = {
   htmlLoadedAt: number;

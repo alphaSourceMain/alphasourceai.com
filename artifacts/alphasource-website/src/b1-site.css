@@ -1,0 +1,375 @@
+/* Sitewide B1 presentation. The homepage keeps its own stylesheet. */
+
+html.b1-theme {
+  --b1-night: #050a1f;
+  --b1-deep: #0b1336;
+  --b1-ink: #0a1547;
+  --b1-ink2: #4a5373;
+  --b1-mist: #f4f6fb;
+  --b1-mint: #19e3b1;
+  --b1-sky: #18b4f0;
+  --b1-soft: #9fb0d3;
+  --b1-line: #e6e9f2;
+  --b1-g: linear-gradient(120deg, #19e3b1, #18b4f0);
+}
+
+html.b1-theme body {
+  font-family: Raleway, system-ui, sans-serif;
+  background: var(--b1-mist);
+}
+
+html.b1-theme :where(h1, h2, h3, h4) {
+  font-family: Sora, Raleway, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+html.b1-theme .b1-home :where(h1, h2, h3, h4) {
+  font-family: Sora, sans-serif;
+}
+
+html.b1-theme .public-site-rest {
+  background: var(--b1-mist);
+  color: var(--b1-ink);
+}
+
+html.b1-theme .public-site-rest.dark {
+  background: var(--b1-night);
+  color: #fff;
+}
+
+html.b1-theme .public-site-rest:not(.dark) main,
+html.b1-theme .public-site-rest:not(.dark) .flex-1 {
+  background: var(--b1-mist);
+}
+
+html.b1-theme .bg-\[\#F8F9FD\],
+html.b1-theme .bg-\[\#F4F6FB\] {
+  background-color: var(--b1-mist) !important;
+}
+
+html.b1-theme .dark .bg-\[\#F8F9FD\],
+html.b1-theme .dark .bg-\[\#F4F6FB\] {
+  background-color: var(--b1-deep) !important;
+}
+
+html.b1-theme .public-site-rest:not(.dark) main :where([class~="rounded-2xl"], [class~="rounded-xl"]).bg-white,
+html.b1-theme .public-site-rest:not(.dark) main :where([class~="rounded-2xl"][class~="bg-white"], [class~="rounded-3xl"][class~="bg-white"]) {
+  border-color: var(--b1-line);
+  border-radius: 24px;
+}
+
+html.b1-theme .as-app-shell > aside,
+html.b1-theme .as-app-shell aside.fixed {
+  background-color: var(--b1-night) !important;
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.b1-theme .text-\[\#A380F6\],
+html.b1-theme .text-\[\#7C5FCC\],
+html.b1-theme .text-\[\#8B68E8\],
+html.b1-theme .text-\[\#5D43CC\],
+html.b1-theme .text-\[\#7251c5\],
+html.b1-theme .text-\[\#7252C7\],
+html.b1-theme .text-\[\#7554CE\],
+html.b1-theme .text-\[\#7554ce\],
+html.b1-theme .text-\[\#6B4FC0\],
+html.b1-theme .text-\[\#3F2B96\],
+html.b1-theme .text-\[\#653bd5\],
+html.b1-theme .text-\[\#7655cc\],
+html.b1-theme .text-\[\#926dea\] {
+  color: #0b87b0 !important;
+}
+
+html.b1-theme .text-\[\#BBA4FF\] {
+  color: #7ef0d0 !important;
+}
+
+html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#A380F6\],
+html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#7C5FCC\],
+html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .text-\[\#BBA4FF\] {
+  color: #8ef6dc !important;
+}
+
+html.b1-theme .hover\:text-\[\#A380F6\]:hover,
+html.b1-theme .hover\:text-\[\#7C5FCC\]:hover {
+  color: #0b87b0 !important;
+}
+
+html.b1-theme :is(footer, aside, nav, .b1-nav, .b1-footer) .hover\:text-\[\#A380F6\]:hover {
+  color: #fff !important;
+}
+
+html.b1-theme .bg-\[\#A380F6\],
+html.b1-theme .bg-\[\#9272EB\],
+html.b1-theme .bg-\[\#9270E8\],
+html.b1-theme .bg-\[\#8060DC\],
+html.b1-theme .bg-\[\#7C5FCC\],
+html.b1-theme .bg-\[\#7252C7\],
+html.b1-theme .bg-\[\#6242B5\],
+html.b1-theme .bg-\[\#5D43CC\],
+html.b1-theme .hover\:bg-\[\#A380F6\]:hover,
+html.b1-theme .hover\:bg-\[\#9270E8\]:hover,
+html.b1-theme .hover\:bg-\[\#8060DC\]:hover,
+html.b1-theme .hover\:bg-\[\#6242B5\]:hover {
+  background-color: transparent !important;
+  background-image: var(--b1-g) !important;
+  color: var(--b1-night) !important;
+}
+
+html.b1-theme .bg-\[\#A380F6\]\/10,
+html.b1-theme .bg-\[\#A380F6\]\/8,
+html.b1-theme .bg-\[\#A380F6\]\/12,
+html.b1-theme .hover\:bg-\[\#A380F6\]\/10:hover,
+html.b1-theme .hover\:bg-\[\#A380F6\]\/20:hover {
+  background-image: none !important;
+  background-color: rgba(25, 227, 177, 0.14) !important;
+  color: inherit !important;
+}
+
+html.b1-theme .bg-\[\#A380F6\]\/20,
+html.b1-theme .bg-\[\#A380F6\]\/25 {
+  background-image: none !important;
+  background-color: rgba(24, 180, 240, 0.18) !important;
+  color: inherit !important;
+}
+
+html.b1-theme .border-\[\#A380F6\],
+html.b1-theme .border-\[\#A380F6\]\/20,
+html.b1-theme .border-\[\#A380F6\]\/25,
+html.b1-theme .border-\[\#A380F6\]\/30,
+html.b1-theme .border-\[\#A380F6\]\/40,
+html.b1-theme .border-\[\#A380F6\]\/45,
+html.b1-theme .border-\[\#A380F6\]\/55,
+html.b1-theme .border-\[\#A380F6\]\/60,
+html.b1-theme .border-\[\#A380F6\]\/70,
+html.b1-theme .border-\[\#A380F6\]\/80,
+html.b1-theme .hover\:border-\[\#A380F6\]:hover,
+html.b1-theme .hover\:border-\[\#A380F6\]\/45:hover,
+html.b1-theme .hover\:border-\[\#A380F6\]\/55:hover,
+html.b1-theme .hover\:border-\[\#A380F6\]\/60:hover,
+html.b1-theme .hover\:border-\[\#A380F6\]\/70:hover,
+html.b1-theme .hover\:border-\[\#A380F6\]\/80:hover,
+html.b1-theme .focus\:border-\[\#A380F6\]:focus {
+  border-color: rgba(24, 180, 240, 0.45) !important;
+}
+
+html.b1-theme .focus\:ring-\[\#A380F6\]\/25:focus,
+html.b1-theme .focus\:ring-\[\#A380F6\]\/30:focus,
+html.b1-theme .focus\:ring-\[\#A380F6\]\/35:focus,
+html.b1-theme .focus\:ring-\[\#A380F6\]\/40:focus,
+html.b1-theme .focus\:ring-\[\#A380F6\]\/45:focus,
+html.b1-theme .focus\:ring-\[\#A380F6\]\/60:focus,
+html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/40:focus-visible,
+html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/45:focus-visible,
+html.b1-theme .focus-visible\:ring-\[\#A380F6\]\/60:focus-visible {
+  --tw-ring-color: rgba(24, 180, 240, 0.45) !important;
+}
+
+html.b1-theme .hover\:bg-purple-50:hover,
+html.b1-theme .bg-purple-50 {
+  background-color: rgba(25, 227, 177, 0.1) !important;
+}
+
+html.b1-theme [style*="background-color:#A380F6"],
+html.b1-theme [style*="background-color: #A380F6"],
+html.b1-theme [style*="background-color:#a380f6"],
+html.b1-theme [style*="background-color: rgb(163, 128, 246)"],
+html.b1-theme [style*="background-color:rgb(163, 128, 246)"] {
+  background-color: transparent !important;
+  background-image: var(--b1-g) !important;
+  color: var(--b1-night) !important;
+}
+
+html.b1-theme [style*="color:#A380F6"],
+html.b1-theme [style*="color: #A380F6"],
+html.b1-theme [style*="color:#a380f6"],
+html.b1-theme [style*="color:#7C5FCC"],
+html.b1-theme [style*="color: #7C5FCC"],
+html.b1-theme [style*="color: rgb(163, 128, 246)"] {
+  color: #0b87b0 !important;
+}
+
+html.b1-theme .public-site-rest [class~="uppercase"] {
+  text-transform: none;
+  letter-spacing: -0.02em;
+}
+
+html.b1-theme :is(aside, footer, nav) [style*="color:#A380F6"],
+html.b1-theme :is(aside, footer, nav) [style*="color: #A380F6"] {
+  color: #8ef6dc !important;
+}
+
+html.b1-theme .bg-\[\#070E36\],
+html.b1-theme .bg-\[\#070D2E\],
+html.b1-theme .bg-\[\#071033\],
+html.b1-theme .bg-\[\#080E2E\],
+html.b1-theme .bg-\[\#111E57\],
+html.b1-theme .dark\:bg-\[\#070E36\],
+html.b1-theme .dark\:bg-\[\#080E2E\],
+html.b1-theme .dark\:bg-\[\#111E57\],
+html.b1-theme .dark\:bg-\[\#0D1A4A\] {
+  background-color: var(--b1-night) !important;
+}
+
+html.b1-theme .b1-nav {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  background: var(--b1-night);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html.b1-theme .b1-nav .b1-nav-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+html.b1-theme .b1-nav img {
+  height: 28px;
+  width: auto;
+}
+
+html.b1-theme .b1-pillnav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 5px;
+}
+
+html.b1-theme .b1-pillnav a {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--b1-soft) !important;
+  font-weight: 500;
+  background: transparent;
+}
+
+html.b1-theme .b1-pillnav a:hover,
+html.b1-theme .b1-pillnav a[aria-current="page"] {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.b1-theme .b1-btn-g {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--b1-g);
+  color: var(--b1-night) !important;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -12px rgba(25, 227, 177, 0.7);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+html.b1-theme .b1-btn-g:hover {
+  transform: translateY(-2px);
+}
+
+html.b1-theme .b1-nav button[aria-label^="Appearance"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+html.b1-theme .b1-mobile-panel {
+  position: fixed;
+  inset: 84px 0 0;
+  z-index: 40;
+  overflow: auto;
+  background: var(--b1-night);
+  color: #fff;
+  padding: 12px 28px 48px;
+}
+
+html.b1-theme .b1-mobile-panel .b1-mobile-link {
+  display: block;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #d7e0f4 !important;
+  background: transparent !important;
+  font-family: Sora, sans-serif;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+html.b1-theme .b1-mobile-panel .b1-mobile-link:hover {
+  color: #fff !important;
+}
+
+html.b1-theme .b1-footer {
+  background: var(--b1-night) !important;
+  color: var(--b1-soft);
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.b1-theme .b1-footer h4,
+html.b1-theme .b1-footer .b1-foot-label {
+  font-family: Sora, sans-serif !important;
+  letter-spacing: -0.02em !important;
+  text-transform: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+}
+
+html.b1-theme .b1-footer a {
+  color: var(--b1-soft);
+}
+
+html.b1-theme .b1-footer a:hover {
+  color: #fff;
+}
+
+html.b1-theme .public-site-rest input,
+html.b1-theme .public-site-rest textarea,
+html.b1-theme .public-site-rest select,
+html.b1-theme .as-app-shell input,
+html.b1-theme .as-app-shell textarea,
+html.b1-theme .as-app-shell select {
+  font-family: Raleway, system-ui, sans-serif;
+}
+
+html.b1-theme .tracking-consent-surface {
+  background: #fff;
+  border-color: var(--b1-line);
+  color: var(--b1-ink);
+}
+
+@media (max-width: 1279px) {
+  html.b1-theme .b1-pillnav {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  html.b1-theme .b1-nav .b1-nav-inner {
+    padding: 0 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.b1-theme .b1-btn-g,
+  html.b1-theme .b1-btn-g:hover {
+    transition: none;
+    transform: none;
+  }
+}

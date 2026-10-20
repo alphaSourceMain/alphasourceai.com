@@ -22,7 +22,7 @@ function HeroSection() {
       <div
         className="absolute inset-0 opacity-20"
         style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(163,128,246,0.2) 1px, transparent 0)`,
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(24,180,240,0.18) 1px, transparent 0)`,
           backgroundSize: "40px 40px",
         }}
       />

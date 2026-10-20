@@ -78,6 +78,20 @@ test("B1 reference motion and mobile menu preserve reduced motion and focus boun
   assert.doesNotMatch(closeHandler, /requestAnimationFrame|\.focus\(/);
 });
 
+test("B1 visual system covers shared chrome and the rest of the site", () => {
+  const site = read("src/b1-site.css");
+  const entry = read("src/main.tsx");
+  assert.match(entry, /import "\.\/b1-site\.css"/);
+  assert.match(read("index.html"), /class="b1-theme"/);
+  assert.match(site, /--b1-night: #050a1f/);
+  assert.match(site, /--b1-mint: #19e3b1/);
+  assert.match(site, /--b1-sky: #18b4f0/);
+  assert.match(site, /font-family: Sora/);
+  assert.match(navbar, /className=\{`b1-nav/);
+  assert.match(footer, /b1-footer/);
+  assert.match(styles, /\.dark \.gradient-hero-bg/);
+});
+
 test("public routes, contact form, and sign-in affordances remain wired", () => {
   for (const href of ["/", "/about/", "/alphascreen", "/alphascreen/how-it-works", "/#contact", "/faq"]) {
     assert.match(navbar, new RegExp(`href: "${href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
