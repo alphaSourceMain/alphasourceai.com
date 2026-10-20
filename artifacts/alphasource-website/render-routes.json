@@ -348,7 +348,7 @@
       "status": 200
     },
     {
-      "source": "/accommodation/:role_token",
+      "source": "/accommodation/:roleToken",
       "destination": "/index.html",
       "status": 200
     },
@@ -358,7 +358,7 @@
       "status": 200
     },
     {
-      "source": "/accommodation-request/:role_token",
+      "source": "/accommodation-request/:roleToken",
       "destination": "/index.html",
       "status": 200
     },
@@ -368,12 +368,12 @@
       "status": 200
     },
     {
-      "source": "/interview-access/:role_token",
+      "source": "/interview-access/:roleToken",
       "destination": "/index.html",
       "status": 200
     },
     {
-      "source": "/interview-host/:role_token",
+      "source": "/interview-host/:roleToken",
       "destination": "/index.html",
       "status": 200
     },
@@ -448,7 +448,7 @@
       "status": 200
     },
     {
-      "source": "/interview/:role_token",
+      "source": "/interview/:roleToken",
       "destination": "/index.html",
       "status": 200
     },
@@ -678,7 +678,7 @@
       "status": 200
     },
     {
-      "source": "/accommodation/:role_token/",
+      "source": "/accommodation/:roleToken/",
       "destination": "/index.html",
       "status": 200
     },
@@ -688,7 +688,7 @@
       "status": 200
     },
     {
-      "source": "/accommodation-request/:role_token/",
+      "source": "/accommodation-request/:roleToken/",
       "destination": "/index.html",
       "status": 200
     },
@@ -698,12 +698,12 @@
       "status": 200
     },
     {
-      "source": "/interview-access/:role_token/",
+      "source": "/interview-access/:roleToken/",
       "destination": "/index.html",
       "status": 200
     },
     {
-      "source": "/interview-host/:role_token/",
+      "source": "/interview-host/:roleToken/",
       "destination": "/index.html",
       "status": 200
     },
@@ -768,7 +768,7 @@
       "status": 200
     },
     {
-      "source": "/interview/:role_token/",
+      "source": "/interview/:roleToken/",
       "destination": "/index.html",
       "status": 200
     },

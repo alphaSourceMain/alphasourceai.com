@@ -25,11 +25,13 @@ test("all SPA document routes retain exact and trailing-slash host rewrites with
  const m=JSON.parse(read("render-routes.json"));
  assert.equal(m.catchAll,null);
  const rules=[...m.publicRedirects,...m.publicRewrites,...m.spaShellRewrites,...m.dynamicSpaRewrites];
- const known=new Set(["/",...rules.map(x=>x.source)]);
+ // Host placeholder names are internal labels; actual URL shapes stay identical.
+ const signature=path=>path.replace(/:[A-Za-z_]+/g,":param");
+ const known=new Set(["/",...rules.map(x=>signature(x.source))]);
  const source=read("src/App.tsx")+read("src/pages/sales/SalesApp.tsx");
  for(const [,path] of source.matchAll(/<Route path="([^"]+)"/g)){
-   assert.ok(known.has(path),"missing "+path);
-   if(path!=="/")assert.ok(known.has(path.replace(/\/$/,"")+"/"),"missing slash "+path);
+   assert.ok(known.has(signature(path)),"missing "+path);
+   if(path!=="/")assert.ok(known.has(signature(path.replace(/\/$/,"")+"/")),"missing slash "+path);
  }
  assert.ok(rules.every(x=>!x.source.includes("*")),"unknown nested paths must not get catch-all 200");
  assert.match(read("scripts/verify-routes.mjs"),/Unknown routes must not be rewritten to HTTP 200/);
@@ -50,6 +52,13 @@ test("Render rules never rewrite a physical file to itself",()=>{
  assert.ok(!rules.some(r=>r.source==="/checkout/subscription-success/index.html"));
  assert.ok(m.spaShellRoutes.includes("/checkout/subscription-success"),"physical file must still be generated");
  assert.match(read("scripts/verify-routes.mjs"),/Render rejects self-rewrites/);
+});
+test("Render host placeholders use alphanumeric labels without altering client params",()=>{
+ const m=JSON.parse(read("render-routes.json"));
+ assert.doesNotMatch(JSON.stringify(m.dynamicSpaRewrites),/:role_token/);
+ assert.equal(m.dynamicSpaRewrites.filter(x=>x.source.includes(":roleToken")).length,10);
+ assert.match(read("src/App.tsx"),/\/interview\/:role_token/);
+ assert.match(read("scripts/verify-routes.mjs"),/literal suffixes/);
 });
 function luminance(hex){const c=hex.match(/[0-9a-f]{2}/gi).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;}
 test("B1 text and placeholder tokens meet AA at their light and dark surfaces",()=>{

@@ -62,6 +62,9 @@ for (const rule of manifestRules) {
   if (rule.source === rule.destination) {
     errors.push(`Render rejects self-rewrites: ${rule.source}`);
   }
+  if (/:[A-Za-z0-9]+_/.test(rule.source)) {
+    errors.push(`Render treats underscores after placeholder names as literal suffixes: ${rule.source}`);
+  }
 }
 const expectedRules = manifestRules.map(formatRouteRule);
 
