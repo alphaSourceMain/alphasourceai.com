@@ -59,7 +59,7 @@ test("live homepage follows approved B1 structure, supplied assets and exact cop
   assert.match(footer, /aria-label="Facebook"/);
   assert.match(home, /Illustrative workflow/);
   assert.doesNotMatch(navbar, /nav-logo|<img/);
-  assert.match(home, /\/brand\/b1\/alpha\.png/);
+  assert.match(home, /\/brand\/b1\/alpha-v4\.svg/);
   assert.match(home, /Unleash your/);
   assert.doesNotMatch(home, /dangerouslySetInnerHTML|<iframe/);
 });

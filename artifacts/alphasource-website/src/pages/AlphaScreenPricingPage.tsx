@@ -785,7 +785,7 @@ function PlanCard({
 
 function EnterpriseCard() {
   return (
-    <article className="b1-price-card b1-price-enterprise b1-night-band flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
+    <article className="b1-price-card b1-price-enterprise b1-night-band b1-mesh-panel flex h-full flex-col rounded-lg border border-[#0A1547]/10 bg-[#0A1547] p-6 text-white shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#02ABE0]">Enterprise</p>

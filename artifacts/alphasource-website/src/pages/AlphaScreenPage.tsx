@@ -672,7 +672,7 @@ function DemoSection() {
           style={{ boxShadow: "0 12px 48px rgba(10,21,71,0.13), 0 0 0 1px rgba(10,21,71,0.06)" }}
         >
           <div
-            className="b1-night-band lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
+            className="b1-night-band b1-mesh-panel lg:w-[40%] flex-shrink-0 p-10 flex flex-col justify-between"
             style={{ background: "linear-gradient(145deg, #1B2B7A 0%, #0A1547 55%, #070E36 100%)" }}
           >
             <div>

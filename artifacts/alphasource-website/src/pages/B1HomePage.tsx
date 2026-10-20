@@ -29,10 +29,16 @@ export default function B1HomePage() {
           </button>
         </p>
       )}
-      <div className="b1-dark">
+      <div className="b1-dark b1-hero-surface">
         <header className="hero wrap">
           <div className="glow" />
-          <img className="mark" src="/brand/b1/alpha.png" alt="" />
+          <div className="as-alpha" aria-hidden="true">
+            <img className="as-alpha-glow as-alpha-glow--base" src="/brand/b1/alpha-v4.svg" alt="" decoding="async" />
+            <div className="as-alpha-sweep"><div className="as-alpha-sweep-inner">
+              <img className="as-alpha-glow" src="/brand/b1/alpha-v4.svg" alt="" decoding="async" />
+            </div></div>
+            <img className="as-alpha-mark" src="/brand/b1/alpha-v4.svg" alt="" fetchPriority="high" />
+          </div>
           <h1>
             Unleash your <span className="gt">talent.</span>
           </h1>
@@ -255,7 +261,7 @@ export default function B1HomePage() {
             style={{ left: -200, right: "auto", top: -100 }}
           />
           <div className="wrap">
-            <div className="r">
+            <div className="r b1-mesh-panel">
               <div className="kick">Request a demo</div>
               <h2 style={{ color: "#fff" }}>
                 Want to see what AI could take off your plate?

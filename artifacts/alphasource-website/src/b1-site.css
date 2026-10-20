@@ -660,6 +660,23 @@
 .b1-public-scope .b1-night-band { background: #050a1f !important; color: #fff; }
 .b1-public-scope .b1-night-band :is(p,[class*="text-[#0A1547]/"],[class*="text-white/"]) { color: #c8d3e9 !important; }
 .b1-public-scope .b1-night-band :is(h2,h3,[class~="text-[#0A1547]"]) { color: #fff !important; }
+.b1-public-scope .b1-mesh-panel { position: relative; isolation: isolate; }
+.b1-public-scope .b1-mesh-panel::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: url(/brand/b1/mesh-text.svg) 0 0 / 520px auto repeat; opacity: .10;
+  -webkit-mask-image: radial-gradient(120% 90% at 0% 100%,#000 0%,transparent 70%);
+  mask-image: radial-gradient(120% 90% at 0% 100%,#000 0%,transparent 70%);
+}
+.b1-public-scope .b1-price-enterprise.b1-mesh-panel::before {
+  -webkit-mask-image: radial-gradient(120% 90% at 100% 0%,#000 0%,transparent 70%);
+  mask-image: radial-gradient(120% 90% at 100% 0%,#000 0%,transparent 70%);
+}
+.b1-public-scope .not-found-page .text-8xl {
+  background-image: url(/brand/b1/mesh-text.svg), linear-gradient(90deg,#22D3B6,#22B8E8);
+  background-size: auto 100%, 100% 100%; background-repeat: repeat-x, no-repeat;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
 /* Portal styling is explicitly scoped on the content, not on document/body. */
 .b1-public-scope.b1-auth-dialog {
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
