@@ -29,6 +29,7 @@ export default function B1HomePage() {
   const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const pendingDestination = useRef<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { openTrackingPreferences } = useTrackingConsent();
   const [setupDismissed, setSetupDismissed] = useState(false);
@@ -80,7 +81,17 @@ export default function B1HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen) {
+      // React runs the previous menu effect's cleanup before this closed effect.
+      // Only then is the destination no longer inert and safe to focus.
+      const destination = pendingDestination.current;
+      pendingDestination.current = null;
+      if (!destination) return;
+      const frame = window.requestAnimationFrame(() =>
+        document.getElementById(destination)?.focus({ preventScroll: true }),
+      );
+      return () => window.cancelAnimationFrame(frame);
+    }
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const background = Array.from(
@@ -138,12 +149,9 @@ export default function B1HomePage() {
   }, [menuOpen]);
 
   const closeMenu = (event: MouseEvent<HTMLAnchorElement>) => {
-    setMenuOpen(false);
     const href = event.currentTarget.getAttribute("href");
-    if (href?.startsWith("#"))
-      window.requestAnimationFrame(() =>
-        document.getElementById(href.slice(1))?.focus({ preventScroll: true }),
-      );
+    pendingDestination.current = href?.startsWith("#") ? href.slice(1) : null;
+    setMenuOpen(false);
   };
   return (
     <div className="b1-home" ref={root}>

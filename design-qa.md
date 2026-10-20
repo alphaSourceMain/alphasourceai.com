@@ -22,6 +22,8 @@ Local verification: typecheck/build pass,14 prerendered routes/15HTML integrity 
 
 No actionable P0/P1/P2 visual mismatch remains locally. Intentional integration additions and P3 screenshot transport limitations are disclosed above; this is not yet hosted acceptance.
 
+Exact-source follow-up: fixed a real menu effect-cleanup race by recording the hash destination and focusing only from the closed-menu effect, after the previous cleanup removes inert. Browser confirmed focus=contact/menu=false/body overflow restored. Prior image-omission HOLD was a diff-packet limitation: all3 PNGs were already tracked in9afc5de; git ls-tree and git-show SHA256 establish committed bytes, not merely local public files. Reference browser computed form Submit font is Arial15px/normal (body Raleway); retaining Arial is intentional exact-target fidelity, not an accidental font substitution. Final local Lighthouse accessibility100/SEO100; no failed scored audits.
+
 final result: passed
 
 ---

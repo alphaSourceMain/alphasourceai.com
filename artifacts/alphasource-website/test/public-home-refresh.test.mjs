@@ -72,6 +72,10 @@ test("B1 reference motion and mobile menu preserve reduced motion and focus boun
   assert.match(home, /event.key !== "Tab"/);
   assert.match(home, /element.inert = inert/);
   assert.match(home, /window.cancelAnimationFrame/);
+  assert.match(home, /if \(!menuOpen\) \{[\s\S]*?const destination = pendingDestination.current;[\s\S]*?document.getElementById\(destination\)\?\.focus/);
+  const closeHandler = home.slice(home.indexOf("const closeMenu ="), home.indexOf("  return (", home.indexOf("const closeMenu =")));
+  assert.match(closeHandler, /pendingDestination.current =/);
+  assert.doesNotMatch(closeHandler, /requestAnimationFrame|\.focus\(/);
 });
 
 test("public routes, contact form, and sign-in affordances remain wired", () => {
