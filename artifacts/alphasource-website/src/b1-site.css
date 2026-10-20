@@ -757,6 +757,9 @@
 .b1-public-scope .b1-price-card :is(p[style*="color"],div[style*="color"]) { color: var(--as-accent) !important; }
 .b1-public-scope .b1-price-enterprise :is(h2,p,span) { color: #f8fafc !important; }
 .b1-public-scope .b1-price-enterprise p:first-child { color: #7ef0d0 !important; }
+.b1-public-scope .b1-pricing-page #pricing-demo .b1-night-band h2 { color: #fff !important; }
+.b1-public-scope .b1-pricing-page #pricing-demo .b1-night-band p { color: #c8d3e9 !important; }
+.b1-public-scope .b1-pricing-page #pricing-demo .b1-night-band p:first-child { color: #5eead4 !important; }
 .b1-public-scope .b1-alphascreen-page > section:first-child { padding-top: 0; }
 .b1-public-scope .b1-alphascreen-page > section:first-child > div:last-child { padding-top: 64px; padding-bottom: 64px; }
 .b1-public-scope .b1-patent-lockup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 0; }

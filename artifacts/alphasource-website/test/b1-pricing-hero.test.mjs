@@ -32,6 +32,11 @@ test("only shared header triggers get button texture and preserve it in interact
  assert.match(css,/\.b1-nav \.b1-nav-signin:focus-visible \{\s*outline: 2px solid #7ef0d0/);
  assert.doesNotMatch(css,/\.b1-btn-g \{[^}]*mesh-btn/);
 });
+test("new pricing contact panel overrides light-theme utility text on its dark surface",()=>{
+ assert.match(css,/#pricing-demo \.b1-night-band h2 \{ color: #fff !important/);
+ assert.match(css,/#pricing-demo \.b1-night-band p \{ color: #c8d3e9 !important/);
+ assert.match(css,/#pricing-demo \.b1-night-band p:first-child \{ color: #5eead4 !important/);
+});
 function luminance(hex){const c=hex.match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;}
 test("pricing text and header gradient endpoint pairs meet AA",()=>{
  // 25364e conservatively bounds the dark band gradients plus 10% white mesh.
