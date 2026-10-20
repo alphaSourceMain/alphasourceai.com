@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { AlphaScreenBreathingLockup, AlphaScreenLockup } from "@/components/AlphaScreenBrand";
-import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
 
 const EASE_OUT = "easeOut" as const;
 
@@ -70,15 +69,6 @@ function HeroSection() {
               className="b1-screen-body text-base leading-relaxed mb-8"
             >
               A membership-based AI interview agent that lets you create job roles and conduct automated screening interviews with AI avatars. The platform leverages advanced AI to comprehensively evaluate candidates — with flexible scheduling so candidates can interview anytime, day or night.
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 1, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.27, duration: 0.6 }}
-              className="b1-screen-date mb-8 text-sm font-semibold"
-            >
-              Last updated {PUBLIC_CONTENT_LAST_UPDATED}
             </motion.p>
 
             <motion.div
