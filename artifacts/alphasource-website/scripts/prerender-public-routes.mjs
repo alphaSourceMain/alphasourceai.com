@@ -885,7 +885,7 @@ function renderSnapshot(route, content) {
           <p class="as-eyebrow">${escapeHtml(content.eyebrow)}</p>
           <h1>${escapeHtml(content.h1)}</h1>
           <p class="as-intro">${escapeHtml(content.intro)}</p>
-          <p class="as-updated">Last updated: ${content.updatedAt ?? LAST_UPDATED}</p>
+          ${route === "/alphascreen" ? "" : `<p class="as-updated">Last updated: ${content.updatedAt ?? LAST_UPDATED}</p>`}
         </section>
         ${content.sections.map(renderContentSection).join("\n")}
         ${renderRelatedLinks(content.links)}
