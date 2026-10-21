@@ -647,6 +647,11 @@ function privacyRoute() {
         "alphaSource AI may collect limited public page view and CTA activity to understand site performance, improve product messaging, measure interest, and troubleshoot abuse or spam.",
         "Public analytics should not include passwords, candidate interview responses, dashboard content, or private customer account data.",
       ]),
+      section("Google Analytics 4 and privacy choices", [
+        "With Analytics enabled in Privacy choices, selected production marketing pages use Google Analytics 4 for public page views and limited navigation and form events. Google receives technical browser and device information and may use analytics cookies. We send fixed public page titles and paths and limited event categories, not lead contents, account identifiers or URL query values.",
+        "This integration excludes pricing and signup, ROI, support, sign-in and password setup, agreements, payments, dashboards and candidate or interview workflows. Advertising personalization, Google signals and automatic form tracking are disabled. Session replay is not used.",
+        "Optional technologies remain blocked until enabled. Turning off Analytics disables further Google measurement; when the choice saves successfully the page reloads to unload the tag. If browser storage is unavailable, Google Analytics fails closed. A preference change does not erase previously collected data; contact us about privacy requests.",
+      ]),
       section("Lead draft and abandoned form capture", [
         "If a visitor begins a public contact, demo, or inquiry form and enters usable business contact information, alphaSource AI may save a partial business-contact lead record even if the visitor does not complete the form.",
         "Message or freeform inquiry text is saved only when the visitor intentionally submits the form.",
@@ -670,6 +675,7 @@ function privacyRoute() {
     ],
     links: [
       ["/terms/", "Terms & Conditions"],
+      ["https://policies.google.com/technologies/partner-sites", "How Google uses information from sites that use its services"],
       ["/sales-sms-consent/", "Sales SMS verbal consent"],
       ["/support", "Support"],
       ["/faq", "FAQ"],

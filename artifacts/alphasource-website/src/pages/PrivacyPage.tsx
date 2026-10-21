@@ -17,7 +17,7 @@ export default function PrivacyPage() {
             <h1 className="text-4xl lg:text-5xl font-black text-[#0A1547] leading-tight mb-3">
               Privacy Policy
             </h1>
-            <p className="text-base text-[#0A1547]/50">Effective Date: 9/17/2026</p>
+            <p className="text-base text-[#0A1547]/50">Effective Date: 10/21/2026</p>
           </motion.div>
         </div>
       </div>
@@ -51,6 +51,9 @@ export default function PrivacyPage() {
               We use first-party public analytics to understand site performance, improve product messaging, measure interest, troubleshoot abuse or spam, and prepare self-serve purchasing workflows.
             </p>
             <p>
+              On selected production marketing pages, enabling Analytics also permits Google Analytics 4 to measure public page views and limited navigation and form events. Google receives technical browser and device information and may use analytics cookies. We send fixed public page titles and paths and limited event categories, not lead names, email addresses, phone numbers, message contents, account identifiers, URL query values or private workflow contents. Advertising personalization, Google signals and automatic form tracking are disabled for this integration. Learn <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">how Google uses information from sites that use its services</a>.
+            </p>
+            <p>
               Analytics events should not include names, email addresses, phone numbers, freeform message text, passwords, candidate interview responses, dashboard content, or private customer account data.
             </p>
           </Section>
@@ -75,10 +78,13 @@ export default function PrivacyPage() {
 
           <Section number="5" title="COOKIES AND SIMILAR TECHNOLOGIES">
             <p>
-              Optional technologies are blocked until you enable the relevant category in Privacy choices. Analytics enables first-party public-site event measurement. Marketing attribution enables Identity Pixel when configured to understand where traffic originates and how visitors navigate through the public website.
+              Optional technologies are blocked until you enable the relevant category in Privacy choices. Analytics enables first-party public-site event measurement and Google Analytics 4 on selected production marketing pages. The Google integration excludes pricing and signup, ROI, support, sign-in and password setup, agreements, payments, dashboards and candidate or interview workflows. Marketing attribution enables Identity Pixel when configured to understand where traffic originates and how visitors navigate through the public website.
             </p>
             <p>
               We store your category preferences using the first-party preference key <code>alphasource:tracking-preferences:v2</code>. Each optional technology remains blocked until its category is enabled. Turning off Analytics clears application-owned optional analytics identifiers where feasible. Changing a preference stops future application-controlled loading; cookies or storage already set by a third party may not be directly removable by this site.
+            </p>
+            <p>
+              Turning off Analytics disables further Google measurement in the current document. When the preference is saved successfully, the page reloads to unload the Google tag. If browser storage is unavailable, the integration fails closed rather than loading Google Analytics without a saved choice. Previously collected data is not erased by changing this device preference; you can contact us about privacy requests.
             </p>
             <p>
               You can reopen Privacy choices from the footer to change your preferences. alphaScreen candidate interview, admin, and client workflow access do not require public marketing pixels to function. Essential sign-in, security, and core website functions remain active regardless of optional technology preferences. We do not use session replay for this public analytics workflow.

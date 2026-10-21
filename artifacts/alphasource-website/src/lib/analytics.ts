@@ -1,4 +1,5 @@
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
+import { trackGa4 } from "./ga4";
 
 type AnalyticsProperties = Record<string, unknown>;
 
@@ -176,7 +177,7 @@ export function trackEvent(eventName: string, properties: AnalyticsProperties = 
   }
 
   try {
-    window.gtag?.("event", eventName, payload.properties);
+    trackGa4(eventName, payload.properties);
   } catch {
     // no-op
   }

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { revokeGa4 } from "@/lib/ga4";
 
 const TRACKING_PREFERENCES_STORAGE_KEY = "alphasource:tracking-preferences:v2";
 const LEGACY_TRACKING_CONSENT_STORAGE_KEY = "alphasource:tracking-consent:v1";
@@ -186,7 +187,8 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       };
 
       if (!nextPreferences.analytics) clearOptionalTrackingIdentifiers();
-      savePreferencesToStorage(nextPreferences);
+      const persisted = savePreferencesToStorage(nextPreferences);
+      if (!nextPreferences.analytics) revokeGa4(persisted);
       setPreferences(nextPreferences);
       closeTrackingPreferences();
     },
