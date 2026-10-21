@@ -1,5 +1,6 @@
 /** Production public-site measurement only. No auth, lead, billing or candidate data. */
 export const GA4_MEASUREMENT_ID = "G-SR258DR5SR";
+export const GA4_CONSENT_REVISION = "ga4-20261021";
 const PREFERENCES_KEY = "alphasource:tracking-preferences:v2";
 const HOSTS = new Set(["www.alphasourceai.com", "alphasourceai.com"]);
 const TITLES: Record<string, string> = {
@@ -48,7 +49,7 @@ export function createGa4(win: GaWindow, enabled: boolean) {
     try {
       const raw = win.localStorage.getItem(PREFERENCES_KEY);
       const saved = raw ? JSON.parse(raw) : null;
-      if (saved?.analytics !== true || typeof saved.updatedAt !== "string" || !Number.isFinite(Date.parse(saved.updatedAt))) return false;
+      if (saved?.analytics !== true || saved.googleAnalyticsRevision !== GA4_CONSENT_REVISION || typeof saved.updatedAt !== "string" || !Number.isFinite(Date.parse(saved.updatedAt))) return false;
       // Fail closed if preferences cannot be persisted (including read-only/blocked storage).
       win.localStorage.setItem(PREFERENCES_KEY, raw!);
       return true;
@@ -158,7 +159,14 @@ export function createGa4(win: GaWindow, enabled: boolean) {
   function revoke(persisted: boolean) {
     if (requested && hold() && persisted) win.location.reload();
   }
-  return { track, hold, revoke, installGuard };
+  function needsConsentRefresh() {
+    if (!enabled || !page()) return false;
+    try {
+      const saved = JSON.parse(win.localStorage.getItem(PREFERENCES_KEY) || "null");
+      return saved?.analytics === true && saved.googleAnalyticsRevision !== GA4_CONSENT_REVISION;
+    } catch { return false; }
+  }
+  return { track, hold, revoke, installGuard, needsConsentRefresh };
 }
 
 const runtime = typeof window === "undefined" ? null : createGa4(window as GaWindow,
@@ -167,3 +175,4 @@ export const installGa4NavigationGuard = () => runtime?.installGuard();
 export const trackGa4 = (name: string, properties: Record<string, unknown> = {}) => runtime?.track(name, properties);
 export const holdGa4ForDocument = () => runtime?.hold();
 export const revokeGa4 = (persisted: boolean) => runtime?.revoke(persisted);
+export const needsGa4ConsentRefresh = () => runtime?.needsConsentRefresh() ?? false;

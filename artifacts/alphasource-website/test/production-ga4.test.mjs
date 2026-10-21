@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
 const source=readFileSync(new URL('../src/lib/ga4.ts',import.meta.url),'utf8');
 const compiled=transformSync(source,{loader:'ts',format:'esm',define:{'import.meta.env':'{}'}}).code;
-const {createGa4,ga4Page,ga4Event,GA4_MEASUREMENT_ID}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const {createGa4,ga4Page,ga4Event,GA4_MEASUREMENT_ID,GA4_CONSENT_REVISION}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const key='alphasource:tracking-preferences:v2';
 function harness({url='https://www.alphasourceai.com/',choice=true,enabled=true,blocked=false,readonly=false}={}){
- const values=new Map(choice===null?[]:[[key,JSON.stringify({analytics:choice,updatedAt:'2026-10-21T22:00:00.000Z'})]]);
+ const values=new Map(choice===null?[]:[[key,JSON.stringify({analytics:choice,googleAnalyticsRevision:GA4_CONSENT_REVISION,updatedAt:'2026-10-21T22:00:00.000Z'})]]);
  const scripts=[],listeners=new Map(),writes=[],navigations=[]; let reloads=0;
  const win={location:{href:url,assign:to=>navigations.push(to),reload:()=>reloads++},
   localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return values.get(k)||null},setItem:(k,v)=>{if(blocked||readonly)throw Error('blocked');values.set(k,v)}},
@@ -27,6 +27,11 @@ test('unknown, rejected, disabled, blocked and read-only preferences load no pro
  for(const options of [{choice:null},{choice:false},{enabled:false},{blocked:true},{readonly:true},{url:'https://qa.example/'}]){
   const h=harness(options);h.ga.track('page_viewed');h.ga.track('lead_form_started',{form_id:'home-contact'});assert.equal(h.scripts.length,0,JSON.stringify(options));assert.equal(h.win.dataLayer,undefined);
  }
+});
+test('prior first-party consent cannot silently opt visitors into a new Google provider',()=>{
+ const h=harness();h.values.set(key,JSON.stringify({analytics:true,marketingAttribution:true,updatedAt:'2026-10-21T22:00:00.000Z'}));assert.equal(h.ga.needsConsentRefresh(),true);h.ga.track('page_viewed');assert.equal(h.scripts.length,0);
+ h.values.set(key,JSON.stringify({analytics:true,googleAnalyticsRevision:GA4_CONSENT_REVISION,updatedAt:'2026-10-21T22:00:00.000Z'}));assert.equal(h.ga.needsConsentRefresh(),false);h.ga.track('page_viewed');assert.equal(h.scripts.length,1);
+ const denied=harness({choice:false});assert.equal(denied.ga.needsConsentRefresh(),false);const disabled=harness({enabled:false});assert.equal(disabled.ga.needsConsentRefresh(),false);
 });
 test('one loader and one manual pageview under repeated React events; sanitized config',()=>{
  const h=harness();for(let i=0;i<3;i++)h.ga.track('page_viewed');assert.equal(h.scripts.length,1);assert.equal(h.win[`ga-disable-${GA4_MEASUREMENT_ID}`],true);

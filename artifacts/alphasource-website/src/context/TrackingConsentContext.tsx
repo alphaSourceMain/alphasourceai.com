@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { revokeGa4 } from "@/lib/ga4";
+import { GA4_CONSENT_REVISION, needsGa4ConsentRefresh, revokeGa4 } from "@/lib/ga4";
 
 const TRACKING_PREFERENCES_STORAGE_KEY = "alphasource:tracking-preferences:v2";
 const LEGACY_TRACKING_CONSENT_STORAGE_KEY = "alphasource:tracking-consent:v1";
@@ -34,6 +34,7 @@ export type OptionalTrackingPreferences = {
   analytics: boolean;
   marketingAttribution: boolean;
   updatedAt: string;
+  googleAnalyticsRevision?: string;
 };
 
 export type OptionalTrackingSelection = Pick<
@@ -104,6 +105,7 @@ function parseStoredPreferences(value: string | null): OptionalTrackingPreferenc
       analytics: preferences.analytics,
       marketingAttribution: preferences.marketingAttribution,
       updatedAt: preferences.updatedAt,
+      googleAnalyticsRevision: preferences.googleAnalyticsRevision === GA4_CONSENT_REVISION ? GA4_CONSENT_REVISION : undefined,
     };
   } catch {
     return null;
@@ -184,6 +186,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
         analytics: Boolean(selection.analytics),
         marketingAttribution: Boolean(selection.marketingAttribution),
         updatedAt: new Date().toISOString(),
+        googleAnalyticsRevision: GA4_CONSENT_REVISION,
       };
 
       if (!nextPreferences.analytics) clearOptionalTrackingIdentifiers();
@@ -208,7 +211,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       analyticsEnabled: preferences?.analytics === true,
       allowAllOptionalTracking,
       closeTrackingPreferences,
-      hasSavedPreferences: preferences !== null,
+      hasSavedPreferences: preferences !== null && !needsGa4ConsentRefresh(),
       marketingAttributionEnabled: preferences?.marketingAttribution === true,
       openTrackingPreferences,
       preferences,

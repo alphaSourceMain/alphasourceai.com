@@ -116,7 +116,8 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
             <div className="max-w-3xl">
               <h2 className="text-sm font-semibold text-[#0A1547]">Privacy choices</h2>
               <p className="mt-1 text-sm leading-5 text-[#38415E]">
-                We use optional analytics and marketing attribution tools. You can allow all
+                We use optional first-party analytics, Google Analytics 4 on selected production
+                pages, and marketing attribution tools. You can allow all
                 optional technologies or choose which categories to enable. Essential sign-in and security
                 functions always remain active.
               </p>
@@ -177,7 +178,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               />
               <PreferenceRow
                 checked={draft.analytics}
-                description="Helps us understand how visitors use the public site so we can improve navigation and content."
+                description="First-party measurement and Google Analytics 4 on selected production public pages help us improve navigation and content. Google receives technical browser/device information and may use analytics cookies."
                 id="analytics"
                 label="Analytics"
                 onCheckedChange={(analytics) => setDraft((current) => ({ ...current, analytics }))}
