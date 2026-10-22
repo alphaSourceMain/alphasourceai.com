@@ -296,6 +296,20 @@ test("when both denial stores fail, opaque query fallback keeps stale grants off
   fresh.tag.start(); assert.equal(fresh.scripts.length, 0); assert.equal(fresh.tag.withdrawalState().saveFailed, true);
   assert.equal(fresh.historyWrites.length, 0); assert.equal(fresh.replacements.length, 0, "never silently strip fallback");
 });
+test("session-only failed withdrawal survives modified and noopener links into empty-session documents", () => {
+  for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey", "blank", "auxclick", "contextmenu"]) {
+    const h = harness({ blockedCookies: true }); h.tag.start(); h.readonly(); h.tag.changeChoice(false, false);
+    assert.equal(h.session.get(blockKey), "save-error");
+    const sameTab = harness({ session: h.session, values: h.values, blockedCookies: true });
+    const anchor = sameTab.doc.querySelector("#private"); anchor.href = root + "about/";
+    if (modifier === "blank") { anchor.target = "_blank"; anchor.rel = "noopener noreferrer"; }
+    const type = ["auxclick", "contextmenu"].includes(modifier) ? modifier : "click";
+    assert.equal(sameTab.interact("#private", type, type !== "click" ? { button: 1 } : modifier === "blank" ? {} : { [modifier]: true }).defaultPrevented, false);
+    assert.equal(new URL(anchor.href).searchParams.get("__as_linkedin_withdrawn"), "save-error");
+    const newTab = harness({ url: anchor.href, values: h.values, session: new Map(), blockedCookies: true });
+    newTab.tag.start(); assert.equal(newTab.scripts.length, 0); assert.equal(newTab.tag.withdrawalState().saveFailed, true);
+  }
+});
 test("failed-save fallback survives ordinary links, modified links and SPA navigation across documents", () => {
   const values = new Map([[key, JSON.stringify(savedConsent)]]);
   let url = root + "?__as_linkedin_withdrawn=save-error";

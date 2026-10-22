@@ -62,11 +62,14 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
   let script: HTMLScriptElement | null = null;
   let prepared: { next: boolean; persisted: boolean; reload: boolean; destination: string | null } | null = null;
 
-  function rememberBlock(reason: Block): boolean {
+  function rememberBlock(reason: Block, acrossContexts = false): boolean {
     // Never downgrade an unacknowledged failed save to a silent temporary hold.
     block = block === "save-error" ? block : reason;
     let saved = false;
-    try { win.sessionStorage.setItem(BLOCK_KEY, block); saved = win.sessionStorage.getItem(BLOCK_KEY) === block; } catch { /* Try privacy cookie. */ }
+    try {
+      win.sessionStorage.setItem(BLOCK_KEY, block);
+      if (!acrossContexts) saved = win.sessionStorage.getItem(BLOCK_KEY) === block;
+    } catch { /* Try privacy cookie. */ }
     try {
       for (const domain of ["", ";Domain=alphasourceai.com"]) win.document.cookie = BLOCK_COOKIE + "=" + block + ";Path=/;Secure;SameSite=Lax" + domain;
       saved = win.document.cookie.split("; ").includes(BLOCK_COOKIE + "=" + block) || saved;
@@ -81,9 +84,9 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
     } catch { /* Remain denied if unremovable. */ }
   }
   function carryBlock(destination: URL) {
-    // With all denial stores unavailable, keep the opaque withdrawal on our
-    // own navigation URLs. Never decorate an external destination.
-    if (block && productionHost(destination) && !rememberBlock(block)) destination.searchParams.set(BLOCK_PARAM, block);
+    // Session storage alone cannot cover a noopener/new-tab browsing context.
+    // Unless a cross-tab cookie verifies, carry denial on our own URLs only.
+    if (block && productionHost(destination) && !rememberBlock(block, true)) destination.searchParams.set(BLOCK_PARAM, block);
     return destination;
   }
   function expireCookies() {
@@ -174,7 +177,7 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
     retireDocument();
     expireCookies();
     unloading = true;
-    win.location.assign(destination.href); // BEFORE history writes / protected React render.
+    win.location.assign(carryBlock(destination).href); // BEFORE history writes / protected React render.
   }
   function installGuard() {
     if (guardInstalled || !configured()) return;
@@ -184,7 +187,7 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
       win.history[method] = function (data: unknown, unused: string, url?: string | URL | null) {
         const destination = new URL(url == null ? win.location.href : String(url), win.location.href);
         if (destination.origin !== new URL(win.location.href).origin) { previous(data, unused, url); return; }
-        if (contaminated && (!pageAllowed() || !linkedInPage(destination.href) || !consent())) { navigate(carryBlock(destination)); return; }
+        if (contaminated && (!pageAllowed() || !linkedInPage(destination.href) || !consent())) { navigate(destination); return; }
         if (!linkedInPage(win.location.href) || !linkedInPage(destination.href)) held = true;
         previous(data, unused, carryBlock(destination).href);
       };
@@ -215,7 +218,7 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
         }
       }
     };
-    for (const name of ["click", "keydown"]) win.document.addEventListener(name, interaction, true);
+    for (const name of ["click", "keydown", "auxclick", "contextmenu"]) win.document.addEventListener(name, interaction, true);
     for (const name of ["popstate", "hashchange"]) win.addEventListener(name, event => {
       if (!linkedInPage(win.location.href)) held = true;
       if (contaminated && (!pageAllowed() || !consent())) {
