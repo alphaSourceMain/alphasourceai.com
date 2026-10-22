@@ -1,7 +1,7 @@
-import { capacityFaq, membershipTermFaq, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, scoringFaqs, interviewStatusFaq, septemberUpdates } from "@/content/supportGuidance";
+import { capacityFaq, membershipFaqs, membershipUpdates, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, scoringFaqs, interviewStatusFaq, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-10-10.1";
+export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-10-22.1";
 
 export const faqSections = [
   {
@@ -100,7 +100,7 @@ export const faqSections = [
       },
       {
         question: "What happens when a role reaches its screening interview capacity?",
-        answer: "Check the role's remaining capacity on Roles. Authorized billing users can open Billing and use Purchase Additional Interviews for the intended role. Candidate starts may be blocked until capacity is available. Check the correct client/entity scope and payment status; contact support if access remains blocked.",
+        answer: "For per-role memberships, check remaining capacity on Roles. Authorized users can use Purchase Additional Interviews in Billing for supported per-role models. Usage-based Enterprise instead uses its agreed paid pool and metered interview rate; do not buy per-role top-ups for that model. Check the client/entity scope and payment status; contact support if access remains blocked.",
       },
     ],
   },
@@ -214,7 +214,7 @@ export const faqSections = [
     title: "Billing and capacity",
     items: [
       capacityFaq,
-      membershipTermFaq,
+      ...membershipFaqs,
       { question: "How does first-role prepay work?", answer: firstRolePrepayAnswer },
       {
         question: "Where do I see my plan or membership status?",
@@ -310,7 +310,7 @@ export const guidanceCards: SupportGuidanceCard[] = [
   },
   {
     title: "Billing, capacity, and team access",
-    body: "Review membership status, screening interview capacity, and team permissions so the right users can support the hiring workflow.",
+    body: "Check your accepted term, payment schedule, and renewal preference in Billing. Review per-role capacity, rollover expiry, or Enterprise pool and metered usage for your billing model. Your existing agreement remains authoritative.",
   },
   {
     title: "Profile and account security",
@@ -350,6 +350,7 @@ export const dataPracticeSections = [
 ];
 
 export const productUpdates = [
+  ...membershipUpdates.map(({ date, ...update }) => ({ version: date, ...update })),
   ...septemberUpdates.map(({ date, ...update }) => ({ version: date, ...update })),
   {
     version: "alphaScreen v2.1",

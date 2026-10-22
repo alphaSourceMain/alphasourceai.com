@@ -49,10 +49,26 @@ const compiled = await build({
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`;
 const content = await import(moduleUrl);
 
+// Exact repeated question+answer pairs need appear only once in the voice
+// context. Do not merge questions whose answers differ by audience.
+const seenFaqs = new Set();
+function uniqueFaqs(items) {
+  return items.filter(item => {
+    const key = JSON.stringify([item.question, item.answer]);
+    if (seenFaqs.has(key)) return false;
+    seenFaqs.add(key);
+    return true;
+  });
+}
+const dashboardFaqs = content.faqSections.map(section => ({ ...section, items: uniqueFaqs(section.items) }));
+const publicFaqs = content.publicFaqSections.map(section => ({ ...section, items: uniqueFaqs(section.items) }))
+  .filter(section => section.items.length > 0);
+const publicSupportQuestions = uniqueFaqs(content.publicSupportQuestions);
 const snapshot = {
   schema_version: 1,
   knowledge_version: content.DASHBOARD_SUPPORT_KNOWLEDGE_VERSION,
   public_content_last_updated: content.PUBLIC_CONTENT_LAST_UPDATED,
+  faq_scope: "All current answers; identical question-and-answer pairs shared across surfaces appear once.",
   sources: {
     dashboard_faq: "src/content/dashboardSupportContent.ts",
     dashboard_rubric_faq: "src/content/rubricGuidance.ts#RUBRIC_FAQ",
@@ -65,13 +81,13 @@ const snapshot = {
     guidance_cards: content.guidanceCards,
     data_practices: content.dataPracticeSections,
     product_updates: content.productUpdates,
-    faq_sections: content.faqSections,
+    faq_sections: dashboardFaqs,
   },
   public: {
-    faq_sections: content.publicFaqSections,
+    faq_sections: publicFaqs,
     product_updates: content.publicProductUpdates,
     support_topics: content.publicSupportTopics,
-    support_questions: content.publicSupportQuestions,
+    support_questions: publicSupportQuestions,
   },
 };
 

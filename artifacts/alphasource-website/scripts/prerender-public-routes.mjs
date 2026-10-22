@@ -19,6 +19,8 @@ const compiledContent = await build({
 });
 const publicContent = await import(`data:text/javascript;base64,${Buffer.from(compiledContent.outputFiles[0].text).toString("base64")}`);
 const LAST_UPDATED = publicContent.PUBLIC_CONTENT_LAST_UPDATED;
+// A Help content refresh must not redraft unrelated public/legal page dates.
+const UNCHANGED_PUBLIC_LAST_UPDATED = "October 10, 2026";
 const supportContact = JSON.parse(fs.readFileSync(supportContactPath, "utf8"));
 const AI_SUPPORT_PHONE_DISPLAY = supportContact.display;
 const AI_SUPPORT_PHONE_URI = supportContact.uri;
@@ -551,6 +553,7 @@ console.log(`Prerendered ${publicRoutes.length} public route HTML snapshots.`);
 
 function faqRoute() {
   return {
+    updatedAt: LAST_UPDATED,
     title: "alphaScreen FAQ | Pricing, Passkeys, Verification, Security, and Human Review",
     description:
       "Read common alphaScreen questions about memberships, pricing, passkeys, candidate verification, reports, security, accommodations, and human hiring decisions.",
@@ -592,6 +595,7 @@ function faqRoute() {
 
 function supportRoute() {
   return {
+    updatedAt: LAST_UPDATED,
     title: "alphaScreen Support | Setup, Passkeys, Verification, and Product Updates",
     description:
       "Get alphaScreen public support guidance for account setup, passkeys, candidate verification, memberships, billing, product updates, recovery, and security questions.",
@@ -879,7 +883,7 @@ function renderSnapshot(route, content) {
           <p class="as-eyebrow">${escapeHtml(content.eyebrow)}</p>
           <h1>${escapeHtml(content.h1)}</h1>
           <p class="as-intro">${escapeHtml(content.intro)}</p>
-          ${route === "/alphascreen" ? "" : `<p class="as-updated">Last updated: ${content.updatedAt ?? LAST_UPDATED}</p>`}
+          ${route === "/alphascreen" ? "" : `<p class="as-updated">Last updated: ${content.updatedAt ?? UNCHANGED_PUBLIC_LAST_UPDATED}</p>`}
         </section>
         ${content.sections.map(renderContentSection).join("\n")}
         ${renderRelatedLinks(content.links)}

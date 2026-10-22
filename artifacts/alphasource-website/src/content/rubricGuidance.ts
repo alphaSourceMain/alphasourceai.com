@@ -1,4 +1,6 @@
 import type { InterviewType } from "@/lib/interviewContract";
+import { MEMBERSHIP_SUPPORT_FACTS } from "./membershipSupportFacts.ts";
+const { essential, pro } = MEMBERSHIP_SUPPORT_FACTS;
 
 export interface RubricFaqItem {
   question: string;
@@ -14,11 +16,11 @@ export interface InterviewTypeGuide {
 export const RUBRIC_FAQ: readonly Readonly<RubricFaqItem>[] = Object.freeze([
   Object.freeze({
     question: "What determines interview length?",
-    answer: "Membership determines interview length. Essential interviews are 10 minutes, Pro interviews are 12 minutes, and Enterprise interviews are 15 minutes.",
+    answer: `Membership determines interview length. New Essential interviews have a ${essential.minutes}-minute cap and Pro interviews a ${pro.minutes}-minute cap. Enterprise duration is customized in the accepted agreement and configured plan; it is not always 15 minutes. Existing agreements retain their accepted limits.`,
   }),
   Object.freeze({
     question: "What determines the number of questions?",
-    answer: "Membership determines the number of scored questions. Essential includes 5, Pro includes 6, and Enterprise includes 7.",
+    answer: `Membership determines the number of scored questions. New Essential includes ${essential.questions} and Pro includes ${pro.questions}. Enterprise question count follows its accepted agreement and configured plan; it is not always 7. Warm-up is separate. Existing agreements retain their accepted settings.`,
   }),
   Object.freeze({
     question: "What does interview type control?",

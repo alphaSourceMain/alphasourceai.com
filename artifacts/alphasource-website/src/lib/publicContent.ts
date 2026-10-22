@@ -1,7 +1,7 @@
-import { capacityFaq, membershipTermFaq, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, buyerVerificationFaq, scoringFaqs, septemberUpdates } from "@/content/supportGuidance";
+import { capacityFaq, membershipFaqs, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, buyerVerificationFaq, scoringFaqs, membershipUpdates, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const PUBLIC_CONTENT_LAST_UPDATED = "October 10, 2026";
+export const PUBLIC_CONTENT_LAST_UPDATED = "October 22, 2026";
 
 export type PublicFaqItem = {
   question: string;
@@ -63,23 +63,8 @@ export const publicFaqSections: PublicFaqSection[] = [
     title: "Memberships & Billing",
     intro: "How public alphaScreen membership pricing works.",
     items: [
-      membershipTermFaq,
+      ...membershipFaqs,
       capacityFaq,
-      {
-        question: "How does pricing work?",
-        answer:
-          "Public Essential and Pro memberships include a platform membership fee plus a per-role fee. Essential is listed at $299 monthly or $3,299 annually plus $399 per role. Pro is listed at $599 monthly or $6,499 annually plus $699 per role.",
-      },
-      {
-        question: "What is included in a membership?",
-        answer:
-          "Essential includes 20 interviews per role with a 10-minute interview cap. Pro includes 30 interviews per role with a 12-minute interview cap. Additional interviews are listed publicly at $25 for Essential and $30 for Pro; client-specific signed terms apply.",
-      },
-      {
-        question: "How do billing and role fees work?",
-        answer:
-          "The membership fee covers platform access for the selected cadence. Role fees are charged when paid roles are opened, and additional interviews are billed only when extra interview capacity is needed for a role.",
-      },
       {
         question: "What is first-role prepay?",
         answer:
@@ -196,6 +181,7 @@ export const publicFaqSections: PublicFaqSection[] = [
 export const publicFaqItems: PublicFaqItem[] = publicFaqSections.flatMap((section) => section.items);
 
 export const publicProductUpdates: PublicProductUpdate[] = [
+  ...membershipUpdates,
   ...septemberUpdates,
   {
     date: "September 2026",
@@ -262,7 +248,7 @@ export const publicSupportTopics: PublicSupportTopic[] = [
   {
     title: "Memberships, billing, and first-role prepay",
     body:
-      "Support can help explain membership cadence, role fees, additional interviews, and first-role prepay status. Billing access remains limited to authorized account users.",
+      "Choose a 3-, 6-, or 12-month prepaid Essential or Pro term online, or contact sales for installments over that term. Enterprise can use custom per-role or usage-based pricing. Authorized users can check renewal settings, payments, role credits, rollover expiry, or paid pools in Billing; your accepted agreement controls.",
     links: [
       { label: "Membership pricing", href: "/alphascreen/pricing" },
       { label: "Value estimator", href: "/alphascreen/roi" },
@@ -293,6 +279,7 @@ export const publicSupportTopics: PublicSupportTopic[] = [
 ];
 
 export const publicSupportQuestions: PublicFaqItem[] = [
+  ...membershipFaqs,
   { question: "Can browser AI support contact the team for me?", answer: "Eligible Pro/Enterprise clients get dashboard AI guidance. Essential uses Help Center/email support. When email escalation is available, it can submit your name, reply email, and a brief issue summary to support@alphasourceai.com after you explicitly approve sending them. It sends only for requested escalation, not after every conversation. It cannot inspect accounts, change records, transfer a browser call, or promise when the team will respond. If submission is not confirmed, email the support team directly. AI Customer Support is also available at (605) 599-8008." },
   deviceCheckFaq,
   launchRecoveryFaq,
