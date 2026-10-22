@@ -6,8 +6,10 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { useClient, type Client, type ClientMembership } from "@/context/ClientContext";
 import { buildEntityFilterOptions, defaultEntityFilterValue, entityFilterHelpText, entityFilterQueryValue, type EntityFilterValue } from "@/lib/entityFilters";
 import { supabase } from "@/lib/supabaseClient";
+import { clientMemberRoleLabel, type ClientMemberDisplayRole } from "@/lib/clientMemberRoleLabel";
 
-type MemberRole = "Manager" | "Member";
+type MemberRole = ClientMemberDisplayRole;
+type AssignableMemberRole = "Manager" | "Member";
 type SortKey = "name" | "email" | "entity" | "role";
 type SortDir = "asc" | "desc";
 
@@ -72,18 +74,13 @@ function parseJsonSafe(text: string): unknown {
   }
 }
 
-function toMemberRole(value: unknown): MemberRole {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "manager" || normalized === "admin") return "Manager";
-  return "Member";
-}
-
 function fallbackNameFromEmail(email: string): string {
   const local = String(email || "").split("@")[0] || "";
   return local.trim() || "Unnamed Member";
 }
 
 const roleStyle: Record<MemberRole, { bg: string; text: string }> = {
+  "Super Admin": { bg: "color-mix(in srgb, var(--as-text) 9%, transparent)", text: "var(--as-text)" },
   Manager: { bg: "rgba(163,128,246,0.12)", text: "#7C5FCC" },
   Member:  { bg: "rgba(2,171,224,0.12)",   text: "#0285B0" },
 };
@@ -242,7 +239,7 @@ export default function MembersPage() {
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
-  const [role, setRole]         = useState<MemberRole>("Member");
+  const [role, setRole]         = useState<AssignableMemberRole>("Member");
   const [entityFilter, setEntityFilter] = useState<EntityFilterValue>("parent");
   const [submitted, setSubmitted] = useState(false);
   const [memberModalOpen, setMemberModalOpen] = useState(false);
@@ -373,7 +370,7 @@ export default function MembersPage() {
               entityName: String(item.entity_name || "").trim() || selectedClient.name || "—",
               name: nameValue,
               email: rawEmail || "—",
-              role: toMemberRole(item.role),
+              role: clientMemberRoleLabel(item.role),
             };
           });
 
@@ -993,7 +990,7 @@ export default function MembersPage() {
                     value={role}
                     onChange={(e) => {
                       setModalNotice(null);
-                      setRole(e.target.value as MemberRole);
+                      setRole(e.target.value as AssignableMemberRole);
                     }}
                     disabled={addingMember}
                     className="w-full appearance-none px-4 py-2.5 rounded-xl border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#A380F6]/25 focus:border-[#A380F6] transition-all cursor-pointer pr-9"
