@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isPublicOptionalTrackingRoute, useTrackingConsent } from "@/context/TrackingConsentContext";
+import { useTrackingConsent } from "@/context/TrackingConsentContext";
 import { syncLinkedInInsight } from "@/lib/linkedinInsight";
 
 export default function LinkedInInsightLoader({ location }: { location: string }) {
@@ -7,7 +7,6 @@ export default function LinkedInInsightLoader({ location }: { location: string }
 
   useEffect(() => {
     syncLinkedInInsight({
-      onPublicRoute: isPublicOptionalTrackingRoute(location),
       marketingAttribution: preferences?.marketingAttribution === true,
       linkedinRevision: preferences?.linkedinRevision,
     });

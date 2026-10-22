@@ -17,7 +17,7 @@ export default function PrivacyPage() {
             <h1 className="text-4xl lg:text-5xl font-black text-[#0A1547] leading-tight mb-3">
               Privacy Policy
             </h1>
-            <p className="text-base text-[#0A1547]/50">Effective Date: 10/21/2026</p>
+            <p className="text-base text-[#0A1547]/50">Effective Date: 10/22/2026</p>
           </motion.div>
         </div>
       </div>
@@ -78,7 +78,13 @@ export default function PrivacyPage() {
 
           <Section number="5" title="COOKIES AND SIMILAR TECHNOLOGIES">
             <p>
-              Optional technologies are blocked until you enable the relevant category in Privacy choices. Analytics enables first-party public-site event measurement and Google Analytics 4 on selected production marketing pages. The Google integration excludes pricing and signup, ROI, support, sign-in and password setup, agreements, payments, dashboards and candidate or interview workflows. Marketing attribution enables Identity Pixel when configured, and the LinkedIn Insight Tag when a partner ID is configured, to understand where traffic originates and how visitors navigate through the public website. The LinkedIn tag is skipped when that category is off, when no partner ID is set, or after the choice is withdrawn.
+              Optional technologies are blocked until you enable the relevant category in Privacy choices. Analytics enables first-party public-site event measurement and Google Analytics 4 on selected production marketing pages. The Google integration excludes pricing and signup, ROI, support, sign-in and password setup, agreements, payments, dashboards and candidate or interview workflows. Marketing attribution enables Identity Pixel when configured to understand where traffic originates and how visitors navigate through the public website.
+            </p>
+            <p>
+              With a configured partner ID and your current Marketing attribution permission, the LinkedIn Insight Tag may receive selected marketing-page URLs, referrer, IP address, browser/device information and timestamps on alphasourceai.com or www.alphasourceai.com. It is excluded from pricing and signup, ROI, support, sign-in/password setup, agreements, payments, dashboards, candidate/interview workflows, other hosts, and URLs containing query parameters or parameter-bearing fragments. Browser Global Privacy Control is respected. We do not send custom lead values, email addresses or enhanced-matching identifiers through this integration. See <a href="https://www.linkedin.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">LinkedIn's Privacy Policy</a>.
+            </p>
+            <p>
+              LinkedIn is disabled before excluded navigation or authentication entry. Turning Marketing attribution off disables its queue, clears partner state, expires reachable first-party LinkedIn cookies where possible, and unloads an initialized tag through a fresh document. If saving a withdrawal fails, LinkedIn remains withdrawn for this visit and an error is shown; a first-party session privacy marker or, as a last resort, an opaque URL query marker prevents the old stored grant from reactivating it. The query fallback also keeps Google Analytics and Clarity off on that document. This does not erase previously delivered data or third-party/HttpOnly cookies outside our control.
             </p>
             <p>
               We store your category preferences using the first-party preference key <code>alphasource:tracking-preferences:v2</code>. Each optional technology remains blocked until its category is enabled. Turning off Analytics clears application-owned optional analytics identifiers where feasible. Changing a preference stops future application-controlled loading; cookies or storage already set by a third party may not be directly removable by this site.

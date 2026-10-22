@@ -83,6 +83,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
     hasSavedPreferences,
     preferences,
     preferencesOpen,
+    preferencesSaveError,
     rejectOptionalTracking,
     savePreferences,
     openTrackingPreferences,
@@ -120,8 +121,8 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               <p className="mt-1 text-sm leading-5 text-[#38415E]">
                 We use optional first-party analytics, Google Analytics 4, Microsoft Clarity session replay
                 on selected production public pages, and marketing attribution, including the LinkedIn
-                Insight Tag. Entered values and form interactions are not recorded; masked form outlines
-                may be visible. Sign-in and private workflows are excluded from replay. Choose which
+                Insight Tag. Clarity does not record entered values or form interactions; masked form outlines
+                may be visible in Clarity replay. Sign-in and private workflows are excluded from replay. Choose which
                 optional technologies to enable; essential sign-in and security remain active.
               </p>
             </div>
@@ -171,6 +172,12 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               </DialogDescription>
             </DialogHeader>
 
+            {preferencesSaveError ? (
+              <p role="alert" className="mt-4 text-sm font-semibold text-red-700">
+                {preferencesSaveError}
+              </p>
+            ) : null}
+
             <div className="mt-6">
               <PreferenceRow
                 checked
@@ -195,7 +202,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               />
               <PreferenceRow
                 checked={draft.marketingAttribution}
-                description="Helps our marketing team understand where website traffic originates and how visitors navigate the public site. When this is enabled and a LinkedIn partner ID is configured, the LinkedIn Insight Tag may load."
+                description="Helps our marketing team understand website traffic. With this choice and a configured partner ID, LinkedIn Insight Tag may receive selected production marketing-page URLs, referrer, IP address and technical browser/device information. Sign-in, private workflows, query parameters and parameter-bearing fragments are excluded. Withdrawal may reload the page."
                 id="marketing-attribution"
                 label="Marketing attribution"
                 onCheckedChange={(marketingAttribution) =>
