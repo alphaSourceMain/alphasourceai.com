@@ -65,6 +65,15 @@ test('choice changes reload once after persistence; failed storage holds without
  const off=harness({enabled:false});assert.equal(off.controller.changeChoice(true,true),false);assert.equal(off.reloads(),0);assert.equal(off.listeners.size,0);
  for(const persisted of [true,false]){const h=harness();await h.controller.start();h.controller.changeChoice(false,persisted);assert.equal(h.reloads(),Number(persisted));h.config().upload(raw());assert.equal(h.deliveries.length,0);assert.ok(h.cookies.every(c=>/^_(clck|clsk)=/.test(c)));}
 });
+test('first persisted opt-in cannot start in the old document while reload is pending',async()=>{
+ const h=harness({choice:false});
+ h.values.set(key,JSON.stringify({analytics:false,marketingAttribution:false,sessionReplay:true,clarityRevision:REPLAY_REVISION,updatedAt:'2026-10-21T22:00:00.000Z'}));
+ assert.equal(h.controller.changeChoice(true,true),true);
+ // The reload stub does not navigate: simulate React committing the saved choice
+ // and rerunning its loader effect before the old document is discarded.
+ await h.controller.start();
+ assert.equal(h.reloads(),1);assert.equal(h.loads(),0);assert.equal(h.starts(),0);assert.equal(h.deliveries.length,0);
+});
 test('an unsafe transient URL or consent loss cannot later resume a stale recording',async()=>{
  const hash=harness();await hash.controller.start();hash.fire('hashchange',{newURL:'https://www.alphasourceai.com/#access_token=private'});assert.equal(hash.reloads(),1);hash.config().upload(raw());assert.equal(hash.deliveries.length,0);
  const restored=harness();await restored.controller.start();restored.win.location.href='https://www.alphasourceai.com/?token=private';restored.win.history.replaceState(null,'','/');assert.deepEqual(restored.navigations,['https://www.alphasourceai.com/']);assert.equal(restored.win.location.href,'https://www.alphasourceai.com/?token=private');

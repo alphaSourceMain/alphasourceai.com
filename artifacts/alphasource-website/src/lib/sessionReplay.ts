@@ -168,9 +168,11 @@ export function createSessionReplay(win: ReplayWindow, enabled: boolean, load: (
     } catch { hold(); }
   }
   function changeChoice(next: boolean, persisted: boolean) {
-    if (requested) { hold(); if (!next) clearCookies(); }
     // First opt-in also enters a clean document, never starts beneath a closing dialog.
     const reload = Boolean(persisted && (requested || (next && enabled && page())));
+    // Navigation is asynchronous: React may commit the new preference first.
+    // Fence this document before reload, including the first saved opt-in.
+    if (requested || reload) { hold(); if (!next) clearCookies(); }
     if (reload) win.location.reload();
     return reload;
   }
