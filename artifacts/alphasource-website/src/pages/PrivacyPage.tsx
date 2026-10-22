@@ -87,7 +87,13 @@ export default function PrivacyPage() {
               Turning off Analytics disables further Google measurement in the current document. When the preference is saved successfully, the page reloads to unload the Google tag. If browser storage is unavailable, the integration fails closed rather than loading Google Analytics without a saved choice. Previously collected data is not erased by changing this device preference; you can contact us about privacy requests.
             </p>
             <p>
-              You can reopen Privacy choices from the footer to change your preferences. alphaScreen candidate interview, admin, and client workflow access do not require public marketing pixels to function. Essential sign-in, security, and core website functions remain active regardless of optional technology preferences. We do not use session replay for this public analytics workflow.
+              You can reopen Privacy choices from the footer to change your preferences. alphaScreen candidate interview, admin, and client workflow access do not require public marketing pixels to function. Essential sign-in, security, and core website functions remain active regardless of optional technology preferences.
+            </p>
+            <p>
+              Session replay is a separate choice, off by default. If you explicitly enable it and the feature is enabled for production, Microsoft Clarity may receive masked public-page layouts, clicks, scrolling and technical browser information, including your IP address as part of the connection. Text is strictly masked and forms, entered values, sign-in, pricing, support, account, agreement, payment and candidate workflows are excluded. Google Analytics or marketing permission alone does not permit replay. We do not provide Clarity custom account identifiers or connect this integration to advertising platforms. See <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer">Microsoft's Privacy Statement</a>.
+            </p>
+            <p>
+              Replay pauses when you open Privacy choices or interact with a form. Sign-in from a replay-enabled page uses a fresh, unrecorded document and the existing sign-in panel. Saving a replay choice may reload the page. Withdrawing replay permission stops future application-controlled uploads, removes known Clarity identifiers where feasible and reloads without the replay library. Previously delivered data is not retracted. Browser privacy signals and blocked storage are respected; other public site functions do not require replay.
             </p>
           </Section>
 

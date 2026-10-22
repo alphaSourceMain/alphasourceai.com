@@ -18,6 +18,7 @@ import { useAppearance } from "@/context/AppearanceContext";
 const EMPTY_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: false,
   marketingAttribution: false,
+  sessionReplay: false,
 };
 
 type TrackingConsentNoticeProps = {
@@ -93,6 +94,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
       setDraft({
         analytics: preferences?.analytics ?? false,
         marketingAttribution: preferences?.marketingAttribution ?? false,
+        sessionReplay: preferences?.sessionReplay ?? false,
       });
     }
   }, [preferences, preferencesOpen]);
@@ -117,7 +119,8 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               <h2 className="text-sm font-semibold text-[#0A1547]">Privacy choices</h2>
               <p className="mt-1 text-sm leading-5 text-[#38415E]">
                 We use optional first-party analytics, Google Analytics 4 on selected production
-                pages, and marketing attribution tools. You can allow all
+                pages, optional Microsoft Clarity session replay on selected production public pages,
+                and marketing attribution tools. You can allow all
                 optional technologies or choose which categories to enable. Essential sign-in and security
                 functions always remain active.
               </p>
@@ -182,6 +185,13 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
                 id="analytics"
                 label="Analytics"
                 onCheckedChange={(analytics) => setDraft((current) => ({ ...current, analytics }))}
+              />
+              <PreferenceRow
+                checked={Boolean(draft.sessionReplay)}
+                description="When enabled for production, Microsoft Clarity records masked public-page layouts and interactions. This separate choice is off by default. Forms, sign-in, private workflows and entered values are excluded. Changing this choice may reload the page."
+                id="session-replay"
+                label="Session replay"
+                onCheckedChange={(sessionReplay) => setDraft((current) => ({ ...current, sessionReplay }))}
               />
               <PreferenceRow
                 checked={draft.marketingAttribution}

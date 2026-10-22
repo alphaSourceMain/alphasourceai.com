@@ -76,8 +76,8 @@ test('no foreign tag, dataLayer or script is overwritten',()=>{
 test('wiring preserves existing first-party submission and gates only the provider',()=>{
  const read=path=>readFileSync(new URL(`../src/${path}`,import.meta.url),'utf8');
  const events=read('lib/analytics.ts');assert.match(events,/fetch\(endpoint/);assert.match(events,/trackGa4\(eventName, payload.properties\)/);assert.doesNotMatch(events,/window.gtag\?\./);
- const consent=read('context/TrackingConsentContext.tsx');assert.ok(consent.indexOf('revokeGa4(persisted)')<consent.indexOf('setPreferences(nextPreferences)'));
+ const consent=read('context/TrackingConsentContext.tsx');assert.ok(consent.indexOf('revokeGa4(persisted && !replayReload)')>=0);assert.ok(consent.indexOf('revokeGa4(persisted && !replayReload)')<consent.indexOf('setPreferences(nextPreferences)'));
  assert.match(read('main.tsx'),/installGa4NavigationGuard\(\)/);assert.match(read('components/PublicSignInPanel.tsx'),/useLayoutEffect\(\(\) => \{ if \(open\) holdGa4ForDocument\(\)/);
  assert.doesNotMatch(source,/clarity\.ms|clarity\.microsoft|clarity\(/);
- const policy=read('pages/PrivacyPage.tsx');assert.match(policy,/Google Analytics 4/);assert.match(policy,/policies.google.com\/technologies\/partner-sites/);assert.match(policy,/We do not use session replay/);
+ const policy=read('pages/PrivacyPage.tsx');assert.match(policy,/Google Analytics 4/);assert.match(policy,/policies.google.com\/technologies\/partner-sites/);assert.match(policy,/Session replay is a separate choice, off by default/);
 });

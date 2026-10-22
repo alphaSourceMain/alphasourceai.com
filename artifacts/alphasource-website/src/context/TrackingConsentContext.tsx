@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { GA4_CONSENT_REVISION, needsGa4ConsentRefresh, revokeGa4 } from "@/lib/ga4";
+import { REPLAY_REVISION, changeReplayChoice, holdSessionReplay, needsReplayConsentRefresh } from "@/lib/sessionReplay";
 
 const TRACKING_PREFERENCES_STORAGE_KEY = "alphasource:tracking-preferences:v2";
 const LEGACY_TRACKING_CONSENT_STORAGE_KEY = "alphasource:tracking-consent:v1";
@@ -35,11 +36,13 @@ export type OptionalTrackingPreferences = {
   marketingAttribution: boolean;
   updatedAt: string;
   googleAnalyticsRevision?: string;
+  sessionReplay?: boolean;
+  clarityRevision?: string;
 };
 
 export type OptionalTrackingSelection = Pick<
   OptionalTrackingPreferences,
-  "analytics" | "marketingAttribution"
+  "analytics" | "marketingAttribution" | "sessionReplay"
 >;
 
 type LegacyTrackingConsentChoice = "granted" | "denied";
@@ -60,11 +63,13 @@ type TrackingConsentContextValue = {
 const EMPTY_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: false,
   marketingAttribution: false,
+  sessionReplay: false,
 };
 
 const ALL_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: true,
   marketingAttribution: true,
+  sessionReplay: true,
 };
 
 const TrackingConsentContext = createContext<TrackingConsentContextValue | null>(null);
@@ -106,6 +111,8 @@ function parseStoredPreferences(value: string | null): OptionalTrackingPreferenc
       marketingAttribution: preferences.marketingAttribution,
       updatedAt: preferences.updatedAt,
       googleAnalyticsRevision: preferences.googleAnalyticsRevision === GA4_CONSENT_REVISION ? GA4_CONSENT_REVISION : undefined,
+      sessionReplay: preferences.sessionReplay === true && preferences.clarityRevision === REPLAY_REVISION,
+      clarityRevision: preferences.clarityRevision === REPLAY_REVISION ? REPLAY_REVISION : undefined,
     };
   } catch {
     return null;
@@ -142,7 +149,7 @@ function readInitialPreferences(): OptionalTrackingPreferences | null {
 
     const legacySelection: OptionalTrackingSelection =
       (legacyConsent as LegacyTrackingConsentChoice) === "granted"
-        ? ALL_OPTIONAL_TRACKING_SELECTION
+        ? { analytics: true, marketingAttribution: true, sessionReplay: false }
         : EMPTY_OPTIONAL_TRACKING_SELECTION;
     const migratedPreferences: OptionalTrackingPreferences = {
       ...legacySelection,
@@ -174,6 +181,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openTrackingPreferences = useCallback(() => {
+    holdSessionReplay();
     if (document.activeElement instanceof HTMLElement) {
       triggerRef.current = document.activeElement;
     }
@@ -187,11 +195,14 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
         marketingAttribution: Boolean(selection.marketingAttribution),
         updatedAt: new Date().toISOString(),
         googleAnalyticsRevision: GA4_CONSENT_REVISION,
+        sessionReplay: Boolean(selection.sessionReplay),
+        clarityRevision: REPLAY_REVISION,
       };
 
       if (!nextPreferences.analytics) clearOptionalTrackingIdentifiers();
       const persisted = savePreferencesToStorage(nextPreferences);
-      if (!nextPreferences.analytics) revokeGa4(persisted);
+      const replayReload = changeReplayChoice(Boolean(nextPreferences.sessionReplay), persisted);
+      if (!nextPreferences.analytics) revokeGa4(persisted && !replayReload);
       setPreferences(nextPreferences);
       closeTrackingPreferences();
     },
@@ -211,7 +222,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       analyticsEnabled: preferences?.analytics === true,
       allowAllOptionalTracking,
       closeTrackingPreferences,
-      hasSavedPreferences: preferences !== null && !needsGa4ConsentRefresh(),
+      hasSavedPreferences: preferences !== null && !needsGa4ConsentRefresh() && !needsReplayConsentRefresh(),
       marketingAttributionEnabled: preferences?.marketingAttribution === true,
       openTrackingPreferences,
       preferences,
