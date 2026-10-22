@@ -310,6 +310,17 @@ test("session-only failed withdrawal survives modified and noopener links into e
     newTab.tag.start(); assert.equal(newTab.scripts.length, 0); assert.equal(newTab.tag.withdrawalState().saveFailed, true);
   }
 });
+test("withdrawal reload gap still carries new-tab denial and prevents inline authentication", () => {
+  const h = harness({ blockedCookies: true }); h.tag.start(); h.readonly(); h.tag.changeChoice(false, false);
+  const anchor = h.doc.querySelector("#private"); anchor.href = root + "about/"; anchor.target = "_blank"; anchor.rel = "noopener";
+  assert.equal(h.interact("#private", "click", { metaKey: true }).defaultPrevented, false);
+  const newTab = harness({ url: anchor.href, values: h.values, session: new Map(), blockedCookies: true });
+  newTab.tag.start(); assert.equal(newTab.scripts.length, 0); assert.equal(newTab.tag.withdrawalState().saveFailed, true);
+  let rendered = false;
+  h.doc.querySelector("[data-replay-auth=client]").addEventListener("click", () => { rendered = true; });
+  assert.equal(h.interact("[data-replay-auth=client]").defaultPrevented, true);
+  assert.equal(rendered, false); assert.equal(h.navigations.length, 0); assert.equal(h.reloads(), 1);
+});
 test("failed-save fallback survives ordinary links, modified links and SPA navigation across documents", () => {
   const values = new Map([[key, JSON.stringify(savedConsent)]]);
   let url = root + "?__as_linkedin_withdrawn=save-error";

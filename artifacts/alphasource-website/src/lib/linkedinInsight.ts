@@ -193,7 +193,6 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
       };
     }
     const interaction = (event: Event) => {
-      if (unloading) return;
       const target = event.target as Element | null;
       if (!target || typeof target.closest !== "function") return;
       const keyboard = event as KeyboardEvent;
@@ -205,9 +204,10 @@ export function createLinkedInInsight(win: LinkedInInsightWindow, partnerId: str
       const auth = target.closest("[data-replay-auth]")?.getAttribute("data-replay-auth");
       if ((auth === "client" || auth === "admin") && (event.type === "click" || (event.type === "keydown" && ["Enter", " "].includes(keyboard.key)))) {
         event.preventDefault(); event.stopImmediatePropagation();
-        navigate(new URL("/support/?signin=" + auth, win.location.href));
+        if (!unloading) navigate(new URL("/support/?signin=" + auth, win.location.href));
         return;
       }
+      if (unloading) return;
       // Modified links may open a separate clean document; modified buttons
       // still run their normal onClick and must pass the auth fence above.
       if (keyboard.metaKey || keyboard.ctrlKey || keyboard.shiftKey || keyboard.altKey) return;
