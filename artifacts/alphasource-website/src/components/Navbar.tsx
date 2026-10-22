@@ -15,6 +15,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [passwordSetupMode, setPasswordSetupMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -33,12 +34,15 @@ export default function Navbar() {
   const search = useSearch();
 
   useEffect(() => {
-    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && new URLSearchParams(window.location.search).get("signin") === "client";
+    const params = new URLSearchParams(window.location.search);
+    const matches = window.location.pathname.replace(/\/+$/, "") === "/support" && params.get("signin") === "client";
     if (!matches) {
+      setPasswordSetupMode(false);
       if (queryLoginRef.current) { setMobileOpen(false); setLoginOpen(false); queryLoginRef.current = false; }
       return;
     }
     queryLoginRef.current = true;
+    setPasswordSetupMode(params.get("setup") === "password");
     setLoginOpen(true);
   }, [location, search]);
 
@@ -186,7 +190,7 @@ export default function Navbar() {
     { label: "Support", href: "/support" },
     { label: "Get in touch", href: "/#contact" },
   ];
-  const openSignIn = () => { setSetupSpotlightVisible(false); setMobileOpen(false); setLoginOpen(true); };
+  const openSignIn = () => { setPasswordSetupMode(false); setSetupSpotlightVisible(false); setMobileOpen(false); setLoginOpen(true); };
   const pageDimOverlay = setupSpotlightVisible && typeof document !== "undefined" ? createPortal(
     <button type="button" aria-label="Dismiss sign-in guidance" className="fixed inset-0 z-40 cursor-default bg-slate-900/35"
       onClick={() => setSetupSpotlightVisible(false)} />, document.body) : null;
@@ -223,9 +227,9 @@ export default function Navbar() {
         <button type="button" className="b1-btn-g b1-nav-signin mt-6 w-full p-3" onClick={openSignIn} data-replay-auth="client">Sign In</button>
       </div>}
     </nav>
-    <PublicSignInPanel open={loginOpen} onOpenChange={setLoginOpen} title="Sign In to alphaSource"
-      description="Access your client dashboard" returnFocus={() => loginButtonRef.current?.focus()}>
-                    <form onSubmit={handleSignIn} className="space-y-3">
+    <PublicSignInPanel open={loginOpen} onOpenChange={setLoginOpen} title={passwordSetupMode ? "Set up your password" : "Sign In to alphaSource"}
+      description={passwordSetupMode ? "Use the secure setup link in your email. Need another link? Enter your buyer email below." : "Access your client dashboard"} returnFocus={() => loginButtonRef.current?.focus()}>
+                    <form onSubmit={passwordSetupMode ? (event) => { event.preventDefault(); void startReset(); } : handleSignIn} className="space-y-3">
                     <input
                       type="email"
                       aria-label="Client email address"
@@ -238,7 +242,7 @@ export default function Navbar() {
                         }}
                         className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[#0A1547] text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#A380F6]/30 focus:border-[#A380F6] transition-all dark:bg-[#0D1A4A] dark:border-[#2A3568] dark:text-white dark:placeholder:text-white/35"
                       />
-                      <input
+                      {!passwordSetupMode && <input
                         type="password"
                         aria-label="Client password"
                         autoComplete="current-password"
@@ -246,17 +250,17 @@ export default function Navbar() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[#0A1547] text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#A380F6]/30 focus:border-[#A380F6] transition-all dark:bg-[#0D1A4A] dark:border-[#2A3568] dark:text-white dark:placeholder:text-white/35"
-                      />
+                      />}
                       <button
                         type="submit"
-                      disabled={clientLoginLoading || !email || !password}
+                      disabled={clientLoginLoading || !email || (!passwordSetupMode && !password)}
                       className="b1-btn-g w-full py-2.5 text-sm"
                     >
-                      {clientLoginLoading ? "Signing in..." : "Sign In"}
+                      {passwordSetupMode ? "Email me a secure setup link" : clientLoginLoading ? "Signing in..." : "Sign In"}
                     </button>
                     <button
                         type="button"
-                        onClick={startReset}
+                        onClick={passwordSetupMode ? () => setPasswordSetupMode(false) : startReset}
                         className="text-xs text-[#A380F6] hover:underline"
                         style={{
                           background: "none",
@@ -266,10 +270,10 @@ export default function Navbar() {
                           font: "inherit",
                         }}
                       >
-                        Forgot password?
+                        {passwordSetupMode ? "Already have a password? Sign in" : "Forgot password?"}
                       </button>
                     </form>
-                    {PASSKEYS_ENABLED && (
+                    {PASSKEYS_ENABLED && !passwordSetupMode && (
                       <>
                         <div className="my-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-[#0A1547]/35 dark:text-white/35">
                           <span className="h-px flex-1 bg-[#0A1547]/10 dark:bg-white/10" />or<span className="h-px flex-1 bg-[#0A1547]/10 dark:bg-white/10" />

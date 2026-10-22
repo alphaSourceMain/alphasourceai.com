@@ -9,11 +9,11 @@ export function supportVoiceOrigin(
       : environment === "staging" || environment == null || environment === ""
         ? "https://ia-backend-qa.onrender.com"
         : null;
-  if (!expected || raw !== expected) return null;
+  if (!expected || (raw !== expected && raw !== `${expected}/`)) return null;
   try {
     const url = new URL(String(raw));
     return url.protocol === "https:" &&
-      url.origin === raw &&
+      url.origin === expected &&
       !url.username &&
       !url.password &&
       !url.search &&

@@ -32,15 +32,14 @@ const nextStep = status => expression(declaration('nextStepCopy'), {
   POLLABLE_STATUSES: new Set(['payment_pending', 'activation_pending', 'setup_pending']),
 });
 
-test('password required never claims an email was sent; existing sign-in/recovery is offered', () => {
+test('password required opens existing secure setup rather than a generic home-page handoff', () => {
   assert.equal(copy.password_required.eyebrow, 'Payment confirmed');
   assert.equal(copy.password_required.title, 'Finish setting up your account.');
   assert.match(copy.password_required.body, /already have a password, sign in/);
-  assert.match(copy.password_required.body, /Forgot password\? to request a secure setup link/);
+  assert.match(copy.password_required.body, /request a new link there/);
   assert.doesNotMatch(JSON.stringify(copy.password_required), /sent to your email|Check your email/);
-  assert.equal(copy.password_required.primaryHref, '/');
-  assert.match(nextStep('password_required'), /request a secure setup link/);
-  assert.doesNotMatch(nextStep('password_required'), /emailed|sent/);
+  assert.equal(copy.password_required.primaryHref, '/support/?signin=client&setup=password');
+  assert.match(nextStep('password_required'), /request a new setup link/);
 });
 
 test('explicit email-sent, ready, pending and cancelled states retain their distinct copy', () => {

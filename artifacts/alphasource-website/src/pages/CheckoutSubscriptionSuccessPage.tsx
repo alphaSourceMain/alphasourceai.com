@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock3, RefreshCw, ShieldCheck } from "lucide-react";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
+import { checkoutPasswordSetupHref } from "@/lib/checkoutPasswordSetup";
 
 type ReturnStatus = "ready" | "password_required" | "setup_email_sent" | "setup_pending" | "activation_pending" | "payment_pending" | "cancelled";
 
@@ -128,10 +129,10 @@ const STATUS_COPY: Record<ReturnStatus, {
   password_required: {
     eyebrow: "Payment confirmed",
     title: "Finish setting up your account.",
-    body: "Your payment is confirmed. Select Sign In on the home page. If you already have a password, sign in; otherwise, enter your email and choose Forgot password? to request a secure setup link.",
+    body: "Your payment is confirmed. Continue to password setup and use your secure emailed link, or request a new link there. If you already have a password, sign in instead.",
     tone: "success",
-    primaryLabel: "Go to sign in",
-    primaryHref: "/",
+    primaryLabel: "Continue to password setup",
+    primaryHref: "/support/?signin=client&setup=password",
     secondaryLabel: "Refresh status",
   },
   setup_email_sent: {
@@ -185,6 +186,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   const [status, setStatus] = useState<ReturnStatus>(initialStatus);
   const [statusError, setStatusError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const statusRequests = useRef(new Set<AbortController>());
   const [firstRolePrepaySelected, setFirstRolePrepaySelected] = useState<boolean | null>(() => readInitialFirstRolePrepaySelected());
   const copy = STATUS_COPY[status];
   const Icon = copy.tone === "success" ? CheckCircle : copy.tone === "cancelled" ? AlertCircle : Clock3;
@@ -198,6 +200,11 @@ export default function CheckoutSubscriptionSuccessPage() {
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
+  useEffect(() => () => {
+    for (const request of statusRequests.current) request.abort();
+    statusRequests.current.clear();
+  }, []);
+
   const shouldPoll = useCallback((nextStatus: ReturnStatus) => {
     return POLLABLE_STATUSES.has(nextStatus);
   }, []);
@@ -208,6 +215,8 @@ export default function CheckoutSubscriptionSuccessPage() {
       return null;
     }
 
+    const request = new AbortController();
+    statusRequests.current.add(request);
     if (manual) setRefreshing(true);
     try {
       const response = await fetch(statusEndpoint, {
@@ -215,22 +224,32 @@ export default function CheckoutSubscriptionSuccessPage() {
         headers: { Accept: "application/json" },
         credentials: "omit",
         cache: "no-store",
+        signal: request.signal,
       });
       const data = await response.json().catch(() => null) as CheckoutStatusResponse | null;
+      if (request.signal.aborted) return null;
       if (!response.ok) throw new Error("Status refresh failed.");
       const nextStatus = normalizeStatus(data?.status);
       const nextFirstRolePrepaySelected = data && typeof data === "object" ? resolveFirstRolePrepaySelected(data as Record<string, unknown>) : null;
       if (nextFirstRolePrepaySelected !== null) setFirstRolePrepaySelected(nextFirstRolePrepaySelected);
       setStatus(nextStatus);
       setStatusError("");
+      const setupHref = checkoutPasswordSetupHref(response.ok, data);
+      if (setupHref) window.location.replace(setupHref);
       return nextStatus;
     } catch (_) {
+      if (request.signal.aborted) return null;
       setStatusError("Status refresh is temporarily unavailable. Try again in a moment.");
       return null;
     } finally {
-      if (manual) setRefreshing(false);
+      statusRequests.current.delete(request);
+      if (manual && !request.signal.aborted) setRefreshing(false);
     }
   }, [statusEndpoint]);
+
+  useEffect(() => {
+    if (statusEndpoint && initialStatus !== "cancelled") void loadCheckoutStatus(false);
+  }, [initialStatus, loadCheckoutStatus, statusEndpoint]);
 
   useEffect(() => {
     if (!statusEndpoint || !shouldPoll(status)) return undefined;
@@ -274,7 +293,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   const backHref = status === "ready" ? "/dashboard" : "/alphascreen/pricing#pricing-demo";
   const backLabel = status === "ready" ? "Back to dashboard" : "Back to pricing";
   const nextStepCopy = status === "password_required"
-    ? "Sign in with your existing password, or choose Forgot password? to request a secure setup link."
+    ? "Continue to password setup to use your secure emailed link or request a new setup link."
     : status === "setup_email_sent"
     ? "Use the emailed setup link, or select Sign In and Forgot password? if the link expired."
     : status === "ready"
