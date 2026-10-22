@@ -640,6 +640,7 @@ function supportRoute() {
 function privacyRoute() {
   return {
     title: "Privacy Policy | alphaSource AI",
+    updatedAt: "October 22, 2026",
     description:
       "Learn how alphaSource AI handles public website analytics, contact and demo form lead capture, alphaScreen product data, and privacy requests.",
     eyebrow: "Privacy",
@@ -650,6 +651,22 @@ function privacyRoute() {
       section("Public website analytics", [
         "alphaSource AI may collect limited public page view and CTA activity to understand site performance, improve product messaging, measure interest, and troubleshoot abuse or spam.",
         "Public analytics should not include passwords, candidate interview responses, dashboard content, or private customer account data.",
+      ]),
+      section("Google Analytics 4 and privacy choices", [
+        "With Analytics enabled in Privacy choices, selected production marketing pages use Google Analytics 4 for public page views and limited navigation and form events. Google receives technical browser and device information and may use analytics cookies. We send fixed public page titles and paths and limited event categories, not lead contents, account identifiers or URL query values.",
+        "This integration excludes pricing and signup, ROI, support, sign-in and password setup, agreements, payments, dashboards and candidate or interview workflows. Advertising personalization, Google signals and automatic form tracking are disabled.",
+        "Optional technologies remain blocked until enabled. Turning off Analytics disables further Google measurement; when the choice saves successfully the page reloads to unload the tag. If browser storage is unavailable, Google Analytics fails closed. A preference change does not erase previously collected data; contact us about privacy requests.",
+      ]),
+      section("LinkedIn Insight Tag and marketing attribution", [
+        "With a configured partner ID and your current Marketing attribution permission, the LinkedIn Insight Tag may receive selected marketing-page URLs, referrer, IP address, browser/device information and timestamps on alphasourceai.com or www.alphasourceai.com. We do not send custom lead values, email addresses or enhanced-matching identifiers through this integration.",
+        "LinkedIn is excluded from pricing and signup, ROI, support, sign-in/password setup, agreements, payments, dashboards, candidate/interview workflows, other hosts, and URLs with query parameters or parameter-bearing fragments. Browser Global Privacy Control is respected. It is disabled before excluded navigation or authentication entry.",
+        "Withdrawal disables its queue, clears partner state, expires reachable first-party LinkedIn cookies where possible, and unloads an initialized tag through a fresh document. Failed withdrawal saves keep LinkedIn off for this visit and show an error; a first-party session privacy marker or, as a last resort, an opaque URL query marker prevents an old stored grant from reactivating it. The query fallback also keeps Google Analytics and Clarity off on that document. This does not erase previously delivered data or third-party/HttpOnly cookies outside our control.",
+        `<a href="https://www.linkedin.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">LinkedIn's Privacy Policy</a>`,
+      ]),
+      section("Optional Microsoft Clarity session replay", [
+        "Session replay is a separate choice, off by default. If you explicitly enable it and the feature is enabled for production, Microsoft Clarity may receive strictly masked public-page layouts, clicks, scrolling and technical browser information, including IP address as part of the connection. Entered values and form interactions are not recorded; masked form outlines may be visible. Sign-in and private workflows are excluded, including pricing, support, accounts, agreements, payments and candidate workflows. Analytics or marketing permission alone does not permit replay.",
+        "Replay pauses when you open Privacy choices or interact with a form. Sign-in uses a fresh, unrecorded document and the existing sign-in panel. Saving a replay choice may reload the page. Withdrawal stops future application-controlled uploads, removes known Clarity identifiers where feasible and reloads without replay. Previously delivered data is not retracted. Blocked storage and browser privacy signals are respected. We do not provide custom account identifiers or connect this integration to advertising platforms.",
+        `<a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer">Microsoft's Privacy Statement</a>`,
       ]),
       section("Lead draft and abandoned form capture", [
         "If a visitor begins a public contact, demo, or inquiry form and enters usable business contact information, alphaSource AI may save a partial business-contact lead record even if the visitor does not complete the form.",
@@ -674,6 +691,7 @@ function privacyRoute() {
     ],
     links: [
       ["/terms/", "Terms & Conditions"],
+      ["https://policies.google.com/technologies/partner-sites", "How Google uses information from sites that use its services"],
       ["/sales-sms-consent/", "Sales SMS verbal consent"],
       ["/support", "Support"],
       ["/faq", "FAQ"],

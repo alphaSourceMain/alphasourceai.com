@@ -32,6 +32,8 @@ import PageAnalytics from "@/components/PageAnalytics";
 import GuardedPricingDevBanner from "@/components/GuardedPricingDevBanner";
 import IDPixelLoader from "@/components/IDPixelLoader";
 import TrackingConsentNotice from "@/components/TrackingConsentNotice";
+import PublicSessionReplay from "@/components/PublicSessionReplay";
+import LinkedInInsightLoader from "@/components/LinkedInInsightLoader";
 import {
   DASHBOARD_ACTIVITY_EVENT,
   DASHBOARD_ACTIVITY_STORAGE_KEY,
@@ -700,6 +702,8 @@ function Router() {
     <>
       <Seo location={location} />
       <PageAnalytics location={location} />
+      <PublicSessionReplay location={location} />
+      <LinkedInInsightLoader location={location} />
       <IDPixelLoader location={location} />
       {isDashboard || isAdmin || isSales || isInterview || isAutomationApproval || isAutomationDigestApproval ? content : <div className="b1-public-scope">{content}</div>}
     </>

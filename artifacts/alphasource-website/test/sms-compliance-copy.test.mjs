@@ -39,7 +39,7 @@ test("public and candidate terms include the approved optional transactional sms
 });
 
 test("privacy policy contains the approved provider-neutral mobile-data notice", () => {
-  assert.match(privacy, /Effective Date: 9\/17\/2026/);
+  assert.match(privacy, /Effective Date: 10\/22\/2026/);
   assert.match(privacy, /MOBILE INFORMATION AND TRANSACTIONAL VERIFICATION MESSAGES/);
   assert.match(privacy, /keyed destination fingerprint/);
   assert.match(privacy, /We do not sell mobile information or share it with third parties for their own promotional or marketing purposes/);

@@ -7,6 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { GA4_CONSENT_REVISION, needsGa4ConsentRefresh, revokeGa4 } from "@/lib/ga4";
+import { LINKEDIN_CONSENT_REVISION, changeLinkedInChoice, linkedInWithdrawalState, needsLinkedInConsentRefresh, prepareLinkedInChoice } from "@/lib/linkedinInsight";
+import { REPLAY_REVISION, changeReplayChoice, holdSessionReplay, needsReplayConsentRefresh } from "@/lib/sessionReplay";
 
 const TRACKING_PREFERENCES_STORAGE_KEY = "alphasource:tracking-preferences:v2";
 const LEGACY_TRACKING_CONSENT_STORAGE_KEY = "alphasource:tracking-consent:v1";
@@ -33,11 +36,15 @@ export type OptionalTrackingPreferences = {
   analytics: boolean;
   marketingAttribution: boolean;
   updatedAt: string;
+  googleAnalyticsRevision?: string;
+  sessionReplay?: boolean;
+  clarityRevision?: string;
+  linkedinRevision?: string;
 };
 
 export type OptionalTrackingSelection = Pick<
   OptionalTrackingPreferences,
-  "analytics" | "marketingAttribution"
+  "analytics" | "marketingAttribution" | "sessionReplay"
 >;
 
 type LegacyTrackingConsentChoice = "granted" | "denied";
@@ -51,6 +58,7 @@ type TrackingConsentContextValue = {
   openTrackingPreferences: () => void;
   preferences: OptionalTrackingPreferences | null;
   preferencesOpen: boolean;
+  preferencesSaveError: string | null;
   rejectOptionalTracking: () => void;
   savePreferences: (selection: OptionalTrackingSelection) => void;
 };
@@ -58,14 +66,17 @@ type TrackingConsentContextValue = {
 const EMPTY_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: false,
   marketingAttribution: false,
+  sessionReplay: false,
 };
 
 const ALL_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: true,
   marketingAttribution: true,
+  sessionReplay: true,
 };
 
 const TrackingConsentContext = createContext<TrackingConsentContextValue | null>(null);
+const PREFERENCES_SAVE_ERROR = "We couldn't save your privacy choices. LinkedIn remains off. Please try again.";
 
 export function normalizeTrackingPath(path: string): string {
   const clean = String(path || "/").split("?")[0].split("#")[0] || "/";
@@ -103,6 +114,10 @@ function parseStoredPreferences(value: string | null): OptionalTrackingPreferenc
       analytics: preferences.analytics,
       marketingAttribution: preferences.marketingAttribution,
       updatedAt: preferences.updatedAt,
+      googleAnalyticsRevision: preferences.googleAnalyticsRevision === GA4_CONSENT_REVISION ? GA4_CONSENT_REVISION : undefined,
+      sessionReplay: preferences.sessionReplay === true && preferences.clarityRevision === REPLAY_REVISION,
+      clarityRevision: preferences.clarityRevision === REPLAY_REVISION ? REPLAY_REVISION : undefined,
+      linkedinRevision: preferences.linkedinRevision === LINKEDIN_CONSENT_REVISION ? LINKEDIN_CONSENT_REVISION : undefined,
     };
   } catch {
     return null;
@@ -132,14 +147,16 @@ function readInitialPreferences(): OptionalTrackingPreferences | null {
     const storedPreferences = parseStoredPreferences(
       window.localStorage.getItem(TRACKING_PREFERENCES_STORAGE_KEY),
     );
-    if (storedPreferences) return storedPreferences;
+    if (storedPreferences) return linkedInWithdrawalState().withdrawn
+      ? { ...storedPreferences, marketingAttribution: false }
+      : storedPreferences;
 
     const legacyConsent = window.localStorage.getItem(LEGACY_TRACKING_CONSENT_STORAGE_KEY);
     if (legacyConsent !== "granted" && legacyConsent !== "denied") return null;
 
     const legacySelection: OptionalTrackingSelection =
       (legacyConsent as LegacyTrackingConsentChoice) === "granted"
-        ? ALL_OPTIONAL_TRACKING_SELECTION
+        ? { analytics: true, marketingAttribution: true, sessionReplay: false }
         : EMPTY_OPTIONAL_TRACKING_SELECTION;
     const migratedPreferences: OptionalTrackingPreferences = {
       ...legacySelection,
@@ -160,7 +177,10 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<OptionalTrackingPreferences | null>(() =>
     typeof window === "undefined" ? null : readInitialPreferences(),
   );
-  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(() => linkedInWithdrawalState().saveFailed);
+  const [preferencesSaveError, setPreferencesSaveError] = useState<string | null>(() =>
+    linkedInWithdrawalState().saveFailed ? PREFERENCES_SAVE_ERROR : null,
+  );
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const closeTrackingPreferences = useCallback(() => {
@@ -171,6 +191,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openTrackingPreferences = useCallback(() => {
+    holdSessionReplay();
     if (document.activeElement instanceof HTMLElement) {
       triggerRef.current = document.activeElement;
     }
@@ -183,12 +204,28 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
         analytics: Boolean(selection.analytics),
         marketingAttribution: Boolean(selection.marketingAttribution),
         updatedAt: new Date().toISOString(),
+        googleAnalyticsRevision: GA4_CONSENT_REVISION,
+        sessionReplay: Boolean(selection.sessionReplay),
+        clarityRevision: REPLAY_REVISION,
+        linkedinRevision: LINKEDIN_CONSENT_REVISION,
       };
 
       if (!nextPreferences.analytics) clearOptionalTrackingIdentifiers();
-      savePreferencesToStorage(nextPreferences);
-      setPreferences(nextPreferences);
-      closeTrackingPreferences();
+      const persisted = savePreferencesToStorage(nextPreferences);
+      setPreferencesSaveError(persisted ? null : PREFERENCES_SAVE_ERROR);
+      // Retire LinkedIn / establish a verified denial BEFORE any provider reload.
+      prepareLinkedInChoice(Boolean(nextPreferences.marketingAttribution), persisted);
+      const replayReload = changeReplayChoice(Boolean(nextPreferences.sessionReplay), persisted);
+      changeLinkedInChoice(Boolean(nextPreferences.marketingAttribution), persisted, replayReload);
+      if (!nextPreferences.analytics) revokeGa4(persisted && !replayReload);
+      if (persisted) {
+        setPreferences(nextPreferences);
+        closeTrackingPreferences();
+      } else {
+        // Do not present unsaved choices as persisted. LinkedIn alone stays withdrawn.
+        setPreferences((current) => current ? { ...current, marketingAttribution: false } : null);
+        setPreferencesOpen(true);
+      }
     },
     [closeTrackingPreferences],
   );
@@ -206,11 +243,12 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       analyticsEnabled: preferences?.analytics === true,
       allowAllOptionalTracking,
       closeTrackingPreferences,
-      hasSavedPreferences: preferences !== null,
+      hasSavedPreferences: preferences !== null && !preferencesSaveError && !needsGa4ConsentRefresh() && !needsReplayConsentRefresh() && !needsLinkedInConsentRefresh(),
       marketingAttributionEnabled: preferences?.marketingAttribution === true,
       openTrackingPreferences,
       preferences,
       preferencesOpen,
+      preferencesSaveError,
       rejectOptionalTracking,
       savePreferences,
     }),
@@ -220,6 +258,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       openTrackingPreferences,
       preferences,
       preferencesOpen,
+      preferencesSaveError,
       rejectOptionalTracking,
       savePreferences,
     ],

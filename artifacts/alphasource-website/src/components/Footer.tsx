@@ -251,6 +251,7 @@ export default function Footer() {
             {/* Admin Login */}
             <div className="relative" ref={dropdownRef}>
               <button
+                data-replay-auth="admin"
                 onClick={() => {
                   setAdminLoginOpen((o) => !o);
                   setEmailError("");

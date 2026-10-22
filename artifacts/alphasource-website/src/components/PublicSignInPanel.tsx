@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useAppearance } from "@/context/AppearanceContext";
+import { holdGa4ForDocument } from "@/lib/ga4";
+import { holdSessionReplay } from "@/lib/sessionReplay";
 
 /** Presentation only. Authentication and recovery stay in their existing owners. */
 export default function PublicSignInPanel({ open, onOpenChange, title, description, children, returnFocus }: {
@@ -9,6 +11,8 @@ export default function PublicSignInPanel({ open, onOpenChange, title, descripti
   description: string; children: ReactNode; returnFocus?: () => void;
 }) {
   const { resolvedMode } = useAppearance();
+  // Presentation-only privacy boundary; authentication owners and handlers stay unchanged.
+  useLayoutEffect(() => { if (open) holdGa4ForDocument(); if (open) holdSessionReplay(); }, [open]);
   return <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 z-[110] bg-[#050a1f]/75 backdrop-blur-sm" />

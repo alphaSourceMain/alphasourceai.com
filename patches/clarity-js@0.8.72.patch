@@ -1,0 +1,40 @@
+diff --git a/build/clarity.js b/build/clarity.js
+index 4c34a1a0370508a7e22825a51961cd638ff0bd00..44bb1b8eaebaa661ab78968d78ee979b82d053dd 100644
+--- a/build/clarity.js
++++ b/build/clarity.js
+@@ -4414,7 +4414,7 @@ function upload(final) {
+                     }
+                     encoded = { e: e, a: a, p: p };
+                     payload = stringify(encoded);
+-                    if (!last) return [3 /*break*/, 1];
++                    if (!last && typeof config$2.upload === "string") return [3 /*break*/, 1];
+                     _a = null;
+                     return [3 /*break*/, 3];
+                 case 1: return [4 /*yield*/, compress(payload)];
+diff --git a/build/clarity.module.js b/build/clarity.module.js
+index e7e8404cecd7e9f023efd067c3702ba2fca8dbec..89efeb7b6550583b9764f0d34ed5800ba1411557 100644
+--- a/build/clarity.module.js
++++ b/build/clarity.module.js
+@@ -4412,7 +4412,7 @@ function upload(final) {
+                     }
+                     encoded = { e: e, a: a, p: p };
+                     payload = stringify(encoded);
+-                    if (!last) return [3 /*break*/, 1];
++                    if (!last && typeof config$2.upload === "string") return [3 /*break*/, 1];
+                     _a = null;
+                     return [3 /*break*/, 3];
+                 case 1: return [4 /*yield*/, compress(payload)];
+diff --git a/src/data/upload.ts b/src/data/upload.ts
+index d34d35fc8e0b865f49c315352e1abef7c5ea8e8f..90c05f0f8652db2551e1706e5b9fddbfb39b321f 100644
+--- a/src/data/upload.ts
++++ b/src/data/upload.ts
+@@ -182,7 +182,8 @@ async function upload(final: boolean = false): Promise<void> {
+     // We also attempt to compress the payload if it is not the last payload and the browser supports it
+     // In all other cases, we continue to send back string value
+     let payload = stringify(encoded);
+-    let zipped = last ? null : await compress(payload);
++    // Callback transports use only the original payload. Avoid yielding across stop().
++    let zipped = last || typeof config.upload !== Constant.String ? null : await compress(payload);
+     metric.sum(Metric.TotalBytes, zipped ? zipped.length : payload.length);
+     send(payload, zipped, envelope.data.sequence, last);
+ }
