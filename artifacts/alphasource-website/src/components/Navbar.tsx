@@ -207,7 +207,7 @@ export default function Navbar() {
         <div className={`b1-nav-actions ${setupSpotlightVisible ? "relative z-50" : ""}`}>
           <AppearanceSelector />
           <button ref={loginButtonRef} type="button" onClick={openSignIn} className="b1-btn-g b1-nav-signin h-10 px-4 text-sm"
-            aria-haspopup="dialog" data-testid="nav-login-button"
+            aria-haspopup="dialog" data-testid="nav-login-button" data-replay-auth="client"
             aria-describedby={setupSpotlightVisible ? setupSpotlightDescriptionId : undefined}>
             <LogIn aria-hidden="true" size={16} /> Sign In
           </button>
@@ -224,7 +224,7 @@ export default function Navbar() {
       {mobileOpen && <div ref={mobilePanelRef} id="site-mobile-panel" role="dialog" aria-modal="true" aria-label="Navigation" className="b1-mobile-panel">
         {navLinks.map(link => <a key={link.label} href={link.href} className="b1-mobile-link"
           onClick={() => setMobileOpen(false)} data-analytics-cta={link.label} data-analytics-placement="mobile-nav">{link.label}</a>)}
-        <button type="button" className="b1-btn-g b1-nav-signin mt-6 w-full p-3" onClick={openSignIn}>Sign In</button>
+        <button type="button" className="b1-btn-g b1-nav-signin mt-6 w-full p-3" onClick={openSignIn} data-replay-auth="client">Sign In</button>
       </div>}
     </nav>
     <PublicSignInPanel open={loginOpen} onOpenChange={setLoginOpen} title={passwordSetupMode ? "Set up your password" : "Sign In to alphaSource"}

@@ -3,6 +3,7 @@ import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import App from "./App";
 import { initSentry, isSentryEnabled } from "./lib/sentry";
+import { installGa4NavigationGuard } from "./lib/ga4";
 import "./index.css";
 import "./b1-site.css";
 
@@ -27,6 +28,7 @@ if (typeof window !== "undefined" && window.__ALPHASOURCE_BOOT__) {
 }
 
 initSentry();
+installGa4NavigationGuard();
 
 function markReactCommitted() {
   if (typeof window === "undefined") return;

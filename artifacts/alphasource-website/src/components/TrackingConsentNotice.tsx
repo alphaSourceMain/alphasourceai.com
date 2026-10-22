@@ -18,6 +18,7 @@ import { useAppearance } from "@/context/AppearanceContext";
 const EMPTY_OPTIONAL_TRACKING_SELECTION: OptionalTrackingSelection = {
   analytics: false,
   marketingAttribution: false,
+  sessionReplay: false,
 };
 
 type TrackingConsentNoticeProps = {
@@ -93,6 +94,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
       setDraft({
         analytics: preferences?.analytics ?? false,
         marketingAttribution: preferences?.marketingAttribution ?? false,
+        sessionReplay: preferences?.sessionReplay ?? false,
       });
     }
   }, [preferences, preferencesOpen]);
@@ -116,9 +118,11 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
             <div className="max-w-3xl">
               <h2 className="text-sm font-semibold text-[#0A1547]">Privacy choices</h2>
               <p className="mt-1 text-sm leading-5 text-[#38415E]">
-                We use optional analytics and marketing attribution tools. You can allow all
-                optional technologies or choose which categories to enable. Essential sign-in and security
-                functions always remain active.
+                We use optional first-party analytics, Google Analytics 4, Microsoft Clarity session replay
+                on selected production public pages, and marketing attribution. Entered values and form
+                interactions are not recorded; masked form outlines may be visible. Sign-in and private
+                workflows are excluded from replay. Choose which optional technologies to enable;
+                essential sign-in and security remain active.
               </p>
             </div>
             <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
@@ -177,10 +181,17 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               />
               <PreferenceRow
                 checked={draft.analytics}
-                description="Helps us understand how visitors use the public site so we can improve navigation and content."
+                description="First-party measurement and Google Analytics 4 on selected production public pages help us improve navigation and content. Google receives technical browser/device information and may use analytics cookies."
                 id="analytics"
                 label="Analytics"
                 onCheckedChange={(analytics) => setDraft((current) => ({ ...current, analytics }))}
+              />
+              <PreferenceRow
+                checked={Boolean(draft.sessionReplay)}
+                description="When enabled for production, Microsoft Clarity records masked public-page layouts and interactions. This separate choice is off by default. Entered values and form interactions are not recorded; masked form outlines may be visible. Sign-in and private workflows are excluded. Changing this choice may reload the page."
+                id="session-replay"
+                label="Session replay"
+                onCheckedChange={(sessionReplay) => setDraft((current) => ({ ...current, sessionReplay }))}
               />
               <PreferenceRow
                 checked={draft.marketingAttribution}
