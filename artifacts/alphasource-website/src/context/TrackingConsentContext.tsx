@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { GA4_CONSENT_REVISION, needsGa4ConsentRefresh, revokeGa4 } from "@/lib/ga4";
+import { LINKEDIN_CONSENT_REVISION, changeLinkedInChoice, needsLinkedInConsentRefresh } from "@/lib/linkedinInsight";
 import { REPLAY_REVISION, changeReplayChoice, holdSessionReplay, needsReplayConsentRefresh } from "@/lib/sessionReplay";
 
 const TRACKING_PREFERENCES_STORAGE_KEY = "alphasource:tracking-preferences:v2";
@@ -38,6 +39,7 @@ export type OptionalTrackingPreferences = {
   googleAnalyticsRevision?: string;
   sessionReplay?: boolean;
   clarityRevision?: string;
+  linkedinRevision?: string;
 };
 
 export type OptionalTrackingSelection = Pick<
@@ -113,6 +115,7 @@ function parseStoredPreferences(value: string | null): OptionalTrackingPreferenc
       googleAnalyticsRevision: preferences.googleAnalyticsRevision === GA4_CONSENT_REVISION ? GA4_CONSENT_REVISION : undefined,
       sessionReplay: preferences.sessionReplay === true && preferences.clarityRevision === REPLAY_REVISION,
       clarityRevision: preferences.clarityRevision === REPLAY_REVISION ? REPLAY_REVISION : undefined,
+      linkedinRevision: preferences.linkedinRevision === LINKEDIN_CONSENT_REVISION ? LINKEDIN_CONSENT_REVISION : undefined,
     };
   } catch {
     return null;
@@ -197,11 +200,13 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
         googleAnalyticsRevision: GA4_CONSENT_REVISION,
         sessionReplay: Boolean(selection.sessionReplay),
         clarityRevision: REPLAY_REVISION,
+        linkedinRevision: LINKEDIN_CONSENT_REVISION,
       };
 
       if (!nextPreferences.analytics) clearOptionalTrackingIdentifiers();
       const persisted = savePreferencesToStorage(nextPreferences);
       const replayReload = changeReplayChoice(Boolean(nextPreferences.sessionReplay), persisted);
+      changeLinkedInChoice(Boolean(nextPreferences.marketingAttribution), persisted && !replayReload);
       if (!nextPreferences.analytics) revokeGa4(persisted && !replayReload);
       setPreferences(nextPreferences);
       closeTrackingPreferences();
@@ -222,7 +227,7 @@ export function TrackingConsentProvider({ children }: { children: ReactNode }) {
       analyticsEnabled: preferences?.analytics === true,
       allowAllOptionalTracking,
       closeTrackingPreferences,
-      hasSavedPreferences: preferences !== null && !needsGa4ConsentRefresh() && !needsReplayConsentRefresh(),
+      hasSavedPreferences: preferences !== null && !needsGa4ConsentRefresh() && !needsReplayConsentRefresh() && !needsLinkedInConsentRefresh(),
       marketingAttributionEnabled: preferences?.marketingAttribution === true,
       openTrackingPreferences,
       preferences,

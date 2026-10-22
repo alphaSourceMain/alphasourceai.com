@@ -119,10 +119,10 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               <h2 className="text-sm font-semibold text-[#0A1547]">Privacy choices</h2>
               <p className="mt-1 text-sm leading-5 text-[#38415E]">
                 We use optional first-party analytics, Google Analytics 4, Microsoft Clarity session replay
-                on selected production public pages, and marketing attribution. Entered values and form
-                interactions are not recorded; masked form outlines may be visible. Sign-in and private
-                workflows are excluded from replay. Choose which optional technologies to enable;
-                essential sign-in and security remain active.
+                on selected production public pages, and marketing attribution, including the LinkedIn
+                Insight Tag. Entered values and form interactions are not recorded; masked form outlines
+                may be visible. Sign-in and private workflows are excluded from replay. Choose which
+                optional technologies to enable; essential sign-in and security remain active.
               </p>
             </div>
             <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
@@ -195,7 +195,7 @@ export default function TrackingConsentNotice({ visible }: TrackingConsentNotice
               />
               <PreferenceRow
                 checked={draft.marketingAttribution}
-                description="Helps our marketing team understand where website traffic originates and how visitors navigate the public site."
+                description="Helps our marketing team understand where website traffic originates and how visitors navigate the public site. When this is enabled and a LinkedIn partner ID is configured, the LinkedIn Insight Tag may load."
                 id="marketing-attribution"
                 label="Marketing attribution"
                 onCheckedChange={(marketingAttribution) =>
