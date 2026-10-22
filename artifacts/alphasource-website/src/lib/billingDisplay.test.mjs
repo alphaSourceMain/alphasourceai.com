@@ -276,10 +276,12 @@ test("dev/staging support origins cannot be cross-wired, relaxed or authenticate
   const qa = "https://ia-backend-qa.onrender.com";
   assert.equal(origin.supportVoiceOrigin(dev, "development"), dev);
   assert.equal(origin.supportVoiceOrigin(qa, "staging"), qa);
+  assert.equal(origin.supportVoiceOrigin(dev + "/", "development"), dev);
+  assert.equal(origin.supportVoiceOrigin(qa + "/", "staging"), qa);
   assert.equal(origin.supportVoiceOrigin(qa, "development"), null);
   assert.equal(origin.supportVoiceOrigin(dev, "staging"), null);
   for (const bad of [
-    dev + "/",
+    dev + "//",
     dev + "?token=x",
     dev + ".evil.invalid",
     "https://user@interview-agent-backend-qa.onrender.com",
