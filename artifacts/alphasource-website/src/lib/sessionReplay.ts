@@ -6,7 +6,6 @@ export const REPLAY_SDK_VERSION = "0.8.72";
 const ENDPOINT = "https://g.clarity.ms/collect";
 const PREFERENCES = "alphasource:tracking-preferences:v2";
 const SENSITIVE = 'form,input,textarea,select,[contenteditable],[role="dialog"]';
-const DROPPED = ["form", "input", "textarea", "select", "[contenteditable]", '[role="dialog"]', "iframe", "script", "noscript"];
 // Native 0.8.72 event numbers; input, selection, clipboard, custom, extraction,
 // errors, variables and unknown event kinds are never forwarded.
 const EVENTS = new Set([0, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 23, 25, 26, 28, 29, 35, 36, 47, 48, 53]);
@@ -160,7 +159,9 @@ export function createSessionReplay(win: ReplayWindow, enabled: boolean, load: (
       win.document.body.setAttribute("data-clarity-mask", "true");
       sdk = loaded;
       live = true;
-      const configuration = { projectId: REPLAY_PROJECT, upload: (raw: string) => upload(raw, attempt), content: false, mask: ["body"], drop: DROPPED,
+      // Native `drop` redacts named URL parameters; it does not remove DOM nodes.
+      // Strict masking protects values; the interaction guard stops form recording.
+      const configuration = { projectId: REPLAY_PROJECT, upload: (raw: string) => upload(raw, attempt), content: false, mask: ["body"], drop: [],
         track: false, report: null, modules: [], cookies: [], fraud: false, conversions: false, diagnostics: false, action: null, fallback: null };
       // The pinned vendor's native defaults use null for these disabled transports,
       // although its published declaration omits null. Keep the audited runtime values.

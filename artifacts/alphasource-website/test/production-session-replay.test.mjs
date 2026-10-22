@@ -35,7 +35,7 @@ test('analytics and marketing grants or an old Allow all never imply replay',asy
 });
 test('one deferred SDK, initial strict mask and disabled secondary transports',async()=>{
  const h=harness();await h.controller.start();await h.controller.start();assert.equal(h.loads(),1);assert.equal(h.starts(),1);assert.equal(h.attributes['data-clarity-mask'],'true');
- const c=h.config();assert.equal(c.projectId,REPLAY_PROJECT);assert.equal(c.content,false);assert.deepEqual(c.mask,['body']);for(const selector of ['form','input','textarea','select','[contenteditable]','[role="dialog"]'])assert.ok(c.drop.includes(selector));
+ const c=h.config();assert.equal(c.projectId,REPLAY_PROJECT);assert.equal(c.content,false);assert.deepEqual(c.mask,['body']);assert.deepEqual(c.drop,[],'native drop is a URL-parameter list, not DOM removal');
  for(const k of ['report','action','fallback'])assert.equal(c[k],null);for(const k of ['track','fraud','conversions','diagnostics'])assert.equal(c[k],false);assert.deepEqual(c.modules,[]);assert.deepEqual(c.cookies,[]);assert.equal(typeof c.upload,'function');assert.equal(h.listeners.get('popstate').length,1);
 });
 test('metadata is canonical and custom, input, clipboard and extraction events are dropped',()=>{

@@ -13,7 +13,7 @@ const compiled=buildSync({entryPoints:[new URL('../src/lib/sessionReplay.ts',imp
 const {createSessionReplay,REPLAY_REVISION}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const key='alphasource:tracking-preferences:v2';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-test('pinned patched SDK masks real DOM, uses only callback transport, and cannot upload after stop/restart/denial', {timeout:8000}, async()=>{
+test('pinned patched SDK masks DOM values without claiming form-node removal, uses only callback transport, and fences stop/restart/denial', {timeout:8000}, async()=>{
  assert.equal(metadata.version,'0.8.72');
  const cookieJar=new CookieJar();
  const dom=new JSDOM('<!doctype html><html lang="en"><head><title>Public marketing</title></head><body><p>MASK_THIS_PUBLIC_TEXT</p><form><label>Private form<input value="buyer-private@example.invalid"></label><textarea>PRIVATE_MESSAGE_NEVER_SEND</textarea></form><div role="dialog">PRIVATE_DIALOG_NEVER_SEND</div></body></html>',{url:'https://www.alphasourceai.com/',runScripts:'outside-only',pretendToBeVisual:true,cookieJar,virtualConsole:new VirtualConsole()});
