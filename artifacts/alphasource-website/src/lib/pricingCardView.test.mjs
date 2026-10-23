@@ -87,7 +87,7 @@ function fixture(){const refs={basic:{3:44900,6:39900,12:34900},pro:{3:74900,6:6
  rollover_days:plan==='basic'?null:90,renewal:{default_auto_renew:true,retain_accepted_pricing:true,commitment_months:months,
  non_renewal_cutoff:'before_term_end',ends_installments_early:false}})));
  return parseMembershipQuoteCatalog({pricing_version:'fixture',offers,first_role_prepay_prices:{basic:35900,pro:62900},monthly_payment_references:refs},'public');}
-test('actual card JSX displays only the selected term and both exact server prices, keeping role-fee styling',()=>{
+test('actual card JSX displays exact term prices and a secondary role fee within the Included box',()=>{
  const catalog=fixture();
  for(const plan_key of ['basic','pro'])for(const months of [3,6,12]){
   const html=renderToStaticMarkup(React.createElement(PlanCard,{plan:{plan_key,display_name:catalog.plans[plan_key].display_name,
@@ -99,7 +99,11 @@ test('actual card JSX displays only the selected term and both exact server pric
   assert.match(html,/class="text-4xl font-black tracking-normal text-\[#0A1547\]">months<\/span>/);
   assert.doesNotMatch(html,/contact sales for monthly/);
   assert.doesNotMatch(html,/through sales|3 \/ 6 \/ 12|Optional first-role prepay/);
-  assert.match(html,new RegExp('class="mt-2 text-sm font-black text-\\[#0A1547\\]">\\+ \\$'+(plan_key==='basic'?399:699)+' / role'));
+  const roleFee=`Role fee: $${plan_key==='basic'?399:699} per role`;
+  assert.ok(html.includes(`<p class="mt-1 text-xs font-medium text-[#0A1547]/70">${roleFee}</p>`));
+  assert.ok(html.indexOf('20 interviews per role') < html.indexOf(roleFee));
+  assert.ok(html.indexOf(roleFee) < html.indexOf('Interview cap'));
+  assert.doesNotMatch(html,/\+ \$\d+ \/ role/);
   assert.ok(html.indexOf(plan_key==='basic'?'Essential test':'Pro test') < html.indexOf('>'+months+'</span>'));
   assert.match(html,/class="mb-5 mt-6"/);
   if(plan_key==='pro'){

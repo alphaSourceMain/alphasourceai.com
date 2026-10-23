@@ -633,10 +633,12 @@ function PackageMetric({
   icon,
   label,
   value,
+  detail,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  detail?: string;
 }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border border-[#0A1547]/10 bg-white px-4 py-3">
@@ -644,6 +646,7 @@ function PackageMetric({
       <div>
         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0A1547]/45">{label}</p>
         <p className="text-sm font-black text-[#0A1547]">{value}</p>
+        {detail ? <p className="mt-1 text-xs font-medium text-[#0A1547]/70">{detail}</p> : null}
       </div>
     </div>
   );
@@ -703,7 +706,6 @@ function PlanCard({
             {membershipMoney(cardPricing.monthlyPaymentCents)} monthly
           </p> : null}
         </div> : <p className="mt-3 text-sm font-bold text-[#0A1547]/60">Awaiting current pricing</p>}
-        {catalog ? <p className="mt-2 text-sm font-black text-[#0A1547]">+ {formatUsd(plan.per_role_fee)} / role</p> : null}
       </div>
 
       <div className="grid gap-3">
@@ -711,6 +713,7 @@ function PlanCard({
           icon={<CheckCircle className="h-4 w-4" />}
           label="Included"
           value={`${included} interviews per role`}
+          detail={catalog ? `Role fee: ${formatUsd(plan.per_role_fee)} per role` : undefined}
         />
         <PackageMetric
           icon={<Clock3 className="h-4 w-4" />}
