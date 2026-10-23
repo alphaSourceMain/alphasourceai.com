@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, RefreshCw, X } from "lucide-react";
 import { getMembershipPlanLabel } from "@/lib/membershipPlans";
+import { rememberCheckoutSetupProof } from "@/lib/checkoutPasswordSetup";
 
 interface SignerPageProps {
   params?: {
@@ -568,6 +569,7 @@ export default function MembershipAgreementSignerPage({ params }: SignerPageProp
       const checkoutUrl = String(payload?.url || "").trim();
       const checkoutClientSecret = String(payload?.checkout_client_secret || "").trim();
       const checkoutSessionId = String(payload?.session_id || "").trim();
+      if (checkoutSessionId) rememberCheckoutSetupProof(checkoutSessionId, token);
 
       if (checkoutClientSecret && stripePublishableKey) {
         setEmbeddedCheckout({

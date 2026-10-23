@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock3, RefreshCw, ShieldCheck } from "lucide-react";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
-import { checkoutPasswordSetupHref } from "@/lib/checkoutPasswordSetup";
+import { checkoutPasswordSetupHref, consumeCheckoutSetupProof } from "@/lib/checkoutPasswordSetup";
 
 type ReturnStatus = "ready" | "password_required" | "setup_email_sent" | "setup_pending" | "activation_pending" | "payment_pending" | "cancelled";
 
@@ -129,9 +129,9 @@ const STATUS_COPY: Record<ReturnStatus, {
   password_required: {
     eyebrow: "Payment confirmed",
     title: "Finish setting up your account.",
-    body: "Your payment is confirmed. Continue to password setup and use your secure emailed link, or request a new link there. If you already have a password, sign in instead.",
+    body: "Your payment is confirmed. Your secure password form opens automatically when this browser can verify your signup. Otherwise, use the secure setup link in your email. Existing account holders can sign in instead.",
     tone: "success",
-    primaryLabel: "Continue to password setup",
+    primaryLabel: "Request a new setup email",
     primaryHref: "/support/?signin=client&setup=password",
     secondaryLabel: "Refresh status",
   },
@@ -187,6 +187,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   const [statusError, setStatusError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const statusRequests = useRef(new Set<AbortController>());
+  const setupAttempted = useRef(false);
   const [firstRolePrepaySelected, setFirstRolePrepaySelected] = useState<boolean | null>(() => readInitialFirstRolePrepaySelected());
   const copy = STATUS_COPY[status];
   const Icon = copy.tone === "success" ? CheckCircle : copy.tone === "cancelled" ? AlertCircle : Clock3;
@@ -234,8 +235,28 @@ export default function CheckoutSubscriptionSuccessPage() {
       if (nextFirstRolePrepaySelected !== null) setFirstRolePrepaySelected(nextFirstRolePrepaySelected);
       setStatus(nextStatus);
       setStatusError("");
-      const setupHref = checkoutPasswordSetupHref(response.ok, data);
-      if (setupHref) window.location.replace(setupHref);
+      if (nextStatus === "password_required" && lookup.sessionId && !setupAttempted.current) {
+        setupAttempted.current = true;
+        const token = consumeCheckoutSetupProof(lookup.sessionId);
+        if (token) {
+          try {
+            const setupResponse = await fetch(joinUrl(getPublicBackendBase(), "/api/alphascreen/checkout-status"), {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              credentials: "omit", cache: "no-store", signal: request.signal,
+              body: JSON.stringify({ session_id: lookup.sessionId, token }),
+            });
+            const setupBody = await setupResponse.json().catch(() => null);
+            if (request.signal.aborted) return null;
+            const setupHref = checkoutPasswordSetupHref(setupResponse.ok, setupBody);
+            if (setupHref) window.location.replace(setupHref);
+            else setStatusError("Automatic password setup is unavailable. Use the secure setup link in your email.");
+          } catch (_) {
+            if (!request.signal.aborted) setStatusError("Automatic password setup is unavailable. Use the secure setup link in your email.");
+          }
+        }
+      } else if (nextStatus === "ready") {
+        consumeCheckoutSetupProof(lookup.sessionId);
+      }
       return nextStatus;
     } catch (_) {
       if (request.signal.aborted) return null;
@@ -245,7 +266,7 @@ export default function CheckoutSubscriptionSuccessPage() {
       statusRequests.current.delete(request);
       if (manual && !request.signal.aborted) setRefreshing(false);
     }
-  }, [statusEndpoint]);
+  }, [statusEndpoint, lookup.sessionId]);
 
   useEffect(() => {
     if (statusEndpoint && initialStatus !== "cancelled") void loadCheckoutStatus(false);
@@ -293,7 +314,7 @@ export default function CheckoutSubscriptionSuccessPage() {
   const backHref = status === "ready" ? "/dashboard" : "/alphascreen/pricing#pricing-demo";
   const backLabel = status === "ready" ? "Back to dashboard" : "Back to pricing";
   const nextStepCopy = status === "password_required"
-    ? "Continue to password setup to use your secure emailed link or request a new setup link."
+    ? "The secure password form opens automatically for a new buyer in the checkout browser. Your emailed setup link remains available if needed."
     : status === "setup_email_sent"
     ? "Use the emailed setup link, or select Sign In and Forgot password? if the link expired."
     : status === "ready"
