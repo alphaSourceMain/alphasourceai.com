@@ -86,8 +86,6 @@ type PurchaseIntentForm = {
   buyer_title: string;
   billing_cadence: string;
   first_role_prepay_selected: boolean;
-  agreement_acknowledged: boolean;
-  contact_acknowledged: boolean;
 };
 
 type PurchaseIntentResult = {
@@ -255,9 +253,7 @@ const EMPTY_PURCHASE_FORM: PurchaseIntentForm = {
   buyer_phone: "",
   buyer_title: "",
   billing_cadence: "monthly",
-  first_role_prepay_selected: false,
-  agreement_acknowledged: false,
-  contact_acknowledged: false,
+  first_role_prepay_selected: true,
 };
 
 function asNumber(value: unknown, fallback = 0): number {
@@ -423,8 +419,6 @@ function buildPurchasePayload(form: PurchaseIntentForm, selectedPlan: AlphaScree
     buyer_title: cleanText(form.buyer_title, 100),
     first_role_prepay_selected: form.first_role_prepay_selected === true,
     source_path: typeof window !== "undefined" ? window.location.pathname : "/alphascreen/pricing",
-    agreement_acknowledged: form.agreement_acknowledged,
-    contact_acknowledged: form.contact_acknowledged,
   };
   return catalog ? publicRetailQuotePayload(identity, catalog, selection, selectedPlan.plan_key as "basic" | "pro") : identity;
 }
@@ -624,8 +618,6 @@ function validatePurchaseForm(form: PurchaseIntentForm, selectedPlan: AlphaScree
   if (!validEmail(form.buyer_email)) return "Enter a valid email address.";
   if (!cleanText(form.buyer_phone, 40)) return "Phone is required.";
   if (!cleanText(form.buyer_title, 100)) return "Title is required.";
-  if (!form.agreement_acknowledged) return "Confirm that agreement signing and payment are required before access is activated.";
-  if (!form.contact_acknowledged) return "Confirm that alphaSource may contact you about this alphaScreen membership.";
   return "";
 }
 
@@ -1385,24 +1377,7 @@ function PurchaseIntentPanel({
             Choose how you want to handle the first paid role under this billing account.
           </p>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2" role="radiogroup" aria-label="First role payment choice">
-          <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
-            !prepaySelected ? "border-[#A380F6] bg-white" : "border-[#0A1547]/10 bg-white/70 hover:border-[#A380F6]/45"
-          }`}>
-            <input
-              type="radio"
-              name="first_role_prepay_selected"
-              checked={!prepaySelected}
-              onChange={() => onChange("first_role_prepay_selected", false)}
-              className="mt-1 h-4 w-4 border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
-            />
-            <span>
-              <span className="block text-sm font-black text-[#0A1547]">Pay when I open my first role later</span>
-              <span className="mt-1 block text-xs font-semibold leading-relaxed text-[#0A1547]/60">
-                Skip the first-role prepayment and pay the standard role fee when you open a role in alphaScreen.
-              </span>
-            </span>
-          </label>
+        <div className="grid items-start gap-3 lg:grid-cols-[1.2fr_1fr]" role="radiogroup" aria-label="First role payment choice">
           <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
             prepaySelected ? "border-[#A380F6] bg-white" : "border-[#0A1547]/10 bg-white/70 hover:border-[#A380F6]/45"
           }`}>
@@ -1426,6 +1401,23 @@ function PurchaseIntentPanel({
               </span>
               <span className="mt-2 block text-xs font-black text-[#0A1547]">
                 {formatAmount(discountedFirstRoleFee)} now instead of {formatAmount(standardFirstRoleFee)}
+              </span>
+            </span>
+          </label>
+          <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+            !prepaySelected ? "border-[#A380F6] bg-white" : "border-[#0A1547]/10 bg-white/70 hover:border-[#A380F6]/45"
+          }`}>
+            <input
+              type="radio"
+              name="first_role_prepay_selected"
+              checked={!prepaySelected}
+              onChange={() => onChange("first_role_prepay_selected", false)}
+              className="mt-1 h-4 w-4 border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
+            />
+            <span>
+              <span className="block text-xs font-bold text-[#0A1547]">Pay when I open my first role later</span>
+              <span className="mt-1 block text-xs leading-relaxed text-[#0A1547]/60">
+                Skip prepayment and pay {formatAmount(standardFirstRoleFee)} when you open your first role.
               </span>
             </span>
           </label>
@@ -1466,26 +1458,9 @@ function PurchaseIntentPanel({
         {newRetail ? <p className="mt-3 text-xs leading-relaxed text-[#0A1547]/60">{renewalCopy}</p> : null}
       </div>
 
-      <div className="mt-6 grid gap-3">
-        <label className="flex items-start gap-3 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4 text-sm font-semibold leading-relaxed text-[#0A1547]/70">
-          <input
-            type="checkbox"
-            checked={form.agreement_acknowledged}
-            onChange={(event) => onChange("agreement_acknowledged", event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
-          />
-          <span>I understand signup requires membership agreement signing and payment before access is activated.</span>
-        </label>
-        <label className="flex items-start gap-3 rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-4 text-sm font-semibold leading-relaxed text-[#0A1547]/70">
-          <input
-            type="checkbox"
-            checked={form.contact_acknowledged}
-            onChange={(event) => onChange("contact_acknowledged", event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[#0A1547]/25 text-[#A380F6] focus:ring-[#A380F6]"
-          />
-          <span>I agree to be contacted about this alphaScreen membership.</span>
-        </label>
-      </div>
+      <p className="mt-5 text-xs leading-relaxed text-[#0A1547]/65">
+        Verify your contact details, then review and sign your membership agreement. Payment is required before access is activated.
+      </p>
 
       </fieldset>
 
@@ -1637,7 +1612,7 @@ export default function AlphaScreenPricingPage() {
     setEmailVerifyLoading(false);
     setVerificationChannel("email");
     clearCheckoutRecoveryState();
-    setPurchaseForm((prev) => ({ ...prev, billing_cadence: cadence, first_role_prepay_selected: false }));
+    setPurchaseForm((prev) => ({ ...prev, billing_cadence: cadence, first_role_prepay_selected: true }));
     trackEvent("signup_started", { plan: plan.plan_key, step: "plan_selection" });
   };
 

@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { consumeCheckoutPasswordToken } from "@/lib/checkoutPasswordSetup";
 
 const RESET_ORIGIN_STORAGE_KEY = "pwreset_origin";
 
@@ -39,6 +40,7 @@ export default function PwResetPage() {
   const [success, setSuccess] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const recoveryAttempt = useRef<Promise<boolean> | null>(null);
 
   const requestId = useMemo(() => {
     try {
@@ -55,18 +57,22 @@ export default function PwResetPage() {
 
   useEffect(() => {
     let alive = true;
-    const url = new URL(window.location.href);
-    const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
-
-    const code = url.searchParams.get("code");
-    const tokenHash = url.searchParams.get("token_hash") || hashParams.get("token_hash");
-    const typeParam = url.searchParams.get("type") || hashParams.get("type");
-    const accessToken = hashParams.get("access_token");
-    const refreshToken = hashParams.get("refresh_token");
-    const hasTokenPair = Boolean(accessToken && refreshToken);
-
-    const handleRecovery = async () => {
-      try {
+    if (!recoveryAttempt.current) {
+      const url = new URL(window.location.href);
+      const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
+      const directToken = consumeCheckoutPasswordToken();
+      const code = url.searchParams.get("code");
+      const tokenHash = directToken || url.searchParams.get("token_hash") || hashParams.get("token_hash");
+      const typeParam = directToken ? "recovery" : url.searchParams.get("type") || hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hasTokenPair = Boolean(accessToken && refreshToken);
+      // Emailed recovery links also leave no capability in browser history once
+      // read. Direct checkout setup never put one in the URL in the first place.
+      ["code", "token_hash", "type"].forEach(key => url.searchParams.delete(key));
+      url.hash = "";
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+      recoveryAttempt.current = (async () => {
         if (code) {
           const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeErr) throw exchangeErr;
@@ -77,6 +83,9 @@ export default function PwResetPage() {
           });
           if (setSessionErr) throw setSessionErr;
         } else if (tokenHash) {
+          if (typeParam && !["recovery", "invite", "magiclink", "email"].includes(typeParam)) {
+            throw new Error("Invalid recovery type.");
+          }
           const { error: verifyErr } = await supabase.auth.verifyOtp({
             type: (typeParam || "recovery") as "recovery",
             token_hash: tokenHash,
@@ -85,8 +94,15 @@ export default function PwResetPage() {
         }
 
         const { data } = await supabase.auth.getSession();
+        return Boolean(data?.session);
+      })();
+    }
+
+    const handleRecovery = async () => {
+      try {
+        const hasSession = await recoveryAttempt.current;
         if (!alive) return;
-        if (data?.session) {
+        if (hasSession) {
           setReadyForPassword(true);
           setError("");
         } else {

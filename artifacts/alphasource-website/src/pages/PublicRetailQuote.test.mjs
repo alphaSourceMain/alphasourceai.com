@@ -20,14 +20,16 @@ function builder(source) {
   vm.runInContext(code, context);
   return (form, plan) => JSON.parse(JSON.stringify(context.build(form, plan)));
 }
-test('actual legacy public purchase payload equals exact prior working builder', () => {
+test('actual legacy public payload preserves prior fields except explicitly removed intake acknowledgements', () => {
   let count = 0;
   for (const plan_key of ['basic', 'pro']) for (const billing_cadence of ['monthly', 'annual', ''])
     for (const first_role_prepay_selected of [false, true]) {
       const form = { company_legal_name: ' Synthetic ', company_dba: '', buyer_first_name: 'QA', buyer_last_name: 'Buyer',
         buyer_email: 'buyer@example.invalid', buyer_phone: 'synthetic-no-phone', buyer_title: 'QA', billing_cadence,
         first_role_prepay_selected, agreement_acknowledged: true, contact_acknowledged: true };
-      assert.deepEqual(builder(current)(form, { plan_key }), builder(old)(form, { plan_key })); count++;
+      const previous = builder(old)(form, { plan_key });
+      delete previous.agreement_acknowledged; delete previous.contact_acknowledged;
+      assert.deepEqual(builder(current)(form, { plan_key }), previous); count++;
     }
   assert.equal(count, 12);
 });

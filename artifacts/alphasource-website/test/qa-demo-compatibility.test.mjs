@@ -6,7 +6,8 @@ import ts from 'typescript';
 function moduleAt(path){
   const source=fs.readFileSync(new URL(path,import.meta.url),'utf8');
   const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  const context=vm.createContext({exports:{},URL});vm.runInContext(code,context);return context.exports;
+  const values=new Map(),window={sessionStorage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)}};
+  const context=vm.createContext({exports:{},URL,window});vm.runInContext(code,context);return context.exports;
 }
 const {supportVoiceOrigin}=moduleAt('../src/lib/supportVoiceOrigin.ts');
 const {checkoutPasswordSetupHref,CLIENT_PASSWORD_SETUP_HREF}=moduleAt('../src/lib/checkoutPasswordSetup.ts');
@@ -21,9 +22,15 @@ test('QA voice accepts only the same backend origin with zero or one trailing sl
   for(const raw of [dev,dev+'/'])assert.equal(supportVoiceOrigin(raw,'development'),dev);
   assert.equal(supportVoiceOrigin(dev+'//','development'),null);
 });
-test('password setup handoff requires the successful exact backend status and carries no checkout capability',()=>{
+test('direct password setup needs an authorized POST token, not public status or a supplied URL',()=>{
   assert.equal(CLIENT_PASSWORD_SETUP_HREF,'/support/?signin=client&setup=password');
-  assert.equal(checkoutPasswordSetupHref(true,{status:'password_required'}),CLIENT_PASSWORD_SETUP_HREF);
+  assert.equal(checkoutPasswordSetupHref(true,{status:'password_required'}),null);
+  const hash='a'.repeat(64);
+  assert.equal(checkoutPasswordSetupHref(true,{status:'password_required',password_setup_token_hash:hash}),
+    '/pwreset?origin=client');
+  for(const password_setup_token_hash of ['bad','https://evil.invalid','a'.repeat(63),hash+'&next=evil',null])
+    assert.equal(checkoutPasswordSetupHref(true,{status:'password_required',password_setup_token_hash}),null);
+  assert.equal(checkoutPasswordSetupHref(true,{status:'password_required',set_password_url:'https://evil.invalid'}),null);
   for(const status of ['ready','setup_email_sent','setup_pending','activation_pending','payment_pending','cancelled','PASSWORD_REQUIRED',null])
     assert.equal(checkoutPasswordSetupHref(true,{status}),null);
   for(const value of [null,undefined,'password_required',[],{password_setup_required:true},{status:'ready',password:'required'}])
@@ -40,7 +47,9 @@ test('setup presentation reuses the existing email recovery and never sends on p
   assert.match(nav,/const redirectTo = buildPwResetUrl\(\{ origin: "client" \}\)/);
   assert.match(nav,/Already have a password\? Sign in/);
   const checkout=fs.readFileSync(new URL('../src/pages/CheckoutSubscriptionSuccessPage.tsx',import.meta.url),'utf8');
-  assert.match(checkout,/checkoutPasswordSetupHref\(response\.ok, data\)/);
+  assert.match(checkout,/checkoutPasswordSetupHref\(setupResponse\.ok, setupBody\)/);
+  assert.match(checkout,/consumeCheckoutSetupProof\(lookup\.sessionId\)/);
+  assert.match(checkout,/setupAttempted\.current = true/);
   assert.match(checkout,/initialStatus !== "cancelled"\) void loadCheckoutStatus\(false\)/);
   assert.doesNotMatch(checkout,/auth\.admin|generateLink\(|inviteUserByEmail|resetPasswordForEmail/);
   const initial=nav.slice(nav.indexOf('useEffect(() => {'),nav.indexOf('useEffect(() => {',nav.indexOf('useEffect(() => {')+1));

@@ -54,6 +54,19 @@ test('actual retail selector renders both schedules only for complete monthly ch
 // Execute the ACTUAL panel's pre-render calculations, not a copied copy helper.
 const page=fs.readFileSync(new URL('../pages/AlphaScreenPricingPage.tsx',import.meta.url),'utf8');
 const pageAst=ts.createSourceFile('pricing.tsx',page,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+test('new signup defaults to first-role prepay without fabricated acknowledgement or contact consent',()=>{
+ const form=pageAst.statements.flatMap(n=>ts.isVariableStatement(n)?[...n.declarationList.declarations]:[])
+  .find(n=>n.name.getText(pageAst)==='EMPTY_PURCHASE_FORM');
+ const defaults=vm.runInNewContext('('+form.initializer.getText(pageAst)+')');
+ assert.equal(defaults.first_role_prepay_selected,true);
+ for(const key of ['agreement_acknowledged','contact_acknowledged'])assert.equal(Object.hasOwn(defaults,key),false);
+ assert.doesNotMatch(page,/agreement_acknowledged|contact_acknowledged/);
+ const choices=page.slice(page.indexOf('aria-label="First role payment choice"'),page.indexOf('If selected, your initial Stripe Checkout'));
+ assert.ok(choices.indexOf('Prepay the first role once')<choices.indexOf('Pay when I open my first role later'));
+ assert.match(choices,/text-xs font-bold[^>]*>Pay when I open my first role later/);
+ assert.match(choices,/checked=\{!prepaySelected\}/);assert.match(choices,/onChange\("first_role_prepay_selected", false\)/);
+ assert.match(page,/Verify your contact details, then review and sign/);
+});
 const panel=pageAst.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='PurchaseIntentPanel');
 const start=panel.body.statements.findIndex(n=>ts.isVariableStatement(n)&&n.declarationList.declarations[0]?.name?.getText(pageAst)==='savedPackage');
 const stop=panel.body.statements.findIndex((n,i)=>i>start&&ts.isIfStatement(n)&&n.expression.getText(pageAst).includes('status === "success"'));
