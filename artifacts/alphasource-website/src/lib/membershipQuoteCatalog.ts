@@ -38,14 +38,15 @@ export function parseMembershipQuoteCatalog(value: unknown, audience: Membership
   if (typeof payload.pricing_version !== "string" || !payload.pricing_version || !Array.isArray(payload.offers)) return invalid();
   const raw = payload.offers.map(item => object(item) ?? invalid());
   const offers = parseMembershipOffers(payload.offers, audience);
-  if (raw.length !== (audience === "public" ? 6 : 12) || offers.length !== raw.length
+  if (!(audience === "public" ? [6, 12].includes(raw.length) : raw.length === 12) || offers.length !== raw.length
+    || (audience === "public" && raw.length === 6 && offers.some(offer => offer.payment_option !== "prepaid"))
     || offers.some(offer => offer.offer_version !== payload.pricing_version)) return invalid();
   const rolePrices = object(payload.first_role_prepay_prices);
   if (!rolePrices) return invalid();
   const plans = {} as Record<"basic" | "pro", RetailPlanDisplay>;
   for (const plan of ["basic","pro"] as const) {
     const selected = raw.filter(offer => offer.plan_key === plan);
-    if (selected.length !== (audience === "public" ? 3 : 6)) return invalid();
+    if (selected.length !== raw.length / 2) return invalid();
     const meta = selected[0];
     for (const key of ["per_role_fee_cents","included_interviews_per_role","max_interview_minutes","scored_question_count"])
       if (!positive(meta[key])) return invalid();
@@ -78,6 +79,9 @@ export function parseMembershipQuoteCatalog(value: unknown, audience: Membership
       if (!prices || Object.keys(prices).sort().join(',') !== '12,3,6'
         || [3, 6, 12].some(months => !positive(prices[months]))) return invalid();
       monthlyReferences[plan] = { 3: prices[3] as number, 6: prices[6] as number, 12: prices[12] as number };
+      for (const offer of offers.filter(item => item.plan_key === plan && item.payment_option === "monthly_installments")) {
+        if (offer.platform_payment_cents !== monthlyReferences[plan][offer.commitment_months]) return invalid();
+      }
     }
   }
   return { pricing_version: payload.pricing_version, offers, plans,
@@ -89,7 +93,9 @@ export function membershipCardPricing(catalog: MembershipQuoteCatalog, planKey: 
   const offer = catalog.offers.find(item => item.plan_key === planKey && item.commitment_months === months
     && item.payment_option === "prepaid" && item.offer_version === catalog.pricing_version);
   if (!offer) return invalid();
-  return { offer, monthlyPaymentCents: catalog.monthly_payment_references?.[planKey]?.[months] ?? null };
+  const monthly = catalog.offers.find(item => item.plan_key === planKey && item.commitment_months === months
+    && item.payment_option === "monthly_installments" && item.offer_version === catalog.pricing_version);
+  return { offer, monthlyPaymentCents: monthly?.platform_payment_cents ?? catalog.monthly_payment_references?.[planKey]?.[months] ?? null };
 }
 export function membershipInitialAmount(offer: RetailMembershipOffer, plan: RetailPlanDisplay, firstRoleSelected: boolean): number {
   if (offer.plan_key !== plan.plan_key || offer.first_role_prepay.selected) return invalid();
