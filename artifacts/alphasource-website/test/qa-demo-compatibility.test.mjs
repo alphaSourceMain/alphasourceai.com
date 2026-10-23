@@ -25,7 +25,7 @@ test('QA voice accepts only the same backend origin with zero or one trailing sl
 test('direct password setup needs an authorized POST token, not public status or a supplied URL',()=>{
   assert.equal(CLIENT_PASSWORD_SETUP_HREF,'/support/?signin=client&setup=password');
   assert.equal(checkoutPasswordSetupHref(true,{status:'password_required'}),null);
-  const hash='a'.repeat(64);
+  const hash='a'.repeat(56);
   assert.equal(checkoutPasswordSetupHref(true,{status:'password_required',password_setup_token_hash:hash}),
     '/pwreset?origin=client');
   for(const password_setup_token_hash of ['bad','https://evil.invalid','a'.repeat(63),hash+'&next=evil',null])
