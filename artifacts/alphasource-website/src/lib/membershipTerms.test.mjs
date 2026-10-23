@@ -64,7 +64,7 @@ test('generation-date version and basis remain an exact pair; old sources retain
   const next=raw.map(offer=>({...offer,offer_version:GENERATION_DATE_MEMBERSHIP_VERSION,term_start_basis:'generation_date'}));
   const offers=parseMembershipOffers(next,'sales');
   assert.equal(offers.length,12);assert.ok(offers.every(o=>o.term_start_basis==='generation_date'));
-  assert.equal(parseMembershipOffers(next,'public').length,6);
+  assert.equal(parseMembershipOffers(next,'public').length,12);
   assert.throws(()=>parseMembershipOffers([{...next[0],term_start_basis:'first_payment_success'}],'sales'));
   assert.throws(()=>parseMembershipOffers([{...raw[0],term_start_basis:'generation_date'}],'sales'));
   assert.match(membershipTermStartCopy(GENERATION_DATE_MEMBERSHIP_VERSION,3),/fixed start and renewal dates/);

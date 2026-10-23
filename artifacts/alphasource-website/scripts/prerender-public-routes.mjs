@@ -317,10 +317,10 @@ const routeContent = {
     eyebrow: "alphaScreen pricing",
     h1: "Compare alphaScreen memberships and get started.",
     intro:
-      "Choose a prepaid 3-, 6-, or 12-month Essential or Pro membership online. Contact sales for monthly installments over the same membership term.",
+      "Choose a 3-, 6-, or 12-month Essential or Pro membership online, paid upfront or in monthly installments over the same membership term.",
     sections: [
       section("How does alphaScreen pricing work?", [
-        "Essential prepaid memberships are $1,200 for 3 months, $1,950 for 6 months, or $3,300 for 12 months, plus $399 per role. Pro prepaid memberships are $2,100 for 3 months, $3,600 for 6 months, or $6,500 for 12 months, plus $699 per role. Contact sales for monthly installments over the selected term.",
+        "Essential prepaid memberships are $1,200 for 3 months, $1,950 for 6 months, or $3,300 for 12 months, plus $399 per role. Pro prepaid memberships are $2,100 for 3 months, $3,600 for 6 months, or $6,500 for 12 months, plus $699 per role. Monthly installments over the selected term are also available online.",
       ]),
       section("What is first-role prepay?", [
         "New self-serve buyers can optionally add their first role to the initial checkout at a one-time 10% discount: $359 for Essential or $629 for Pro. Additional roles use the standard role fee.",

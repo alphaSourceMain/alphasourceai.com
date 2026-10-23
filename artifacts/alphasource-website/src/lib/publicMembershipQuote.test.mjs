@@ -20,7 +20,7 @@ const context = vm.createContext({ retailAgreementTerms });
 vm.runInContext(`${declaration.getText(ast)};globalThis.project = safePackageSummary;`, context);
 const safeSummary = snapshot => JSON.parse(JSON.stringify(context.project(snapshot)));
 
-test('public payload matrix uses actual backend factory and twelve keys-only selections', () => {
+test('public payload matrix uses actual backend factory and 24 keys-only selections', () => {
   const { catalog } = verifiedPublicCatalog(rawCatalog());
   const identity = { company_legal_name: 'Synthetic', company_dba: '', buyer_first_name: 'QA', buyer_last_name: 'Buyer',
     buyer_email: 'buyer@example.invalid', buyer_phone: 'synthetic-no-phone', buyer_title: 'QA', source_path: '/alphascreen/pricing',
@@ -31,13 +31,13 @@ test('public payload matrix uses actual backend factory and twelve keys-only sel
     const body = publicRetailQuotePayload({ ...identity, first_role_prepay_selected: selected }, catalog,
       { offerKey: offer.offer_key, offerVersion: offer.offer_version }, offer.plan_key);
     assert.equal(body.commitment_months, offer.commitment_months);
-    assert.equal(body.payment_option, 'prepaid'); assert.equal(body.offer_version, catalog.pricing_version);
+    assert.equal(body.payment_option, offer.payment_option); assert.equal(body.offer_version, catalog.pricing_version);
     assert.equal(body.first_role_prepay_selected, selected); assert.equal(body.buyer_email, identity.buyer_email);
     for (const key of ['billing_cadence', 'platform_fee', 'included_interviews', 'auto_renew', 'stripe_price_id'])
       assert.equal(Object.hasOwn(body, key), false);
     assert.equal(Object.keys(body).length, 15); count++;
   }
-  assert.equal(count, 12);
+  assert.equal(count, 24);
   assert.throws(() => publicRetailQuotePayload(identity, catalog, null, 'basic'));
   assert.throws(() => publicRetailQuotePayload(identity, catalog, { offerKey: catalog.offers[0].offer_key, offerVersion: 'old' }, 'basic'));
 });
@@ -59,18 +59,22 @@ test('all new server saved summaries, selected or no role, remain independent of
   let count = 0;
   for (const offer of catalog.offers) for (const selected of [false, true]) {
     const snapshot = buildRetailPackageSnapshot({ channel: 'public', planKey: offer.plan_key, commitmentMonths: offer.commitment_months,
-      paymentOption: 'prepaid', offerVersion: offer.offer_version, firstRolePrepaySelected: selected });
+      paymentOption: offer.payment_option, offerVersion: offer.offer_version, firstRolePrepaySelected: selected });
     const summary = savedPublicMembershipTerms(safeSummary(snapshot));
     assert.equal(summary.platform_fee_cents, snapshot.platform_fee_cents);
     assert.equal(summary.first_role_selected, selected); assert.equal(summary.first_role_price_cents, snapshot.first_role_prepay.discounted_credit_amount_cents);
     assert.equal(summary.scored_question_count, snapshot.scored_question_count); count++;
+    assert.equal(summary.payment_option,offer.payment_option);
+    assert.equal(summary.platform_commitment_total_cents,snapshot.platform_fee_cents*(offer.payment_option==='prepaid'?1:offer.commitment_months));
     const historical = safeSummary(snapshot);
+    if(offer.payment_option==='prepaid'){
     historical.pricing_version = 'accepted-historical'; historical.platform_fee_cents += 17;
     historical.platform_commitment_total_cents = historical.platform_fee_cents;
     assert.equal(savedPublicMembershipTerms(historical).platform_fee_cents, snapshot.platform_fee_cents + 17);
     assert.equal(savedPublicMembershipTerms(historical).pricing_version, 'accepted-historical');
+    }
   }
-  assert.equal(count, 12);
+  assert.equal(count, 24);
   for (const plan of ['basic', 'pro']) for (const billing of ['monthly', 'annual'])
     assert.equal(savedPublicMembershipTerms(safeSummary(buildAlphaScreenPackageSnapshot(plan, billing))), null);
   const saved = safeSummary(buildRetailPackageSnapshot({ channel: 'public', planKey: 'basic', commitmentMonths: 3,

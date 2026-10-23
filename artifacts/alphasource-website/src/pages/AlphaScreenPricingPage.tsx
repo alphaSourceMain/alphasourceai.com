@@ -16,7 +16,7 @@ import { trackEvent } from "@/lib/analytics";
 import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 import { MembershipTermsSelector } from "@/components/MembershipTermsSelector";
-import { membershipMoney, selectedMembershipOffer, membershipTermStartCopy, type MembershipOfferSelection } from "@/lib/membershipTerms";
+import { membershipMoney, membershipObligationCopy, selectedMembershipOffer, membershipTermStartCopy, type MembershipOfferSelection } from "@/lib/membershipTerms";
 import { membershipCardPricing, type MembershipQuoteCatalog, type RetailPlanDisplay } from "@/lib/membershipQuoteCatalog";
 import { verifiedPublicCatalog, publicRetailQuotePayload, savedPublicMembershipTerms } from "@/lib/publicMembershipQuote";
 import {
@@ -700,7 +700,7 @@ function PlanCard({
         {cardPricing ? <div className="mt-3 grid gap-1 text-sm font-bold text-[#0A1547]">
           <p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
           {cardPricing.monthlyPaymentCents !== null ? <p className="text-xs font-bold text-[#0A1547]/55">
-            {membershipMoney(cardPricing.monthlyPaymentCents)} monthly <span className="text-[10px] font-medium">(contact sales for monthly)</span>
+            {membershipMoney(cardPricing.monthlyPaymentCents)} monthly
           </p> : null}
         </div> : <p className="mt-3 text-sm font-bold text-[#0A1547]/60">Awaiting current pricing</p>}
         {catalog ? <p className="mt-2 text-sm font-black text-[#0A1547]">+ {formatUsd(plan.per_role_fee)} / role</p> : null}
@@ -954,9 +954,13 @@ function PurchaseIntentPanel({
   const firstRoleDiscount = firstRoleDiscountPercent(selectedPlan);
   const prepaySelected = savedQuoteLocked ? savedPackage?.first_role_prepay?.selected === true : form.first_role_prepay_selected === true;
   const totalDueToday = selectedPlatformFee + (prepaySelected ? discountedFirstRoleFee : 0);
-  const termLabel = newRetail ? months ? `${months} months, prepaid` : "Choose a prepaid term"
+  const monthlyPayments = (savedTerms?.payment_option ?? offer?.payment_option) === "monthly_installments";
+  const commitmentTotal = savedTerms?.platform_commitment_total_cents ?? offer?.platform_commitment_total_cents;
+  const termLabel = newRetail ? months ? `${months} months, ${monthlyPayments ? "monthly payments" : "prepaid"}` : "Choose a membership term"
     : cadenceLabel(selectedPlan, savedPackage?.billing_cadence || form.billing_cadence);
-  const renewalCopy = newRetail ? `${membershipTermStartCopy(savedTerms?.pricing_version ?? offer?.offer_version ?? catalog?.pricing_version, months)} Auto-renew is on for the same term at your accepted platform price. You may turn it off any time before term end. Access lasts the full prepaid term; refunds are limited to exceptions in your accepted agreement.` : "";
+  const obligation = months ? membershipObligationCopy({ commitment_months: months,
+    payment_option: monthlyPayments ? "monthly_installments" : "prepaid" }) : "";
+  const renewalCopy = newRetail ? `${membershipTermStartCopy(savedTerms?.pricing_version ?? offer?.offer_version ?? catalog?.pricing_version, months)} Auto-renew is on for the same term at your accepted platform price. You may turn it off any time before term end. ${monthlyPayments ? `${obligation} ${membershipMoney(commitmentTotal ?? 0)} total platform commitment.` : "Access lasts the full prepaid term; refunds are limited to exceptions in your accepted agreement."}` : "";
 
   if (status === "success" && result) {
     const signingUrl = agreementSigningHref(agreementResult);
@@ -1847,7 +1851,7 @@ export default function AlphaScreenPricingPage() {
       return;
     }
     if (retailCatalog && !selectedMembershipOffer(retailCatalog.offers, retailSelection, selectedPlanKey as "basic" | "pro")) {
-      setPurchaseError("Choose a current prepaid membership term before continuing.");
+      setPurchaseError("Choose a current membership term and payment schedule before continuing.");
       return;
     }
     const validationMessage = validatePurchaseForm(purchaseForm, selectedPlan);

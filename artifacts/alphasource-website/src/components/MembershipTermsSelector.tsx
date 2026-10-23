@@ -12,8 +12,9 @@ export function MembershipTermsSelector({ offers, planKey, audience, selection, 
   firstRoleSelected?: boolean; firstRolePriceCents?: number;
 }) {
   const labelId = useId();
-  const available = offers.filter(offer => offer.plan_key === planKey
-    && (audience !== "public" || offer.payment_option === "prepaid"));
+  const available = offers.filter(offer => offer.plan_key === planKey);
+  const monthlyAvailable = [3, 6, 12].every(months => available.some(offer => offer.commitment_months === months
+    && offer.payment_option === "monthly_installments"));
   const selected = selectedMembershipOffer(available, selection, planKey);
   const paymentOption = selected?.payment_option ?? "prepaid";
   const months = selected?.commitment_months ?? 3;
@@ -27,7 +28,7 @@ export function MembershipTermsSelector({ offers, planKey, audience, selection, 
         <h3 id={labelId} className="text-base font-black" style={{ color: "var(--as-text)" }}>Membership term</h3>
         <p className="mt-1 text-sm" style={{ color: "var(--as-text-muted)" }}>Choose your commitment. {membershipTermStartCopy(selected?.offer_version ?? available[0]?.offer_version, months)}</p>
       </div>
-      {audience !== "public" ? (
+      {audience !== "public" || monthlyAvailable ? (
         <fieldset disabled={disabled} className="flex flex-wrap gap-2">
           <legend className="mb-2 text-xs font-bold" style={{ color: "var(--as-text-muted)" }}>Payment schedule</legend>
           {(["prepaid", "monthly_installments"] as const).map(option => {

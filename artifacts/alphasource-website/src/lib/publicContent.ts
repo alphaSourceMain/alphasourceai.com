@@ -1,7 +1,7 @@
 import { capacityFaq, membershipFaqs, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, buyerVerificationFaq, scoringFaqs, membershipUpdates, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const PUBLIC_CONTENT_LAST_UPDATED = "October 22, 2026";
+export const PUBLIC_CONTENT_LAST_UPDATED = "October 23, 2026";
 
 export type PublicFaqItem = {
   question: string;
@@ -248,7 +248,7 @@ export const publicSupportTopics: PublicSupportTopic[] = [
   {
     title: "Memberships, billing, and first-role prepay",
     body:
-      "Choose a 3-, 6-, or 12-month prepaid Essential or Pro term online, or contact sales for installments over that term. Enterprise can use custom per-role or usage-based pricing. Authorized users can check renewal settings, payments, role credits, rollover expiry, or paid pools in Billing; your accepted agreement controls.",
+      "Choose a 3-, 6-, or 12-month Essential or Pro term online, paid upfront or in monthly installments over that term. Enterprise can use custom per-role or usage-based pricing. Authorized users can check renewal settings, payments, role credits, rollover expiry, or paid pools in Billing; your accepted agreement controls.",
     links: [
       { label: "Membership pricing", href: "/alphascreen/pricing" },
       { label: "Value estimator", href: "/alphascreen/roi" },

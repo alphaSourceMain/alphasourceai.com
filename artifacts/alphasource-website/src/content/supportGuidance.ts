@@ -8,14 +8,14 @@ export const capacityFaq = {
 
 export const membershipTermFaq = {
   question: "Is monthly billing a month-to-month membership?",
-  answer: "No. New Essential and Pro memberships have a 3-, 6-, or 12-month commitment. Online signup is prepaid; contact sales for monthly installments over the same selected term. Installments are not a month-to-month cancellation option: current-term payments remain owed. Enterprise terms are customized. Existing and custom accounts keep their accepted agreement terms.",
+  answer: "No. New Essential and Pro memberships have a 3-, 6-, or 12-month commitment. Online signup offers upfront payment or monthly installments over the same selected term. Installments are not a month-to-month cancellation option: current-term payments remain owed. Enterprise terms are customized. Existing and custom accounts keep their accepted agreement terms.",
 };
 
 export const firstRolePrepayAnswer = `New self-serve buyers may optionally prepay the first role once: ${dollars(essential.firstRoleCents)} for Essential or ${dollars(pro.firstRoleCents)} for Pro (USD). This non-refundable credit has no expiration and applies to the first paid role opened by the parent or a child entity under the same billing account. It does not renew. Later roles use the standard role fee. Contact support before opening another paid role if the credit is missing, or before changing membership with an unused credit.`;
 
 export const membershipPricingFaq = {
   question: "How does pricing work?",
-  answer: `New Essential prepaid platform memberships cost ${essential.prepaidCents.map((price, i) => `${dollars(price)} for ${months[i]} months`).join(", ")}. Pro costs ${pro.prepaidCents.map((price, i) => `${dollars(price)} for ${months[i]} months`).join(", ")}. Prices are USD, before applicable tax; role fees are separate. Contact sales for monthly installments over the selected term; these are not the prepaid price divided into monthly payments. Your accepted agreement controls existing or custom pricing.`,
+  answer: `New Essential prepaid platform memberships cost ${essential.prepaidCents.map((price, i) => `${dollars(price)} for ${months[i]} months`).join(", ")}. Pro costs ${pro.prepaidCents.map((price, i) => `${dollars(price)} for ${months[i]} months`).join(", ")}. Prices are USD, before applicable tax; role fees are separate. Monthly installments over the selected term are also available online; these are not the prepaid price divided into monthly payments. Your accepted agreement controls existing or custom pricing.`,
 };
 
 export const membershipRoleFeesFaq = {
@@ -62,7 +62,7 @@ export const membershipUpdates = [{
   title: "Membership terms and Enterprise options",
   summary: "Help now reflects the new memberships; accepted existing agreements stay unchanged.",
   bullets: [
-    "Essential and Pro offer 3-, 6-, and 12-month prepaid terms; contact sales for installments",
+    "Essential and Pro offer 3-, 6-, and 12-month terms online, paid upfront or in monthly installments",
     "Billing shows renewal controls; cancelling does not erase current-term obligations",
     "Enterprise supports custom platform-and-role or usage-based pricing and optional paid pools",
     "Pro and Enterprise include eligible dashboard AI support alongside their agreed support channels",

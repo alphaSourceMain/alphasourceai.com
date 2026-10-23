@@ -23,7 +23,7 @@ test("static human-readable copy matches prepaid terms and leaves monthly instal
   const pricing = script.slice(script.indexOf('  "/alphascreen/pricing": {'), script.indexOf('  "/alphascreen/security": {'));
   assert.doesNotMatch(pricing, /\$299|\$3,299|\$599|\$6,499/);
   for (const price of ["$1,200", "$1,950", "$3,300", "$2,100", "$3,600", "$6,500"]) assert.ok(pricing.includes(price));
-  assert.match(pricing, /Contact sales for monthly installments/);
+  assert.match(pricing, /Monthly installments over the selected term are also available online/);
   assert.match(pricing, /dedicated Client Support Agent/);
   assert.match(pricing, /platform fee and per-interview pricing/);
 });

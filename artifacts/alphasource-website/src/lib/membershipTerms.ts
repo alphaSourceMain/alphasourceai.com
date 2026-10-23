@@ -90,7 +90,8 @@ export function parseMembershipOffers(value: unknown, audience: MembershipAudien
       renewal: { default_auto_renew: true, retain_accepted_pricing: true, commitment_months: offer.commitment_months,
         non_renewal_cutoff: "before_term_end", ends_installments_early: false } };
   });
-  return audience === "public" ? offers.filter(offer => offer.payment_option === "prepaid") : offers;
+  return audience === "public" ? offers.filter(offer => offer.payment_option === "prepaid"
+    || isGenerationDateMembership(offer.offer_version)) : offers;
 }
 export function selectedMembershipOffer(offers: RetailMembershipOffer[], selection: MembershipOfferSelection | null,
   planKey: RetailMembershipOffer["plan_key"]): RetailMembershipOffer | null {
@@ -103,7 +104,7 @@ export function membershipSelectionPayload(offer: RetailMembershipOffer) {
   return { offer_version: offer.offer_version, plan_key: offer.plan_key,
     commitment_months: offer.commitment_months, payment_option: offer.payment_option };
 }
-export function membershipObligationCopy(offer: RetailMembershipOffer): string {
+export function membershipObligationCopy(offer: Pick<RetailMembershipOffer, "payment_option" | "commitment_months">): string {
   return offer.payment_option === "prepaid"
     ? "Your membership stays active for the full prepaid term. Turning off renewal does not create a refund; exceptions are subject to the accepted agreement."
     : `All ${offer.commitment_months} monthly payments remain due for this term. Turning off renewal does not cancel remaining payments; access continues while payments are made.`;
