@@ -30,7 +30,7 @@ export function checkoutPasswordSetupHref(responseOk: boolean, body: unknown): s
   if (!responseOk || !body || typeof body !== "object") return null;
   const response = body as { status?: unknown; password_setup_token_hash?: unknown };
   if (response.status !== "password_required" || typeof response.password_setup_token_hash !== "string"
-    || !/^[a-f0-9]{64}$/i.test(response.password_setup_token_hash)) return null;
+    || !/^[a-f0-9]{56}$/i.test(response.password_setup_token_hash)) return null;
   // Fixed same-origin route; the capability never enters the address bar,
   // history or a referrer. The existing password form consumes it once.
   try {
@@ -47,7 +47,7 @@ export function consumeCheckoutPasswordToken(): string | null {
     window.sessionStorage.removeItem(PASSWORD_TOKEN_KEY);
     const item = JSON.parse(raw || "null");
     const age = Date.now() - item?.savedAt;
-    return typeof item?.token === "string" && /^[a-f0-9]{64}$/i.test(item.token)
+    return typeof item?.token === "string" && /^[a-f0-9]{56}$/i.test(item.token)
       && Number.isFinite(age) && age >= 0 && age <= 120000 ? item.token : null;
   } catch {
     return null;

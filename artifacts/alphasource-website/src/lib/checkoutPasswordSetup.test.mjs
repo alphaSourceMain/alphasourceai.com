@@ -40,11 +40,11 @@ test('storage restrictions fail safely without blocking checkout or minting a ca
   Object.defineProperty(c.window, 'sessionStorage', { get() { throw Error('storage denied'); } });
   assert.doesNotThrow(() => c.rememberCheckoutSetupProof('cs_test_synthetic', 'synthetic-secret-token-01234567890123456789'));
   assert.equal(c.consumeCheckoutSetupProof('cs_test_synthetic'), null);
-  assert.equal(c.checkoutPasswordSetupHref(true, { status: 'password_required', password_setup_token_hash: 'a'.repeat(64) }), null);
+  assert.equal(c.checkoutPasswordSetupHref(true, { status: 'password_required', password_setup_token_hash: 'a'.repeat(56) }), null);
 });
 
 test('recovery capability is handed to the existing form in tab storage, never a URL, and consumed once', () => {
-  const c = setup(), hash = 'a'.repeat(64);
+  const c = setup(), hash = 'a'.repeat(56);
   const href = c.checkoutPasswordSetupHref(true, { status: 'password_required', password_setup_token_hash: hash, action_link: 'https://evil.invalid' });
   assert.equal(href, '/pwreset?origin=client');assert.equal(href.includes(hash), false);
   assert.equal(c.consumeCheckoutPasswordToken(), hash);assert.equal(c.values.size, 0);
@@ -52,4 +52,15 @@ test('recovery capability is handed to the existing form in tab storage, never a
   c.checkoutPasswordSetupHref(true, { status: 'password_required', password_setup_token_hash: hash });
   const [key, raw] = [...c.values][0], item = JSON.parse(raw);item.savedAt = Date.now() - 120001;
   c.values.set(key, JSON.stringify(item));assert.equal(c.consumeCheckoutPasswordToken(), null);
+});
+
+test('Supabase SHA-224 recovery hashes are accepted; wrong-length or non-hex capabilities are refused', () => {
+  const c=setup();
+  for (const hash of ['a'.repeat(55), 'a'.repeat(57), 'a'.repeat(64), 'g'.repeat(56), 'https://example.invalid']) {
+    assert.equal(c.checkoutPasswordSetupHref(true, {status:'password_required',password_setup_token_hash:hash}),null);
+    assert.equal(c.values.size,0);
+  }
+  c.checkoutPasswordSetupHref(true,{status:'password_required',password_setup_token_hash:'a'.repeat(56)});
+  const [key,raw]=[...c.values][0];const item=JSON.parse(raw);item.token='a'.repeat(64);c.values.set(key,JSON.stringify(item));
+  assert.equal(c.consumeCheckoutPasswordToken(),null);assert.equal(c.values.size,0);
 });

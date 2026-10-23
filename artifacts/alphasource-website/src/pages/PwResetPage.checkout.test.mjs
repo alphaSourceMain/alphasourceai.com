@@ -32,7 +32,7 @@ function pageCase({ direct = true, hash = '', authError = false } = {}) {
       localStorage: { setItem() {}, getItem: () => 'admin' } },
     require(name) { if (name === 'react') return hooks;
       if (name === '@/lib/supabaseClient') return { supabase: { auth } };
-      if (name === '@/lib/checkoutPasswordSetup') return { consumeCheckoutPasswordToken: () => { reads++;return direct ? 'a'.repeat(64) : null; } };
+      if (name === '@/lib/checkoutPasswordSetup') return { consumeCheckoutPasswordToken: () => { reads++;return direct ? 'a'.repeat(56) : null; } };
       throw Error('Unexpected module ' + name);
     },
   });
