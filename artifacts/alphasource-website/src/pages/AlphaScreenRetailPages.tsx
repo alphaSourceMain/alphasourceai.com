@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { PUBLIC_CONTENT_LAST_UPDATED } from "@/lib/publicContent";
+import { useRetailSales } from "@/context/RetailSalesContext";
 import PatentPendingBadge from "@/components/PatentPendingBadge";
 import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 
@@ -45,8 +46,8 @@ const alphaScreenLinks = [
 const pricing = {
   basic: {
     name: "Essential",
-    monthly: 299,
-    annual: 3299,
+    monthly: 349,
+    annual: 3300,
     role: 399,
     included: 20,
     cap: 10,
@@ -54,8 +55,8 @@ const pricing = {
   },
   pro: {
     name: "Pro",
-    monthly: 599,
-    annual: 6499,
+    monthly: 649,
+    annual: 6500,
     role: 699,
     included: 30,
     cap: 12,
@@ -476,6 +477,7 @@ export function AlphaScreenDentalGroupsPage() {
 }
 
 export function AlphaScreenRoiPage() {
+  const { enabled: retailEnabled, ready: retailPolicyReady } = useRetailSales();
   const [roles, setRoles] = useState(4);
   const [candidatesPerRole, setCandidatesPerRole] = useState(25);
   const [minutesPerScreen, setMinutesPerScreen] = useState(60);
@@ -508,7 +510,9 @@ export function AlphaScreenRoiPage() {
       totalCost,
       net: value - totalCost,
     };
-  }, [cadence, candidatesPerRole, hourlyCost, membership, minutesPerScreen, roles]);
+  }, [cadence, candidatesPerRole, hourlyCost, membership, minutesPerScreen, roles, retailEnabled]);
+
+  if (!retailPolicyReady) return <div className="b1-page-section mx-auto max-w-7xl px-6 py-32"><h1 className="text-3xl font-black">alphaScreen value estimator</h1><p role="status" className="mt-4">Review the pricing page or contact sales for current membership pricing and availability.</p></div>;
 
   const numericInputs: Array<{ label: string; value: number; setValue: (value: number) => void }> = [
     { label: "Roles opened per month", value: roles, setValue: setRoles },
@@ -596,6 +600,7 @@ export function AlphaScreenRoiPage() {
 
                 <div className="mt-auto rounded-lg border border-[#0A1547]/10 bg-white p-4">
                   <p className="text-sm font-black text-[#0A1547]">{estimate.selected.name} membership assumptions</p>
+                  {!retailEnabled && <p className="mt-2 text-xs font-semibold text-[#0A1547]/60">12-month commitment, paid monthly or annually. Request a demo or contact sales. Existing accepted terms stay unchanged.</p>}
                   <p className="mt-2 text-sm leading-relaxed text-[#0A1547]/60">
                     Includes {estimate.selected.included} interviews per role, {estimate.selected.cap}-minute interview cap, {formatUsd(estimate.selected.role)} per role, and {formatUsd(estimate.selected.additional)} per additional interview.
                   </p>

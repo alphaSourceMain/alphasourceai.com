@@ -9,7 +9,8 @@ const page=read("src/pages/AlphaScreenPricingPage.tsx"), css=read("src/b1-site.c
 test("one static pricing band replaces redundant hero and section header",()=>{
  assert.equal((page.match(/<h1\b/g)||[]).length,1);
  assert.match(page,/<h1 id="pricing-title">Choose the membership that fits your <span className="pr-gt">hiring needs\.<\/span><\/h1>/);
- assert.match(page,/<p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support\.<\/p>/);
+ assert.match(page,/Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support\./);
+ assert.match(page,/Compare 12-month Essential or Pro memberships, paid monthly or annually/);
  assert.match(page,/<AlphaScreenLockup treatment="teal" wordmarkTone="white"/);
  assert.match(page,/markClassName="h-10 w-10" wordmarkClassName="text-\[42px\]"/);
  assert.match(page,/pr-band__meta.*b1-patent-text b1-patent-on-dark">Patent Pending/);
@@ -19,7 +20,7 @@ test("one static pricing band replaces redundant hero and section header",()=>{
  assert.ok(page.indexOf('className="pr-dock"')<page.indexOf('id="packages"'));
  assert.equal((page.match(/setCardCommitmentMonths\(months\)/g)||[]).length,1);
  assert.match(page,/aria-pressed=\{cardCommitmentMonths === months\}/);
- assert.match(page,/commitmentMonths=\{cardCommitmentMonths\}/);
+ assert.match(page,/commitmentMonths=\{retailEnabled \? cardCommitmentMonths : 12\}/);
 });
 test("dock keeps focus, light active palette and structural centering under reduced motion",()=>{
  assert.match(css,/\.pr-dock button:focus-visible \{ outline-color: #087565 !important/);

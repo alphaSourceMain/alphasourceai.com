@@ -12,7 +12,7 @@ const supportContactPath = path.join(projectRoot, "src", "lib", "support-contact
 
 const SITE_URL = "https://www.alphasourceai.com";
 const compiledContent = await build({
-  entryPoints: [path.join(projectRoot, "src/lib/publicContent.ts")],
+  stdin: { contents: 'export * from "./src/lib/publicContent.ts"; export {neutralRetailContent} from "./src/content/retailSalesContent.ts";', resolveDir: projectRoot, loader: "ts" },
   absWorkingDir: projectRoot,
   alias: { "@": path.join(projectRoot, "src") },
   bundle: true, format: "esm", platform: "node", target: "node20", write: false,
@@ -537,7 +537,8 @@ if (!fs.existsSync(indexPath)) {
 const baseHtml = fs.readFileSync(indexPath, "utf8");
 
 for (const route of publicRoutes) {
-  const content = routeContent[route];
+  const content = ["/privacy/", "/terms/", "/sales-sms-consent"].includes(route)
+    ? routeContent[route] : publicContent.neutralRetailContent(routeContent[route]);
   if (!content) throw new Error(`Missing prerender content for ${route}`);
   writeRoute(route, renderRouteHtml(baseHtml, route, content));
 }

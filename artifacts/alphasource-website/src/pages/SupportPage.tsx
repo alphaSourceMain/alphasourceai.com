@@ -7,10 +7,11 @@ import {
 } from "@/components/ui/accordion";
 import {
   PUBLIC_CONTENT_LAST_UPDATED,
-  publicProductUpdates,
-  publicSupportQuestions,
-  publicSupportTopics,
+  publicProductUpdates as originalProductUpdates,
+  publicSupportQuestions as originalSupportQuestions,
+  publicSupportTopics as originalSupportTopics,
 } from "@/lib/publicContent";
+import { useRetailContent } from "@/hooks/useRetailContent";
 import {
   AI_SUPPORT_PHONE_DISPLAY,
   AI_SUPPORT_PHONE_LABEL,
@@ -36,6 +37,9 @@ const supportLinks = [
 ];
 
 export default function SupportPage() {
+  const publicProductUpdates = useRetailContent(originalProductUpdates);
+  const publicSupportQuestions = useRetailContent(originalSupportQuestions);
+  const publicSupportTopics = useRetailContent(originalSupportTopics);
   return (
     <div className="min-h-screen bg-[#F8F9FD]">
       <section className="b1-inner-dark-hero relative overflow-hidden pt-32 pb-16">

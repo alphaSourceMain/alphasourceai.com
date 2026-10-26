@@ -6,8 +6,9 @@ import {
   dataPracticeSections,
   faqSections as supportFaqSections,
   guidanceCards,
-  productUpdates,
+  productUpdates as originalProductUpdates,
 } from "@/content/dashboardSupportContent";
+import { useRetailContent } from "@/hooks/useRetailContent";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 import { Link } from "wouter";
 import { AI_SUPPORT_PHONE_DISPLAY, AI_SUPPORT_PHONE_URI } from "@/lib/supportContact";
@@ -33,13 +34,15 @@ const primaryTextStyle = { color: "var(--as-text)" };
 const mutedTextStyle = { color: "var(--as-text)", opacity: 0.65 };
 const subtleTextStyle = { color: "var(--as-text-subtle)" };
 
-const faqSections = supportFaqSections.map((section) => (
+const originalFaqSections = supportFaqSections.map((section) => (
   section.title === "Interview types, membership, and warm-up"
     ? { ...section, items: [...RUBRIC_FAQ] }
     : section
 ));
 
 export default function DashboardFaqPage() {
+  const faqSections = useRetailContent(originalFaqSections);
+  const productUpdates = useRetailContent(originalProductUpdates);
   const { selectedClient } = useClient();
   const { currentUser } = useAuth();
   const isDemo = selectedClient.is_sales_demo === true || Boolean(currentUser?.app_metadata?.sales_demo_client_id);

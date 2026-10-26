@@ -85,6 +85,7 @@ import DemoManagerRoute from "@/components/SalesDemoManagerPage";
 
 /* Admin dashboard */
 import AdminOverviewPage from "@/pages/admin/AdminOverviewPage";
+import { RetailSalesProvider } from "@/context/RetailSalesContext";
 import AdminClientsPage from "@/pages/admin/AdminClientsPage";
 import AdminMetricsPage from "@/pages/admin/AdminMetricsPage";
 import AdminInterviewReliabilityPage from "@/pages/admin/AdminInterviewReliabilityPage";
@@ -717,7 +718,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <TrackingConsentProvider>
             <AuthProvider>
-              <Router />
+              <RetailSalesProvider><Router /></RetailSalesProvider>
               <GuardedPricingDevBanner />
             </AuthProvider>
           </TrackingConsentProvider>

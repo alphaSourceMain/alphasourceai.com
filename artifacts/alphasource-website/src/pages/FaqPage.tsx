@@ -5,7 +5,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { PUBLIC_CONTENT_LAST_UPDATED, publicFaqItems, publicFaqSections } from "@/lib/publicContent";
+import { PUBLIC_CONTENT_LAST_UPDATED, publicFaqItems, publicFaqSections as originalFaqSections } from "@/lib/publicContent";
+import { useRetailContent } from "@/hooks/useRetailContent";
 
 const EASE_OUT = "easeOut" as const;
 
@@ -29,6 +30,7 @@ const resourceLinks = [
 ];
 
 export default function FaqPage() {
+  const publicFaqSections = useRetailContent(originalFaqSections);
   return (
     <div className="min-h-screen bg-[#F8F9FD]">
       <section className="b1-inner-dark-hero relative overflow-hidden pt-32 pb-16">

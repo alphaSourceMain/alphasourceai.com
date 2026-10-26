@@ -756,9 +756,18 @@
 .b1-public-scope .b1-pricing-page #packages { background: var(--as-page); padding-top: 64px; }
 .b1-public-scope .b1-price-card { border-radius: 24px; padding: 30px; box-shadow: none !important; }
 .b1-public-scope .b1-price-card > p { min-height: 48px; }
+html .b1-public-scope .b1-pricing-page .pr-dock div[aria-label="Payment frequency"] { background: #f8f9fd !important; }
+html .b1-public-scope .b1-pricing-page .pr-dock [aria-label="Payment frequency"] button { background: transparent !important; color: #4a5373 !important; }
+html .b1-public-scope .b1-pricing-page .pr-dock [aria-label="Payment frequency"] button[aria-pressed="true"] { background: #0a1547 !important; color: #fff !important; }
 .b1-public-scope .b1-price-card > div:first-child { min-height: 80px; }
 .b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(button) { background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat, linear-gradient(120deg,#19e3b1,#18b4f0) !important; color: #050a1f !important; box-shadow: none !important; }
 .b1-public-scope .b1-price-card [data-analytics-placement="pricing-card"]:is(a) { color: var(--as-text) !important; }
+.b1-public-scope .b1-price-card a.b1-mesh-button[data-analytics-placement="pricing-card"],
+.b1-public-scope .b1-price-card a.b1-mesh-button[data-analytics-placement="pricing-card"]:is(:hover,:focus-visible,:active) {
+  background: url(/brand/b1/mesh-btn.svg) center / cover no-repeat, linear-gradient(120deg,#19e3b1,#18b4f0) !important;
+  color: #050a1f !important;
+  box-shadow: none !important;
+}
 .b1-public-scope .b1-price-card :is(p[style*="color"],div[style*="color"]) { color: var(--as-accent) !important; }
 .b1-public-scope .b1-price-enterprise :is(h2,p,span) { color: #f8fafc !important; }
 .b1-public-scope .b1-price-enterprise p:first-child { color: #7ef0d0 !important; }
