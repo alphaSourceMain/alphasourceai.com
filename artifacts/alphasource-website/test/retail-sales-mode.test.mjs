@@ -34,4 +34,6 @@ test('all support surfaces select shared mode; original exports and accepted bil
   const provider=read('src/context/RetailSalesContext.tsx');
   assert.match(provider,/enabled: !query.isError && query.data\?\.enabled === true/);
   assert.match(provider,/cache: "no-store"/);assert.match(provider,/retry: false/);
+  assert.match(provider,/if \(!verifiedPublicCatalog\(body\).catalog\) throw/);
+  assert.match(read('src/pages/AlphaScreenPricingPage.tsx'),/retailEnabled && presentationReady && <button/);
 });

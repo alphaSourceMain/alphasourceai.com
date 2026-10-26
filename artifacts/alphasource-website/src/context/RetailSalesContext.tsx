@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
+import { verifiedPublicCatalog } from "@/lib/publicMembershipQuote";
 
 export type RetailSalesPolicy = { enabled: boolean; version: number; changed_at: string | null };
 export function parseRetailSalesPolicy(value: unknown): RetailSalesPolicy {
@@ -19,7 +20,9 @@ export function RetailSalesProvider({ children }: { children: ReactNode }) {
         headers: { Accept: "application/json" }, cache: "no-store",
       });
       if (!response.ok) throw new Error("Retail sales settings unavailable");
-      return parseRetailSalesPolicy((await response.json()).retail_sales_policy);
+      const body = await response.json();
+      if (!verifiedPublicCatalog(body).catalog) throw new Error("Current membership pricing unavailable");
+      return parseRetailSalesPolicy(body.retail_sales_policy);
     },
     staleTime: 0, refetchInterval: 30_000, refetchOnWindowFocus: true, retry: false,
   });

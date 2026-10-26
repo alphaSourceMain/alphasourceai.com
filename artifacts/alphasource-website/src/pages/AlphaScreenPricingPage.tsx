@@ -701,7 +701,7 @@ function PlanCard({
           {presentationReady && <span className="text-4xl font-black tracking-normal text-[#0A1547]">months</span>}
         </div>
         {cardPricing && verifiedDisplayPrice ? <div className="mt-3 grid gap-1 text-sm font-bold text-[#0A1547]">
-          {!retailEnabled ? <><p className="text-2xl">{membershipMoney(displayCadence === "monthly" ? cardPricing.monthlyPaymentCents! : cardPricing.offer.platform_payment_cents)} {displayCadence === "monthly" ? "monthly" : "annually"}</p><p className="text-xs font-bold text-[#0A1547]/55">12-month commitment · {displayCadence === "monthly" ? "12 monthly payments" : "paid upfront"}</p></> : <><p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
+          {!retailEnabled ? <><p>{membershipMoney(displayCadence === "monthly" ? cardPricing.monthlyPaymentCents! : cardPricing.offer.platform_payment_cents)} {displayCadence === "monthly" ? "monthly" : "annually"}</p><p className="text-xs font-bold text-[#0A1547]/55">12-month commitment · {displayCadence === "monthly" ? "12 monthly payments" : "paid upfront"}</p></> : <><p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
           {cardPricing.monthlyPaymentCents !== null ? <p className="text-xs font-bold text-[#0A1547]/55">
             {membershipMoney(cardPricing.monthlyPaymentCents)} monthly
           </p> : null}</>}
@@ -740,7 +740,7 @@ function PlanCard({
       </div>
 
       <div className="mt-auto grid gap-2 pt-6">
-        {retailEnabled && <button
+        {retailEnabled && presentationReady && <button
           type="button"
           onClick={() => onStart(plan)}
           disabled={!available}
