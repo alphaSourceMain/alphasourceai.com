@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { assetUrl, canonicalUrl, getSeoConfig } from "@/lib/seo";
+import { useRetailSales } from "@/context/RetailSalesContext";
+import { neutralRetailContent, retailContentForMode, withoutOfferMetadata } from "@/content/retailSalesContent";
 
 type SeoProps = {
   location: string;
@@ -55,8 +57,10 @@ function upsertJsonLd(data: unknown) {
 }
 
 export default function Seo({ location }: SeoProps) {
+  const { enabled, ready } = useRetailSales();
   useEffect(() => {
-    const config = getSeoConfig(location);
+    const original = withoutOfferMetadata(getSeoConfig(location));
+    const config = ready ? retailContentForMode(original, enabled) : neutralRetailContent(original);
     const isIndexable = config.robots.startsWith("index");
     const url = isIndexable && config.path ? canonicalUrl(config.path) : null;
     const image = assetUrl(config.imagePath);
@@ -83,7 +87,7 @@ export default function Seo({ location }: SeoProps) {
     }
 
     upsertJsonLd(config.jsonLd || null);
-  }, [location]);
+  }, [location, enabled, ready]);
 
   return null;
 }

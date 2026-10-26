@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { trackEvent } from "@/lib/analytics";
+import { useRetailSales } from "@/context/RetailSalesContext";
 import { AlphaScreenLockup } from "@/components/AlphaScreenBrand";
 import { getPublicBackendBase, joinUrl } from "@/lib/urlConfig";
 import { MembershipTermsSelector } from "@/components/MembershipTermsSelector";
@@ -651,6 +652,9 @@ function PlanCard({
   catalog,
   available,
   commitmentMonths,
+  retailEnabled,
+  displayCadence,
+  presentationReady,
 }: {
   plan: AlphaScreenPackage;
   selected: boolean;
@@ -658,12 +662,16 @@ function PlanCard({
   catalog: MembershipQuoteCatalog | null;
   available: boolean;
   commitmentMonths: 3 | 6 | 12;
+  retailEnabled: boolean;
+  displayCadence: BillingCadenceKey;
+  presentationReady: boolean;
 }) {
   const accent = PLAN_ACCENTS[plan.plan_key] || PLAN_ACCENTS.basic;
   const included = plan.included_interviews_per_role || plan.included_interviews;
   const duration = plan.max_interview_minutes || plan.interview_duration_minutes;
   const overage = plan.additional_interview_fee || plan.additional_interview_price || plan.overage_price;
   const cardPricing = catalog ? membershipCardPricing(catalog, plan.plan_key as "basic" | "pro", commitmentMonths) : null;
+  const verifiedDisplayPrice = presentationReady && cardPricing && (retailEnabled || displayCadence !== "monthly" || cardPricing.monthlyPaymentCents !== null);
 
   return (
     <article
@@ -689,14 +697,14 @@ function PlanCard({
 
       <div className="mb-5 mt-6" style={{ minHeight: 144 }}>
         <div className="flex items-end gap-2">
-          <span className="text-4xl font-black tracking-normal text-[#0A1547]">{commitmentMonths}</span>
-          <span className="text-4xl font-black tracking-normal text-[#0A1547]">months</span>
+          <span className="text-4xl font-black tracking-normal text-[#0A1547]">{presentationReady ? commitmentMonths : "Membership"}</span>
+          {presentationReady && <span className="text-4xl font-black tracking-normal text-[#0A1547]">months</span>}
         </div>
-        {cardPricing ? <div className="mt-3 grid gap-1 text-sm font-bold text-[#0A1547]">
-          <p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
+        {cardPricing && verifiedDisplayPrice ? <div className="mt-3 grid gap-1 text-sm font-bold text-[#0A1547]">
+          {!retailEnabled ? <><p className="text-2xl">{membershipMoney(displayCadence === "monthly" ? cardPricing.monthlyPaymentCents! : cardPricing.offer.platform_payment_cents)} {displayCadence === "monthly" ? "monthly" : "annually"}</p><p className="text-xs font-bold text-[#0A1547]/55">12-month commitment · {displayCadence === "monthly" ? "12 monthly payments" : "paid upfront"}</p></> : <><p>{membershipMoney(cardPricing.offer.platform_payment_cents)} prepay</p>
           {cardPricing.monthlyPaymentCents !== null ? <p className="text-xs font-bold text-[#0A1547]/55">
             {membershipMoney(cardPricing.monthlyPaymentCents)} monthly
-          </p> : null}
+          </p> : null}</>}
         </div> : <p className="mt-3 text-sm font-bold text-[#0A1547]/60">Awaiting current pricing</p>}
       </div>
 
@@ -705,7 +713,7 @@ function PlanCard({
           icon={<CheckCircle className="h-4 w-4" />}
           label="Included"
           value={`${included} interviews per role`}
-          detail={catalog ? `Role fee: ${formatUsd(plan.per_role_fee)} per role` : undefined}
+          detail={catalog && presentationReady ? `Role fee: ${formatUsd(plan.per_role_fee)} per role` : undefined}
         />
         <PackageMetric
           icon={<Clock3 className="h-4 w-4" />}
@@ -715,7 +723,7 @@ function PlanCard({
         <PackageMetric
           icon={<BadgeDollarSign className="h-4 w-4" />}
           label="Additional interviews"
-          value={catalog ? `${formatUsd(overage)} per additional interview` : "Awaiting current rate"}
+          value={catalog && presentationReady ? `${formatUsd(overage)} per additional interview` : "Awaiting current rate"}
         />
       </div>
 
@@ -732,7 +740,7 @@ function PlanCard({
       </div>
 
       <div className="mt-auto grid gap-2 pt-6">
-        <button
+        {retailEnabled && <button
           type="button"
           onClick={() => onStart(plan)}
           disabled={!available}
@@ -746,10 +754,10 @@ function PlanCard({
           data-analytics-target="#signup-modal"
         >
           Start {plan.display_name} membership
-        </button>
+        </button>}
         <a
           href="#pricing-demo"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-black text-[#0A1547]/55 transition-colors hover:border-[#A380F6]/35 hover:text-[#A380F6]"
+          className={retailEnabled ? "flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-black text-[#0A1547]/55 transition-colors hover:border-[#A380F6]/35 hover:text-[#A380F6]" : "b1-mesh-button flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black"}
           data-analytics-cta={`Request demo for ${plan.display_name}`}
           data-analytics-placement="pricing-card"
           data-analytics-target="#pricing-demo"
@@ -1508,12 +1516,14 @@ function LoadingNotice({ state }: { state: PackageLoadState }) {
     <div role={isLoading ? "status" : "alert"} className="mb-6 rounded-lg border border-[#0A1547]/10 bg-white px-4 py-3 text-sm font-semibold text-[#0A1547]/65">
       {isLoading
         ? "Loading current alphaScreen membership configuration..."
-        : "Current pricing could not be verified. Memberships are available in 3-, 6-, or 12-month terms. New signup is unavailable until current pricing loads."}
+        : "Current pricing could not be verified. Contact sales to discuss a membership; new signup is unavailable until current pricing loads."}
     </div>
   );
 }
 
 export default function AlphaScreenPricingPage() {
+  const { enabled: retailEnabled, ready: retailPolicyReady } = useRetailSales();
+  const [displayCadence, setDisplayCadence] = useState<BillingCadenceKey>("annual");
   const retailSmsUiEnabled = isRetailSmsUiEnabled(import.meta.env as Record<string, unknown>);
   const [packages, setPackages] = useState<AlphaScreenPackage[]>(FALLBACK_PACKAGES);
   const [loadState, setLoadState] = useState<PackageLoadState>("loading");
@@ -1542,6 +1552,10 @@ export default function AlphaScreenPricingPage() {
   const [emailSendLoading, setEmailSendLoading] = useState(false);
   const [emailVerifyLoading, setEmailVerifyLoading] = useState(false);
   const [verificationChannel, setVerificationChannel] = useState<OtpDeliveryChannel>("email");
+
+  useEffect(() => {
+    if (!retailEnabled && !purchaseResult?.purchase_intent_id) setCheckoutModalOpen(false);
+  }, [retailEnabled, purchaseResult?.purchase_intent_id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1582,6 +1596,7 @@ export default function AlphaScreenPricingPage() {
   const smsVerificationAvailable = !isGuardedPricingDev && retailSmsUiEnabled && purchaseResult?.sms_verification?.available === true;
 
   const startPurchase = (plan: AlphaScreenPackage) => {
+    if (!retailEnabled) return;
     if (purchaseSubmitInFlightRef.current) return;
     // A saved intent is commercial continuity, not a fresh quote. Closing/back
     // navigation cannot clear it and sell today's cheaper catalog behind it.
@@ -1816,6 +1831,10 @@ export default function AlphaScreenPricingPage() {
 
   const handlePurchaseSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!retailEnabled && !purchaseResult?.purchase_intent_id) {
+      setPurchaseError("Online signup is currently unavailable. Request a demo or contact sales.");
+      return;
+    }
     if (purchaseSubmitInFlightRef.current) return;
     // Resume the existing record without rebuilding its commercial key, even
     // when today's catalog is down, repriced, or a different cohort is enabled.
@@ -2181,12 +2200,12 @@ export default function AlphaScreenPricingPage() {
               markClassName="h-10 w-10" wordmarkClassName="text-[42px]" />
           </div>
           <h1 id="pricing-title">Choose the membership that fits your <span className="pr-gt">hiring needs.</span></h1>
-          <p className="pr-band__sub">Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support.</p>
+          <p className="pr-band__sub">{!retailPolicyReady ? "Compare memberships, request a demo, or contact sales for current pricing and availability." : retailEnabled ? "Select Essential or Pro to start membership signup, or choose Enterprise for custom volume and rollout support." : "Compare 12-month Essential or Pro memberships, paid monthly or annually. Request a demo, or choose Enterprise for custom volume and rollout support."}</p>
           <div className="pr-band__meta"><span className="b1-patent-text b1-patent-on-dark">Patent Pending</span></div>
         </div>
         <div className="pr-dock" role="group" aria-label="Billing term">
           <span className="pr-dock__label">Billing term</span>
-            <div role="group" aria-label="Membership length" className="flex rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
+            {!retailPolicyReady ? <span className="px-4 py-2 text-sm font-bold" role="status">Loading membership options…</span> : retailEnabled ? <div role="group" aria-label="Membership length" className="flex rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">
               {([3, 6, 12] as const).map(months => <button key={months} type="button"
                 aria-pressed={cardCommitmentMonths === months}
                 onClick={() => setCardCommitmentMonths(months)}
@@ -2194,7 +2213,7 @@ export default function AlphaScreenPricingPage() {
                 className={`rounded-md px-4 py-2 text-sm font-black transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A380F6] ${
                   cardCommitmentMonths === months ? "bg-[#0A1547] text-white" : "text-[#0A1547]/65 hover:text-[#A380F6]"
                 }`}>{months} months</button>)}
-            </div>
+            </div> : <div role="group" aria-label="Payment frequency" className="flex rounded-lg border border-[#0A1547]/10 bg-[#F8F9FD] p-1">{(["monthly", "annual"] as const).map(cadence => <button key={cadence} type="button" aria-pressed={displayCadence === cadence} onClick={() => setDisplayCadence(cadence)} className={`rounded-md px-4 py-2 text-sm font-black transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A380F6] ${displayCadence === cadence ? "bg-[#0A1547] text-white" : "text-[#0A1547]/65 hover:text-[#A380F6]"}`}>{cadence === "monthly" ? "Monthly" : "Annual"}</button>)}</div>}
         </div>
       </section>
 
@@ -2210,7 +2229,10 @@ export default function AlphaScreenPricingPage() {
                 onStart={startPurchase}
                 catalog={retailCatalog}
                 available={Boolean(purchaseResult?.purchase_intent_id) || loadState === "ready"}
-                commitmentMonths={cardCommitmentMonths}
+                commitmentMonths={retailEnabled ? cardCommitmentMonths : 12}
+                retailEnabled={retailEnabled}
+                displayCadence={displayCadence}
+                presentationReady={retailPolicyReady && loadState === "ready"}
               />
             ))}
             <EnterpriseCard />
@@ -2301,15 +2323,15 @@ export default function AlphaScreenPricingPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid gap-8">
             <div className="max-w-3xl">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">Signup workflow</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">What happens next after signup starts</h2>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#A380F6]">{retailEnabled ? "Signup workflow" : "Getting started"}</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#0A1547]">{retailEnabled ? "What happens next after signup starts" : "What happens after you request a demo"}</h2>
               <p className="mt-4 text-sm leading-relaxed text-[#0A1547]/60">
-                Pick the membership that fits your hiring volume, review terms, complete checkout, and set up access before creating roles and inviting candidates.
+                {retailEnabled ? "Pick the membership that fits your hiring volume, review terms, complete checkout, and set up access before creating roles and inviting candidates." : "Request a demo and discuss the right membership with sales, then review terms, complete payment, and set up access before creating roles and inviting candidates."}
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {[
-                ["1", "Start membership signup", "Select Essential, Pro, or talk to sales for custom terms."],
+                retailEnabled ? ["1", "Start membership signup", "Select Essential, Pro, or talk to sales for custom terms."] : ["1", "Request a demo", "Discuss Essential, Pro, or custom Enterprise terms with sales."],
                 ["2", "Review agreement", "Review and sign your membership agreement."],
                 ["3", "Complete Stripe Checkout", "Continue to secure payment after signing."],
                 ["4", "Set your password", "Finish account setup and access the dashboard."],

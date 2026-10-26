@@ -19,21 +19,22 @@ const {PlanCard,EnterpriseCard}=vm.runInNewContext(js+'\n({PlanCard,EnterpriseCa
  PLAN_ACCENTS:{basic:{color:'#02D99D'},pro:{color:'#A380F6'}},BEST_FOR:{basic:'Essential test',pro:'Pro test'},
  BriefcaseBusiness:icon,Layers3:icon,CheckCircle:icon,Clock3:icon,BadgeDollarSign:icon,ArrowRight:icon,Building2:icon,
 });
-test('initial and unavailable cards always render 3/6/12 terms without unverified legacy dollar amounts',()=>{
+test('initial and unavailable cards are neutral without term counts, prices or signup controls',()=>{
  for(const plan_key of ['basic','pro'])for(const months of [3,6,12]){
   const html=renderToStaticMarkup(React.createElement(PlanCard,{plan:{plan_key,display_name:plan_key==='basic'?'Essential':'Pro',
    platform_monthly_fee:plan_key==='basic'?299:599,platform_annual_fee:3299,per_role_fee:399,
    included_interviews_per_role:20,max_interview_minutes:10,additional_interview_fee:25},
-   selected:false,onStart:()=>{},catalog:null,available:false,commitmentMonths:months}));
-  assert.match(html,new RegExp('>'+months+'</span>'));
-  assert.match(html,/>months<\/span>/);
+   selected:false,onStart:()=>{},catalog:null,available:false,commitmentMonths:months,retailEnabled:false,presentationReady:false,displayCadence:'annual'}));
+  assert.match(html,/>Membership<\/span>/);
+  assert.doesNotMatch(html,/>months<\/span>/);
   assert.match(html,/Awaiting current pricing/);
   assert.doesNotMatch(html,/\$\d|\/mo platform|\/year platform|Annual platform pricing/);
-  assert.match(html,/<button[^>]*disabled=""/);
+  assert.doesNotMatch(html,/Start .* membership/);
+  assert.match(html,/b1-mesh-button/);
  }
  const dock=source.slice(source.indexOf('<div className="pr-dock"'),source.indexOf('<section id="packages"'));
  assert.match(dock,/\(\[3, 6, 12\] as const\)/);
- assert.doesNotMatch(dock,/!retailCatalog|Monthly|Annual|updateSelectedBillingCadence/);
+ assert.match(dock,/aria-label="Payment frequency"/);
 });
 
 let loadDeclaration;
@@ -92,7 +93,7 @@ test('actual card JSX displays exact term prices and a secondary role fee within
  for(const plan_key of ['basic','pro'])for(const months of [3,6,12]){
   const html=renderToStaticMarkup(React.createElement(PlanCard,{plan:{plan_key,display_name:catalog.plans[plan_key].display_name,
    per_role_fee:catalog.plans[plan_key].per_role_fee_cents/100,included_interviews_per_role:20,max_interview_minutes:10,additional_interview_fee:25},
-   selected:false,billingCadence:'monthly',onStart:()=>{},catalog,available:true,commitmentMonths:months}));
+   selected:false,billingCadence:'monthly',onStart:()=>{},catalog,available:true,commitmentMonths:months,retailEnabled:true,presentationReady:true,displayCadence:'annual'}));
   assert.match(html,new RegExp('>'+months+'</span>'));
   assert.ok(html.includes(membershipMoney(months*100000)+' prepay'));
   assert.ok(html.includes(membershipMoney(catalog.monthly_payment_references[plan_key][months])+' monthly'));
@@ -133,7 +134,7 @@ const handlerJs=ts.transpileModule('const startPurchase = '+startInitializer+'; 
 test('actual saved-intent handler resumes without resetting or selecting any current catalog offer',()=>{
  const accepted={purchase_intent_id:'saved-synthetic',selected_package:{offer_version:'historical',platform_fee_cents:195017}};
  const calls=[];
- const handler=vm.runInNewContext(handlerJs,{purchaseSubmitInFlightRef:{current:false},purchaseResult:accepted,
+ const handler=vm.runInNewContext(handlerJs,{retailEnabled:true,purchaseSubmitInFlightRef:{current:false},purchaseResult:accepted,
   setPurchaseStatus:v=>calls.push(['status',v]),setCheckoutModalOpen:v=>calls.push(['open',v])});
  handler({plan_key:'pro'});
  assert.deepEqual(calls,[['status','success'],['open',true]]);
@@ -142,7 +143,7 @@ test('actual saved-intent handler resumes without resetting or selecting any cur
 test('actual new signup handler seeds the selected verified prepaid term, never the monthly reference',()=>{
  for(const plan_key of ['basic','pro'])for(const months of [3,6,12]){
   let selection=null;
-  const context={purchaseSubmitInFlightRef:{current:false},purchaseResult:null,loadState:'ready',
+  const context={retailEnabled:true,purchaseSubmitInFlightRef:{current:false},purchaseResult:null,loadState:'ready',
    selectedBillingCadence:'monthly',retailCatalog:fixture(),cardCommitmentMonths:months,membershipCardPricing,
    planSupportsCadence:()=>false,defaultCadence:()=> 'monthly',purchaseFormStartedRef:{current:true},
    setRetailSelection:v=>selection=v,clearCheckoutRecoveryState:()=>{},trackEvent:()=>{}};

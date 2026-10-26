@@ -5,6 +5,7 @@ import {
   Star, ArrowRight, Download, Plus, AlertCircle,
 } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
+import RetailSalesControl from "@/components/RetailSalesControl";
 import AppearanceSelector from "@/components/AppearanceSelector";
 import { useAdminClient } from "@/context/AdminClientContext";
 import { getInterviewTypeLabel, type InterviewTypeLabel } from "@/lib/interviewContract";
@@ -629,6 +630,7 @@ export default function AdminOverviewPage() {
         </div>
       </div>
 
+      <RetailSalesControl />
       {overviewError && (
         <div
           className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold"
