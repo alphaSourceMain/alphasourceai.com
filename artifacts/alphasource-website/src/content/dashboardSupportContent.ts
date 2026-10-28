@@ -1,7 +1,7 @@
 import { capacityFaq, membershipFaqs, membershipUpdates, firstRolePrepayAnswer, deviceCheckFaq, launchRecoveryFaq, microphoneRecoveryFaq, scoringFaqs, interviewStatusFaq, septemberUpdates } from "@/content/supportGuidance";
 import { RUBRIC_FAQ } from "@/content/rubricGuidance";
 
-export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-10-23.1";
+export const DASHBOARD_SUPPORT_KNOWLEDGE_VERSION = "2026-10-28.1";
 
 export const faqSections = [
   {

@@ -92,7 +92,7 @@ export const buyerVerificationFaq = {
 export const scoringFaqs = [
   {
     question: "How is the Interview Score calculated?",
-    answer: "Each scorable question is evaluated against the role's requirements, competency, expected evidence, and role-specific rubric. Question rating bands are Weak 0–39, Adequate 40–59, Strong 60–79, and Exceptional 80–100. The Interview Score is the rounded average of scorable question scores. These bands describe answer evidence, not automatic hiring decisions. Review the actual answers and role context alongside the score.",
+    answer: "Each scorable answer is evaluated against the saved role rubric and realistic job requirements. Reports labeled with the 80/20 formula use 80% of the role-answer average plus 20% of transcript answer quality: specificity, directness, consistency, and communication structure. Both averages keep full precision; the final score is rounded once. Bands are Below baseline under 60, Adequate 60–74, Strong 75–89, and Exceptional 90–100. Older reports without that formula retain the rounded question average and legacy bands: Weak 0–39, Adequate 40–59, Strong 60–79, Exceptional 80–100. Scores support human review, not automatic hiring decisions.",
   },
   {
     question: "How do Resume, Interview, and Overall scores differ?",
@@ -104,7 +104,7 @@ export const scoringFaqs = [
   },
   {
     question: "What do confidence, risk, and supporting analysis mean?",
-    answer: "Confidence means evidence strength supporting the evaluation, not the candidate's personal confidence. Communication, specificity, consistency, and evaluation-condition signals add context; they are not separate components averaged into the Interview Score. AI-aided and integrity risk indicators are review prompts, not proof of misconduct. Non-verbal signals are secondary supporting evidence, not a stand-alone hiring assessment.",
+    answer: "Evidence strength describes support for the evaluation, not personal confidence. On 80/20 reports, the four transcript answer-quality dimensions contribute 20% as shown. Clarity, confidence, engagement, emotion, and evaluation conditions are separate observations and do not enter that formula. AI-aided and integrity risk indicators are review prompts, not proof of misconduct or scoring deductions. Older reports retain their original scoring policy.",
   },
 ];
 

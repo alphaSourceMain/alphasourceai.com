@@ -1,3 +1,4 @@
+import { normalizeScoringSummary, qualityAnalysisForDisplay } from '../../lib/interviewQuality.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
@@ -82,6 +83,7 @@ interface Candidate {
   interviewSubs: SubScore[];
   interviewSummary: string;
   interviewAnalysisV2?: InterviewAnalysisV2 | null;
+  scoringSummary?: ReturnType<typeof normalizeScoringSummary>;
   unanswered: string;
   reliability: number | null;
   reliabilityState?: "available" | "unavailable" | "not_applicable";
@@ -403,7 +405,8 @@ export function mapRowToCandidate(item: Record<string, unknown>, index: number):
   const transcriptScores = item.transcript_scores && typeof item.transcript_scores === "object"
     ? (item.transcript_scores as Record<string, unknown>)
     : {};
-  const interviewAnalysisV2 = normalizeInterviewAnalysisV2(item.interview_analysis_v2);
+  const scoringSummary = normalizeScoringSummary(item.scoring_summary);
+  const interviewAnalysisV2 = normalizeInterviewAnalysisV2(qualityAnalysisForDisplay(item.interview_analysis_v2, scoringSummary));
 
   const resumeScore = toScoreOrNull(item.resume_score);
   const interviewScore = toScoreOrNull(item.interview_score);
@@ -495,6 +498,7 @@ export function mapRowToCandidate(item: Record<string, unknown>, index: number):
     interviewSummary: hasInterview
       ? (interviewSummaryRaw || "No interview summary available yet.")
       : "Interview not yet completed.",
+    scoringSummary: hasInterview ? scoringSummary : null,
     interviewAnalysisV2: hasInterview && hasUsableInterviewAnalysisV2(interviewAnalysisV2) ? interviewAnalysisV2 : null,
     unanswered: hasInterview
       ? (unansweredQuestions.length ? unansweredQuestions.join("\n") : "No unanswered questions captured.")
@@ -952,6 +956,12 @@ function ExpandedPanel({
         <p className="text-xs font-semibold text-red-500 -mt-2 mb-4">{actionError}</p>
       )}
 
+      {c.scoringSummary && (
+        <p className="mb-4 text-xs leading-relaxed" style={mutedTextStyle}>
+          Interview score: 80% role answers ({c.scoringSummary.role_answers.toFixed(1)}/100) + 20% answer quality ({c.scoringSummary.answer_quality.toFixed(1)}/100), rounded once.
+          {" "}Delivery signals are separate. Bands: below baseline under 60, adequate 60–74, strong 75–89, exceptional 90–100.
+        </p>
+      )}
       {/* 2×2 analysis grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {/* Resume Analysis */}
