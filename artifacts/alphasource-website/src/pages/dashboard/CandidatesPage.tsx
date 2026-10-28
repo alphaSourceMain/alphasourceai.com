@@ -406,7 +406,7 @@ export function mapRowToCandidate(item: Record<string, unknown>, index: number):
     ? (item.transcript_scores as Record<string, unknown>)
     : {};
   const scoringSummary = normalizeScoringSummary(item.scoring_summary);
-  const interviewAnalysisV2 = normalizeInterviewAnalysisV2(qualityAnalysisForDisplay(item.interview_analysis_v2, scoringSummary));
+  const interviewAnalysisV2 = normalizeInterviewAnalysisV2(qualityAnalysisForDisplay(item.interview_analysis_v2, scoringSummary, item.interview_quality_version));
 
   const resumeScore = toScoreOrNull(item.resume_score);
   const interviewScore = toScoreOrNull(item.interview_score);
@@ -881,7 +881,7 @@ function ExpandedPanel({
     {
       label: "Signal Confidence",
       value: advancedConditions.signal_confidence,
-      tooltip: "Confidence in this analysis based on available transcript and perception evidence",
+      tooltip: c.scoringSummary ? "Confidence in this supporting analysis based on transcript content; separate from the Interview Score" : "Confidence in this analysis based on available transcript and perception evidence",
     },
     {
       label: "Audio Quality Issues",
@@ -891,7 +891,7 @@ function ExpandedPanel({
     {
       label: "Distraction Risk",
       value: advancedConditions.distraction_risk,
-      tooltip: "Transcript/perception-based signs that focus may have been interrupted, without visual-trait assumptions",
+      tooltip: c.scoringSummary ? "Transcript content or process limitations; no emotion or visual-trait inference and no scoring deduction" : "Transcript/perception-based signs that focus may have been interrupted, without visual-trait assumptions",
     },
     {
       label: "Integrity Risk",

@@ -9,8 +9,8 @@ export function normalizeScoringSummary(value) {
   if (Math.abs(value.role_answers-roleTotal/count)>1e-8 || value.answer_quality!==qualityTotal/4 || value.overall!==Math.round((roleTotal*80*4+qualityTotal*20*count)/(100*count*4))) return null;
   return { version: 'role_quality_v3', role_answers: value.role_answers, answer_quality: value.answer_quality, overall: value.overall, answer_quality_scores: quality };
 }
-export function qualityAnalysisForDisplay(value, summary) {
-  if (!summary) return value;
+export function qualityAnalysisForDisplay(value, summary, version) {
+  if (!summary) return version === 'role_quality_v3' ? null : value;
   const current = value?.version === 'path_a_v1_role_quality_v3' ? value : {};
   return { ...current, scores: { ...summary.answer_quality_scores } };
 }

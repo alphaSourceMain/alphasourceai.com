@@ -15,3 +15,5 @@ test('stale analysis evidence is hidden; authoritative four values stay visible'
  assert.equal(qualityAnalysisForDisplay({version:'path_a_v1_role_quality_v3',evidence:['current']},safe).evidence[0],'current');
  const legacy={version:'path_a_v1'}; assert.equal(qualityAnalysisForDisplay(legacy,null),legacy);
 });
+
+test('no-score v3 cannot display legacy independently generated quality scores',()=>{ assert.equal(qualityAnalysisForDisplay({scores:{response_specificity:90}},null,'role_quality_v3'),null); });
